@@ -472,7 +472,11 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
           const ledger = store.snapshot()
           const excludeDone = url.searchParams.get('excludeDone') === 'true' || url.searchParams.get('excludeDone') === '1'
           const doneCount = ledger.tasks.filter(t => t.status === 'done' && t.trashedAt === undefined).length
-          const tasks = excludeDone ? ledger.tasks.filter(t => t.status !== 'done') : ledger.tasks
+          const dependencyIndex = new Map(ledger.tasks.map(t => [t.id, t]))
+          const visible = excludeDone ? ledger.tasks.filter(t => t.status !== 'done') : ledger.tasks
+          const tasks = visible.map(t => t.dependsOn?.length
+            ? { ...t, dependencyProgress: dependencyState(t, ledger.tasks, dependencyIndex) }
+            : t)
           json(res, {
             ok: true,
             value: {
