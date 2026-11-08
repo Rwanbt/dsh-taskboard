@@ -91,6 +91,8 @@ export type CreateTaskBody = {
   permission?: string
   /** Acceptance checklist item texts (host mints ids, all unchecked). */
   checklist?: string[]
+  /** Optional prerequisite IDs, validated atomically by the host. */
+  dependsOn?: string[]
 }
 
 /** Update-task request body (ifVersion mandatory). */
@@ -122,6 +124,8 @@ export type UpdateTaskBody = {
   permission?: string | null
   /** Replace the whole checklist (GUI owner surface); null clears it. */
   checklist?: unknown
+  /** Replace all prerequisites; [] clears. */
+  dependsOn?: string[]
 }
 
 /** Move-task request body (ifVersion mandatory; the user MAY move to done). */
