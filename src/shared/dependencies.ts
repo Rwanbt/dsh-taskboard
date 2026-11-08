@@ -35,8 +35,9 @@ export interface DependencyState {
 export function dependencyState(
   task: Pick<DependencyTask, 'dependsOn'>,
   tasks: readonly DependencyTask[],
+  index?: ReadonlyMap<string, DependencyTask>,
 ): DependencyState {
-  const byId = new Map(tasks.map(t => [t.id, t]))
+  const byId = index ?? new Map(tasks.map(t => [t.id, t]))
   const ids = task.dependsOn ?? []
   const pendingIds: string[] = []
   const missingIds: string[] = []
