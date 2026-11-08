@@ -858,6 +858,8 @@ export type TaskRecord = {
   status: TaskStatus
   /** Horizontal marker: work cannot continue right now (any non-terminal status). */
   blocked: boolean
+  /** Optional same-workspace prerequisite task IDs. All must reach human-approved done before starting. */
+  dependsOn?: string[]
   /** Omitted = infer; true = explicit human wait; false = suppress inference. */
   waitingForHuman?: boolean
   /** Explanation only; never put credentials or secret values here. */
@@ -976,6 +978,7 @@ export function spawnNextCycle(source: TaskRecord, prevExecutionId: string | und
     urgency: source.urgency,
     status: 'todo',
     blocked: false,
+    ...(source.dependsOn !== undefined ? { dependsOn: [...source.dependsOn] } : {}),
     execution: { mode: 'scheduled', cron, nextRunAt: next, periodicCompletion: source.execution.periodicCompletion ?? DEFAULT_PERIODIC_COMPLETION,
       ...(source.execution.reuseSessionId !== undefined ? { reuseSessionId: source.execution.reuseSessionId } : {}),
       ...(source.execution.sessionReuseMode !== undefined ? { sessionReuseMode: source.execution.sessionReuseMode } : {}),
@@ -1710,6 +1713,10 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
       urgency: asUrgency(strOr(e, 'urgency', 'normal')),
       status,
       blocked: e.blocked === true,
+      ...(Array.isArray(e.dependsOn) && e.dependsOn.length <= 32
+        && e.dependsOn.every((id: unknown) => typeof id === 'string' && isValidTaskId(id))
+        ? { dependsOn: [...e.dependsOn] as string[] }
+        : {}),
       execution,
       ...(typeof e.model === 'object' && e.model !== null ? { model: normalizeModel(e.model) } : {}),
       ...(typeof e.isolation === 'string' && (e.isolation === 'worktree' || e.isolation === 'none') ? { isolation: e.isolation } : {}),
@@ -1806,6 +1813,7 @@ export type TaskSummary = {
   urgency: Urgency
   status: TaskStatus
   blocked: boolean
+  dependsOn?: string[]
   waitingForHuman?: boolean
   waitingReason?: string
   executionMode: ExecutionMode
@@ -1835,6 +1843,7 @@ export function summarize(task: TaskRecord): TaskSummary {
     urgency: task.urgency,
     status: task.status,
     blocked: task.blocked,
+    ...(task.dependsOn?.length ? { dependsOn: [...task.dependsOn] } : {}),
     ...(typeof task.waitingForHuman === 'boolean' ? { waitingForHuman: task.waitingForHuman } : {}),
     ...(task.waitingForHuman === true && task.waitingReason ? { waitingReason: task.waitingReason } : {}),
     executionMode: task.execution.mode,
