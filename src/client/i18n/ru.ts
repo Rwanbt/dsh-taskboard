@@ -8,6 +8,14 @@
 import type { TaskboardDict } from './zh.ts'
 
 export const ru: TaskboardDict = {
+  'dependency.title': 'Зависимости',
+  'dependency.progress': 'Готово {done}/{total}',
+  'dependency.waiting': 'Ожидается задач: {count}',
+  'dependency.empty': 'Нет зависимостей',
+  'dependency.add': 'Добавить зависимость',
+  'dependency.remove': 'Удалить',
+  'dependency.placeholder': 'ID задачи (например t-...)',
+  'dependency.notice': 'Все необходимые задачи должны быть подтверждены человеком',
 
   'ext.requestInterval': 'Минимальный интервал запросов (миллисекунды, 0 — выкл., максимум 10000)',
   'ext.removeMapping': 'Удалить привязку проекта {n}',
