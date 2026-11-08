@@ -1442,6 +1442,9 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               }
               replacedTotal = ledger.tasks.length
               ledger.tasks = structuredClone(imported)
+              for (const item of ledger.tasks) {
+                if (item.dependsOn?.length) validateDependencies(item, item.dependsOn, ledger.tasks)
+              }
               if (plan.externalSync !== undefined) ledger.externalSync = structuredClone(plan.externalSync)
               else delete ledger.externalSync
               // Replace is a whole-ledger swap (0.5.0): board settings ride
@@ -1469,6 +1472,11 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               byId.set(task.id, structuredClone(task))
             }
             ledger.tasks = [...byId.values()]
+            for (const incoming of imported) {
+              const current = byId.get(incoming.id)!
+              if (current.dependsOn?.length) validateDependencies(current, current.dependsOn, ledger.tasks)
+              validateWorkspaceLinks(current, ledger.tasks)
+            }
             return structuredClone(imported)
           })
           json(res, {
