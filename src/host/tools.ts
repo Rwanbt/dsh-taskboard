@@ -1,6 +1,7 @@
 import type { SessionArchiveResult } from '../shared/api.ts'
 import { archiveTaskSessions } from './archive-sessions.ts'
 import { applyHumanWaitingPatch, humanWaiting } from '../shared/human-wait.ts'
+import { dependencyState, validateDependencies } from '../shared/dependencies.ts'
 /**
  * The ten `taskboard_*` agent tools. All writes require a calling agent
  * session (ownership audit), carry optimistic-version checks, and enforce
@@ -577,6 +578,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
         description: `Acceptance checklist (DoD) item texts (≤${MAX_CHECKLIST_ITEMS} × 200 chars); agents check them off at handoff, the user reviews.`,
         items: { type: 'string' },
       },
+      dependsOn: { type: 'array', items: { type: 'string' }, description: 'Task IDs that must be human-approved done before this task can start. Same workspace, acyclic.' },
     },
     output: {
       schema: JSON_OUT,
@@ -600,6 +602,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       permission?: string
       presetId?: string
       checklist?: string[]
+      dependsOn?: string[]
     }, exec: unknown) {
       try {
         const { actor } = caller(exec as ToolRunContext)
@@ -657,6 +660,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           executions: [],
         }
         await store.mutate('task-created', ledger => {
+          if (args.dependsOn !== undefined) task.dependsOn = validateDependencies(task, args.dependsOn, ledger.tasks)
           ledger.tasks.push(task)
           return [task]
         })
@@ -669,7 +673,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
   disposers.push(register(defineTool({
     name: 'taskboard_update',
     description:
-      'Update a task\'s title/description/prompt/urgency/blocked/waitingForHuman/waitingReason/permission. Requires ifVersion (read first). '
+      'Update a task\'s title/description/prompt/urgency/blocked/waitingForHuman/waitingReason/permission/dependsOn. Requires ifVersion (read first). '
       + 'The model and execution config are read-only through this tool (they belong to the task owner/user).',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id.' },
@@ -679,6 +683,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       prompt: { type: 'string', description: 'New execution prompt.' },
       urgency: { type: 'string', description: 'urgent | normal | relaxed.' },
       blocked: { type: 'boolean', description: 'Blocked marker (work cannot continue right now).' },
+      dependsOn: { type: 'array', items: { type: 'string' }, description: 'Replace prerequisites by same-workspace task IDs; [] clears, cycles rejected.' },
       waitingForHuman: { type: 'boolean', description: 'True to wait for human action; false to explicitly clear the wait and suppress inference. Independent of blocked.' },
       waitingReason: { type: 'string', description: 'Why human input/action is needed (max 500 characters). Never include credentials or secret values. Empty clears the reason.' },
       permission: { type: 'string', description: 'Execution permission: read-only | workspace-write | danger-full-access.' },
@@ -699,6 +704,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       prompt?: string
       urgency?: string
       blocked?: boolean
+      dependsOn?: string[]
       waitingForHuman?: boolean
       waitingReason?: string
       permission?: string
@@ -719,6 +725,14 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           if (args.prompt !== undefined) next.prompt = normalizePrompt(args.prompt)
           if (args.urgency !== undefined) next.urgency = asUrgency(args.urgency)
           if (args.blocked !== undefined) next.blocked = args.blocked
+          if (args.dependsOn !== undefined) {
+            if (task.status === 'in_progress' || task.executions.some(e => e.outcome === 'running')) {
+              throw new ToolError(ERR.invalidInput, 'dependencies cannot change while the task is running')
+            }
+            const ids = validateDependencies(next, args.dependsOn, ledger.tasks)
+            if (ids.length) next.dependsOn = ids
+            else delete next.dependsOn
+          }
           applyHumanWaitingPatch(next, args)
           if (args.permission !== undefined) next.permission = asPermission(args.permission)
           next.version = task.version + 1
@@ -778,6 +792,10 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           }
           if (!canTransition(task.status, to)) {
             throw new ToolError(ERR.invalidTransition, `illegal transition ${task.status} → ${to}`)
+          }
+          if (to === 'in_progress') {
+            const dependency = dependencyState(task, ledger.tasks)
+            if (!dependency.ready) throw new ToolError(ERR.invalidTransition, 'unsatisfied dependencies: ' + dependency.pendingIds.join(', '))
           }
           // Exclusive hold: while a task is in_progress under a session
           // (explicit claimedBy — an agent claim or a live execution), no other
