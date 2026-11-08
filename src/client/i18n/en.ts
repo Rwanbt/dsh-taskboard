@@ -8,6 +8,14 @@
 import type { TaskboardDict } from './zh.ts'
 
 export const en: TaskboardDict = {
+  'dependency.title': 'Dependencies',
+  'dependency.progress': '{done}/{total} prerequisites complete',
+  'dependency.waiting': 'Waiting on {count} prerequisite(s)',
+  'dependency.empty': 'No prerequisites',
+  'dependency.add': 'Add prerequisite',
+  'dependency.remove': 'Remove',
+  'dependency.placeholder': 'Task ID (e.g. t-...)',
+  'dependency.notice': 'All prerequisites must be human-approved before execution',
   'ext.requestInterval': 'Minimum request interval (milliseconds, 0 off, maximum 10000)',
   'ext.removeMapping': 'Remove project mapping {n}',
   'ext.lastAttempt': 'Last sync attempt',
