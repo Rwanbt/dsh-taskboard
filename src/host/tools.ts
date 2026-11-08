@@ -69,6 +69,7 @@ function taskLine(t: {
   version: number
   workspaceId: string
   blocked: boolean
+  dependsOn?: string[]
   waitingForHuman?: boolean
   waitingReason?: string
   executionMode: string
@@ -82,6 +83,7 @@ function taskLine(t: {
     `「${t.title}」`,
   ]
   if (t.blocked) parts.push('·受阻')
+  if (t.dependsOn?.length) parts.push('·依赖' + t.dependsOn.length)
   if (t.waitingForHuman === true) parts.push(`·待人工${t.waitingReason ? `：${t.waitingReason}` : ''}`)
   if (t.executionMode === 'scheduled') parts.push('·定时')
   if (t.commentCount !== undefined && t.commentCount > 0) parts.push(`·评论${t.commentCount}`)
@@ -104,6 +106,7 @@ function taskDetail(t: TaskRecord & { effectivePrompt?: string }): string {
   if (waiting.needs) lines.push(`人工等待: ${waiting.source === 'inferred' ? '疑似，需确认' : '已标记'}${waiting.reason ? ` · ${waiting.reason}` : ''}`)
   else if (t.waitingForHuman === false) lines.push('人工等待: 已明确解除（不自动识别）')
   if (holder !== undefined) lines.push(`认领: agent ${String(holder).slice(0, 24)}（持有期间其他会话不可移动或删除）`)
+  if (t.dependsOn?.length) lines.push('前置依赖（全部需人工确认 done 后才能开始）: ' + t.dependsOn.join(', '))
   if (t.execution.nextRunAt !== undefined) lines.push(`下次触发: ${new Date(t.execution.nextRunAt).toISOString()}`)
   if (t.model !== undefined) lines.push(`固定模型: ${t.model.provider}/${t.model.model}${t.model.reasoningEffort !== undefined ? ` (思考强度: ${t.model.reasoningEffort})` : ''}`)
   if (t.presetId !== undefined) lines.push(`执行模式: ${t.presetId}（未指定时为部署默认 preset）`)
