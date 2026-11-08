@@ -35,6 +35,7 @@ import {
   type TaskRecord,
 } from '../shared/protocol.ts'
 import { type GitFace, type SettlementFacts } from './git.ts'
+import { dependencyState } from '../shared/dependencies.ts'
 import { isLegacySingle, prepareMirror, type PreparedMirror, type PreparedMirrorRepo } from './isolation.ts'
 import { createRepoScanner, type RepoScanner } from './repos.ts'
 import { MessageId } from './sdk.ts'
@@ -603,6 +604,12 @@ export class ExecutionService {
       // mutation can never be woken by a stale delivery.
       if (trigger === 'comment' && target.status !== 'in_review') {
         gate = `comment wake requires in_review (current ${target.status})`
+        return undefined
+      }
+      // Atomic prerequisite gate covers manual, scheduled and comment-wake runs.
+      const prerequisite = dependencyState(target, ledger.tasks)
+      if (!prerequisite.ready) {
+        gate = 'unsatisfied dependencies: ' + prerequisite.pendingIds.join(', ')
         return undefined
       }
       // Refuse while work is IN FLIGHT: a live execution, or a session holding
