@@ -8,6 +8,7 @@
  */
 import { DEFAULT_DISPATCH_INTERVAL_MS, DEFAULT_MAX_CONCURRENT, isSpentOneShot, newCommentId, nextCronTime, normalizeBody, parseCron, type TaskLedger } from '../shared/protocol.ts'
 import type { ExecutionService } from './execution.ts'
+import { dependencyState } from '../shared/dependencies.ts'
 import type { TaskStore } from './store.ts'
 
 /** Tick cadence. */
@@ -173,9 +174,11 @@ export class SchedulerService {
 
     // Re-read after the queue mutations. Stable due-time order prevents cards
     // later in the ledger from starving behind a fixed snapshot order.
-    const queued = this.deps.store.snapshot().tasks
+    const queuedTasks = this.deps.store.snapshot().tasks
+    const queued = queuedTasks
       .filter(task => task.execution.mode === 'scheduled' && task.status === 'todo'
-        && task.trashedAt === undefined && task.execution.queuedRunAt !== undefined)
+        && task.trashedAt === undefined && task.execution.queuedRunAt !== undefined
+        && dependencyState(task, queuedTasks).ready)
       .sort((a, b) => (a.execution.queuedRunAt! - b.execution.queuedRunAt!)
         || ((a.execution.queuedAt ?? 0) - (b.execution.queuedAt ?? 0)) || a.id.localeCompare(b.id))
     for (const task of queued) {
