@@ -12,6 +12,7 @@ import { ExternalSourcePanel } from './ExternalSourcePanel.tsx'
 import type { BoardController } from '../controller.ts'
 import type { CommentRecord, ExecutionRecord, TaskRecord } from '../../shared/protocol.ts'
 import { canTransition, checklistProgress, taskAssociatedSessionIds, taskSessionId } from '../../shared/protocol.ts'
+import { dependencyState } from '../../shared/dependencies.ts'
 import { useAlert } from './AlertModal.tsx'
 import { checkNeedsHuman, fmtTime, isStaleClaim } from './format.ts'
 import { MOVE_KEYS, OUTCOME_KEYS, STATUS_KEYS, URGENCY_KEYS } from './labels.ts'
@@ -638,6 +639,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   // share one in-flight guard: a double click used to fire duplicate runs or
   // copies while the first round-trip was still pending (review P0).
   const [actionBusy, setActionBusy] = useState(false)
+  const [prerequisiteId, setPrerequisiteId] = useState('')
   // The task id is the only stable handle to quote when talking about a card
   // from the outside (agents, logs, issue reports) and the detail panel never
   // showed it. Click copies it, the label acknowledges the copy.
@@ -672,6 +674,8 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   const targetSessionId = taskSessionId(task)
   const associatedSessions = taskAssociatedSessionIds(task)
   const archiveState = controller.getSnapshot()
+  const dependency = task.dependencyProgress ?? dependencyState(task, archiveState.ledger.tasks)
+  const canEditDependencies = task.status !== 'in_progress' && task.status !== 'archived' && task.trashedAt === undefined
   const archiveResult = archiveState.sessionArchive?.taskId === task.id ? archiveState.sessionArchive.result : undefined
   const isReviewOrDone = task.status === 'in_review' || task.status === 'done'
   const hasReport = task.executions.some(e => e.report !== undefined)
@@ -1044,6 +1048,69 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
             </button>
           )}
         </div>
+      </div>
+
+      <div className="dsh-atb-section" data-section="task-dependencies">
+        <details>
+          <summary>
+            🔗 {t('dependency.title')}{dependency.total > 0
+              ? ` · ${dependency.completed}/${dependency.total}`
+              : ''}
+          </summary>
+          <div className="dsh-atb-commentlist">
+            {dependency.total === 0 && <div className="dsh-atb-empty2">{t('dependency.empty')}</div>}
+            {(task.dependsOn ?? []).map(id => {
+              const source = archiveState.ledger.tasks.find(item => item.id === id)
+              const isCompleted = !dependency.pendingIds.includes(id)
+              return (
+                <div key={id} className="dsh-atb-bubble" data-from="user">
+                  <div className="dsh-atb-bubble-avatar">{isCompleted ? '✓' : '○'}</div>
+                  <div className="dsh-atb-bubble-main">
+                    <button type="button" className="dsh-atb-btn" title={id}
+                      onClick={() => {
+                        if (source !== undefined) controller.select(id)
+                        else if (archiveState.doneCollapsed) {
+                          controller.setDoneCollapsed(false)
+                          void controller.refresh().then(() => controller.select(id))
+                        }
+                      }}>{source?.title ?? id}</button>
+                  </div>
+                  {canEditDependencies && (
+                    <button type="button" className="dsh-atb-btn" disabled={actionBusy}
+                      onClick={() => runAction(() => controller.update(task.id, task.version, {
+                        dependsOn: (task.dependsOn ?? []).filter(other => other !== id),
+                      }))}>{t('dependency.remove')}</button>
+                  )}
+                </div>
+              )
+            })}
+            {!dependency.ready && (
+              <div className="dsh-atb-empty2">{t('dependency.waiting', { count: dependency.pendingIds.length })} · {t('dependency.notice')}</div>
+            )}
+            {canEditDependencies && (
+              <div>
+                <input type="text" list="dsh-atb-prerequisite-suggestions"
+                  aria-label={t('dependency.placeholder')}
+                  placeholder={t('dependency.placeholder')} value={prerequisiteId}
+                  onChange={event => setPrerequisiteId(event.target.value)}
+                />
+                <datalist id="dsh-atb-prerequisite-suggestions">
+                  {archiveState.ledger.tasks
+                    .filter(item => item.id !== task.id && item.workspaceId === task.workspaceId
+                      && item.trashedAt === undefined && !(task.dependsOn ?? []).includes(item.id))
+                    .map(item => <option key={item.id} value={item.id} label={item.title} />)}
+                </datalist>
+                <button type="button" className="dsh-atb-btn" disabled={actionBusy || prerequisiteId.trim().length === 0}
+                  onClick={() => runAction(async () => {
+                    const ok = await controller.update(task.id, task.version, {
+                      dependsOn: [...(task.dependsOn ?? []), prerequisiteId.trim()],
+                    })
+                    if (ok) setPrerequisiteId('')
+                  })}>{t('dependency.add')}</button>
+              </div>
+            )}
+          </div>
+        </details>
       </div>
 
       <div className="dsh-atb-section">
