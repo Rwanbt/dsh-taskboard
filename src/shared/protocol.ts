@@ -860,6 +860,8 @@ export type TaskRecord = {
   blocked: boolean
   /** Optional same-workspace prerequisite task IDs. All must reach human-approved done before starting. */
   dependsOn?: string[]
+  /** Derived GET /state field; never stored as an execution gate or source of truth. */
+  dependencyProgress?: import('./dependencies.ts').DependencyState
   /** Omitted = infer; true = explicit human wait; false = suppress inference. */
   waitingForHuman?: boolean
   /** Explanation only; never put credentials or secret values here. */
