@@ -1,5 +1,6 @@
 import { archiveTaskSessions } from './archive-sessions.ts'
 import { applyHumanWaitingPatch } from '../shared/human-wait.ts'
+import { DependencyError, dependencyState, validateDependencies, validateWorkspaceLinks } from '../shared/dependencies.ts'
 /**
  * /dsh-taskboard routes on the shared DSH webserver: a JSON API for the
  * GUI's human operations (create/update/move/comment/delete — actor `user`,
@@ -255,6 +256,7 @@ function normalizePresetId(raw: string | null): string | undefined {
 
 /** Map a thrown domain error to the envelope. */
 function toFail(error: unknown): { res: ApiFail; status: number } {
+  if (error instanceof DependencyError) return fail('invalid_input', error.message)
   const message = error instanceof Error ? error.message : String(error)
   // Structured path first (review P2): ToolError carries its code — no need
   // to parse the 'Error: <code>: …' prefix it also renders into the message.
@@ -806,6 +808,9 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
             executions: [],
           }
           await store.mutate('task-created', ledger => {
+            if (body.dependsOn !== undefined) {
+              task.dependsOn = validateDependencies(task, body.dependsOn, ledger.tasks)
+            }
             ledger.tasks.push(task)
             return [task]
           })
@@ -910,6 +915,15 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
                 if (items.length > 0) next.checklist = items
                 else delete next.checklist
               }
+              if (body.dependsOn !== undefined) {
+                if (task.status === 'in_progress' || task.executions.some(e => e.outcome === 'running')) {
+                  throw new Error('Error: invalid_input: dependencies cannot change while a task is running')
+                }
+                const ids = validateDependencies(next, body.dependsOn, ledger.tasks)
+                if (ids.length) next.dependsOn = ids
+                else delete next.dependsOn
+              }
+              validateWorkspaceLinks(next, ledger.tasks)
               next.version = task.version + 1
               next.updatedAt = options.now()
               next.updatedBy = { kind: 'user' }
@@ -931,6 +945,10 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               const { index, task } = liveTaskAt(ledger, id)
               if (ifVersion !== task.version) throw new Error(`Error: version_conflict: stale version ${ifVersion} (current ${task.version})`)
               if (!canTransition(task.status, to)) throw new Error(`Error: invalid_transition: illegal transition ${task.status} → ${to}`)
+              if (to === 'in_progress') {
+                const dependency = dependencyState(task, ledger.tasks)
+                if (!dependency.ready) throw new Error('Error: invalid_transition: unsatisfied dependencies: ' + dependency.pendingIds.join(', '))
+              }
               beforeTask = task
               next = structuredClone(task)
               next.status = to
