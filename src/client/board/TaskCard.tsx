@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import type { BoardController } from '../controller.ts'
 import { taskSessionId, type TaskRecord } from '../../shared/protocol.ts'
+import { dependencyState } from '../../shared/dependencies.ts'
 import { checkNeedsHuman, fmtTime, isStaleClaim } from './format.ts'
 import { OUTCOME_KEYS, URGENCY_KEYS } from './labels.ts'
 import { useT } from '../i18n/runtime.ts'
@@ -52,6 +53,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   const running = task.executions.find(ex => ex.outcome === 'running')
   const stale = now !== undefined && isStaleClaim(task, now)
   const reviewing = task.status === 'in_review' && task.trashedAt === undefined
+  const dependency = task.dependencyProgress ?? dependencyState(task, controller.getSnapshot().ledger.tasks)
   const needsHuman = checkNeedsHuman(task, t)
   const latestReport = last?.report
   const latestWithGit = last
@@ -209,6 +211,12 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
       <div className="dsh-atb-card-meta">
         <span className="dsh-atb-badge">{t(URGENCY_KEYS[task.urgency])}</span>
         {task.blocked && <span className="dsh-atb-badge" data-kind="blocked">{t('shared.blocked')}</span>}
+        {dependency.total > 0 && (
+          <span className="dsh-atb-badge" data-kind={dependency.ready ? 'checklist' : 'blocked'}
+            title={dependency.ready ? t('dependency.progress', { done: dependency.completed, total: dependency.total }) : t('dependency.waiting', { count: dependency.pendingIds.length })}>
+            🔗 {dependency.completed}/{dependency.total}
+          </span>
+        )}
         {stale && <span className="dsh-atb-badge" data-kind="stale">{t('card.badge.stale')}</span>}
         {task.execution.mode === 'scheduled'
           && (task.execution.nextRunAt ?? task.execution.queuedRunAt ?? task.execution.runAt) !== undefined && (
