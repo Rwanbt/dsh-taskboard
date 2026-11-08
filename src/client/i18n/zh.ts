@@ -10,6 +10,14 @@
  * @module dsh-taskboard/client/i18n/zh
  */
 export const zh = {
+  'dependency.title': '前置依赖',
+  'dependency.progress': '已完成 {done}/{total}',
+  'dependency.waiting': '仍需完成 {count} 项前置任务',
+  'dependency.empty': '尚无前置依赖',
+  'dependency.add': '添加依赖',
+  'dependency.remove': '移除',
+  'dependency.placeholder': '输入任务 ID（例如 t-...）',
+  'dependency.notice': '所有前置任务经人工验收后才能执行',
   'ext.requestInterval': '最小请求间隔（毫秒，0 关闭，最大 10000）',
   'ext.removeMapping': '删除第 {n} 个项目映射',
   'ext.lastAttempt': '最近尝试同步',
