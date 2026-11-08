@@ -1588,6 +1588,11 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
   const e = raw as Record<string, unknown>
   const id = typeof e.id === 'string' ? e.id.trim() : ''
   const fail = (reason: string): { ok: false; reason: string } => ({ ok: false, reason })
+  if (e.dependsOn !== undefined && (!Array.isArray(e.dependsOn) || e.dependsOn.length > 32
+    || e.dependsOn.some((id: unknown) => typeof id !== 'string' || !isValidTaskId(id))
+    || new Set(e.dependsOn).size !== e.dependsOn.length || e.dependsOn.includes(id))) {
+    return fail('invalid dependsOn prerequisite IDs')
+  }
   // R4①: length alone let traversal-shaped ids (`../../x`, `..\..\x`) into
   // the ledger; the charset gate is the primary defense for every downstream
   // filesystem use of a task id.
@@ -1762,6 +1767,8 @@ export function isPlausibleTaskRecord(raw: unknown): boolean {
     && typeof t.workspaceId === 'string' && (t.workspaceId.length > 0 || normalizeExternalSource(t.external)?.provider === 'zentao')
     && ALL_STATUSES.includes(t.status as TaskStatus)
     && typeof t.version === 'number' && Number.isFinite(t.version) && t.version >= 1
+    && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.length <= 32
+      && t.dependsOn.every((id: unknown) => typeof id === 'string' && isValidTaskId(id))))
     && Array.isArray(t.comments) && Array.isArray(t.executions)
     && typeof t.execution === 'object' && t.execution !== null
     && (t.execution as { mode?: unknown }).mode !== undefined
