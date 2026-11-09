@@ -15,6 +15,7 @@ import type { TaskRecord } from '../src/shared/protocol.ts'
 import type { CreateTaskBody, UpdateTaskBody } from '../src/shared/api.ts'
 import { disposeI18n } from '../src/client/i18n/runtime.ts'
 import { waitFor } from './wait-for.ts'
+import { chooseSelect, selectText } from './select-helpers.ts'
 
 const cleanups: Array<() => void> = []
 beforeEach(() => { localStorage.clear(); document.documentElement.lang = 'zh-CN'; disposeI18n() })
@@ -180,24 +181,19 @@ describe('SettingsModal branch naming (#98)', () => {
     const section = Array.from(host.querySelectorAll('.dsh-atb-diag-sec'))
       .find(el => el.querySelector('h4')?.textContent === '分支命名')
     expect(section).toBeDefined()
-    const select = section!.querySelector('select')!
+    const select = section!.querySelector<HTMLButtonElement>('.dsh-atb-sel')!
     // Default draft: title-id, no prefix input.
-    expect((select as HTMLSelectElement).value).toBe('title-id')
+    expect(selectText(select)).toContain('task/标题+ID（默认）')
     expect(section!.querySelector('input')).toBeNull()
     expect(section!.textContent).toContain('task/修复登录+t-1a2b')
 
     // Switch to the pure-ASCII preset → still no prefix input.
-    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
-    const pick = (value: string): void => {
-      selectSetter.call(select, value)
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    }
-    pick('id')
+    chooseSelect(select, 'task/ID（纯英文）')
     await new Promise(r => setTimeout(r, 10))
     expect(section!.querySelector('input')).toBeNull()
 
     // Switch to a prefix preset → the prefix input appears.
-    pick('prefix-id')
+    chooseSelect(select, '前缀/ID')
     await new Promise(r => setTimeout(r, 10))
     const prefixInput = section!.querySelector<HTMLInputElement>('input')!
     expect(prefixInput.value).toBe('task')

@@ -17,6 +17,7 @@ import { fmtTime, initialWorkspaceId } from './format.ts'
 import { useT, type Translate } from '../i18n/runtime.ts'
 import { SlashPromptInput } from './SlashPromptInput.tsx'
 import { useAlert } from './AlertModal.tsx'
+import { Select } from './Select.tsx'
 
 /** One row of the configured model catalog (from llm.models). */
 export interface CatalogModel {
@@ -574,98 +575,112 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
 
             <div className="dsh-atb-form-subgrid">
               <Field label={t('form.field.project')} required>
-                <select value={workspaceId} onChange={e => { setWorkspaceId(e.target.value); setSessionChoice('fresh'); setProjectSessions([]) }}>
-                  {state.workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.title || ws.path}</option>)}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.project')}
+                  value={workspaceId}
+                  onChange={v => { setWorkspaceId(v); setSessionChoice('fresh'); setProjectSessions([]) }}
+                  options={state.workspaces.map(ws => ({ value: ws.id, label: ws.title || ws.path }))}
+                />
               </Field>
 
               <Field label={t('form.field.model')}>
-                <select
+                <Select
+                  full
+                  ariaLabel={t('form.field.model')}
                   value={model}
-                  onChange={e => {
-                    const val = e.target.value
+                  onChange={val => {
                     setModel(val)
-                    if (val === '') {
-                      setReasoningEffort('')
-                    } else {
-                      const pm = JSON.parse(val) as { provider: string; model: string }
-                      const cm = catalog.find(m => m.provider === pm.provider && m.model === pm.model)
-                      if (cm?.reasoning?.defaultEffort !== undefined) {
-                        setReasoningEffort(cm.reasoning.defaultEffort)
-                      } else {
-                        setReasoningEffort('')
-                      }
-                    }
+                    if (val === '') { setReasoningEffort(''); return }
+                    const pm = JSON.parse(val) as { provider: string; model: string }
+                    const cm = catalog.find(m => m.provider === pm.provider && m.model === pm.model)
+                    setReasoningEffort(cm?.reasoning?.defaultEffort ?? '')
                   }}
-                >
-                  <option value="">{t('form.field.modelDefault')}</option>
-                  {parsedModel !== undefined && currentCatalogModel === undefined && <option value={model}>{parsedModel.model} ({parsedModel.provider})</option>}
-                  {catalog.map(m => (
-                    <option key={`${m.provider}/${m.model}`} value={JSON.stringify({ provider: m.provider, model: m.model })}>
-                      {t('form.model.option', { name: m.name ?? m.model, provider: m.provider })}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: t('form.field.modelDefault') },
+                    ...(parsedModel !== undefined && currentCatalogModel === undefined
+                      ? [{ value: model, label: `${parsedModel.model} (${parsedModel.provider})` }]
+                      : []),
+                    ...catalog.map(m => ({
+                      value: JSON.stringify({ provider: m.provider, model: m.model }),
+                      label: t('form.model.option', { name: m.name ?? m.model, provider: m.provider }),
+                    })),
+                  ]}
+                />
               </Field>
 
               {parsedModel !== undefined && (
                 <Field label={t('form.field.effort')}>
-                  <select
-                    value={reasoningEffort}
-                    onChange={e => setReasoningEffort(e.target.value)}
+                  <Select
+                    full
+                    ariaLabel={t('form.field.effort')}
                     title={t('form.field.effortTitle')}
-                  >
-                    <option value="">{t('form.effort.follow')}{modelReasoning?.defaultEffort !== undefined ? t('shared.current', { name: modelReasoning.efforts.find(ef => ef.id === modelReasoning.defaultEffort)?.name ?? modelReasoning.defaultEffort }) : ''}</option>
-                    {reasoningEffort !== '' && !(modelReasoning !== undefined && modelReasoning.efforts.length > 0
-                      ? modelReasoning.efforts.some(eff => eff.id === reasoningEffort)
-                      : ['low', 'medium', 'high', 'none'].includes(reasoningEffort)) && (
-                      <option value={reasoningEffort}>{reasoningEffort}</option>
-                    )}
-                    {modelReasoning !== undefined && modelReasoning.efforts.length > 0 ? (
-                      modelReasoning.efforts.map(eff => (
-                        <option key={eff.id} value={eff.id}>
-                          {eff.name}{eff.description ? ` (${eff.description})` : ''}
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="low">{t('form.effort.low')}</option>
-                        <option value="medium">{t('form.effort.medium')}</option>
-                        <option value="high">{t('form.effort.high')}</option>
-                        <option value="none">{t('form.effort.none')}</option>
-                      </>
-                    )}
-                  </select>
+                    value={reasoningEffort}
+                    onChange={v => setReasoningEffort(v)}
+                    options={[
+                      { value: '', label: t('form.effort.follow') + (modelReasoning?.defaultEffort !== undefined
+                        ? t('shared.current', { name: modelReasoning.efforts.find(ef => ef.id === modelReasoning.defaultEffort)?.name ?? modelReasoning.defaultEffort })
+                        : '') },
+                      ...(reasoningEffort !== '' && !(modelReasoning !== undefined && modelReasoning.efforts.length > 0
+                        ? modelReasoning.efforts.some(eff => eff.id === reasoningEffort)
+                        : ['low', 'medium', 'high', 'none'].includes(reasoningEffort))
+                        ? [{ value: reasoningEffort, label: reasoningEffort }]
+                        : []),
+                      ...(modelReasoning !== undefined && modelReasoning.efforts.length > 0
+                        ? modelReasoning.efforts.map(eff => ({ value: eff.id, label: eff.name + (eff.description ? ` (${eff.description})` : '') }))
+                        : [
+                          { value: 'low', label: t('form.effort.low') },
+                          { value: 'medium', label: t('form.effort.medium') },
+                          { value: 'high', label: t('form.effort.high') },
+                          { value: 'none', label: t('form.effort.none') },
+                        ]),
+                    ]}
+                  />
                 </Field>
               )}
 
               {(presets.length > 0 || presetId !== '') && (
                 <Field label={t('form.field.preset')}>
-                  <select value={presetId} onChange={e => setPresetId(e.target.value)} title={t('form.field.presetTitle')}>
-                    <option value="">{t('form.preset.follow')}{presetDefault !== undefined ? t('shared.current', { name: presets.find(p => p.id === presetDefault)?.name ?? presetDefault }) : ''}</option>
-                    {presetId !== '' && !presets.some(p => p.id === presetId) && <option value={presetId}>{presetId}</option>}
-                    {presets.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name ?? p.id}{p.id === presetDefault ? t('form.preset.defaultTag') : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    full
+                    ariaLabel={t('form.field.preset')}
+                    title={t('form.field.presetTitle')}
+                    value={presetId}
+                    onChange={v => setPresetId(v)}
+                    options={[
+                      { value: '', label: t('form.preset.follow') + (presetDefault !== undefined
+                        ? t('shared.current', { name: presets.find(p => p.id === presetDefault)?.name ?? presetDefault })
+                        : '') },
+                      ...(presetId !== '' && !presets.some(p => p.id === presetId) ? [{ value: presetId, label: presetId }] : []),
+                      ...presets.map(p => ({ value: p.id, label: (p.name ?? p.id) + (p.id === presetDefault ? t('form.preset.defaultTag') : '') })),
+                    ]}
+                  />
                 </Field>
               )}
             </div>
 
             <div className="dsh-atb-form-subgrid">
               <Field label={t('form.field.permission')}>
-                <select className="dsh-atb-permission-select" value={permission} onChange={e => setPermission(asPermission(e.target.value))}>
-                  {permissionOptions(t).map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}{opt.value === 'workspace-write' ? t('form.perm.defaultTag') : ''}</option>
-                  ))}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.permission')}
+                  value={permission}
+                  onChange={v => setPermission(asPermission(v))}
+                  options={permissionOptions(t).map(opt => ({
+                    value: opt.value,
+                    icon: opt.icon,
+                    label: opt.label + (opt.value === 'workspace-write' ? t('form.perm.defaultTag') : ''),
+                  }))}
+                />
               </Field>
               <Field label={t('form.field.urgency')}>
-                <select className="dsh-atb-urgency-select" value={urgency} onChange={e => setUrgency(e.target.value as Urgency)}>
-                  {urgencyOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.urgency')}
+                  value={urgency}
+                  onChange={v => setUrgency(v as Urgency)}
+                  options={urgencyOptions(t).map(o => ({ value: o.value, label: o.label }))}
+                />
               </Field>
             </div>
 
@@ -740,11 +755,17 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
 
             {mode === 'periodic' && (
               <Field label={t('form.field.reuseSession')} full>
-                <select value={sessionChoice} onChange={e => setSessionChoice(e.target.value as SessionChoice)}>
-                  <option value="fresh">{t('form.session.fresh')}</option>
-                  <option value="reuse">{t('form.session.reuse')}</option>
-                  {projectSessions.map(session => <option key={session.id} value={`selected:${session.id}`}>{session.title ?? session.id}</option>)}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.reuseSession')}
+                  value={sessionChoice}
+                  onChange={v => setSessionChoice(v as SessionChoice)}
+                  options={[
+                    { value: 'fresh', label: t('form.session.fresh') },
+                    { value: 'reuse', label: t('form.session.reuse') },
+                    ...projectSessions.map(session => ({ value: `selected:${session.id}`, label: session.title ?? session.id })),
+                  ]}
+                />
                 {sessionsLoading && <span className="dsh-atb-isolation-note">{t('shared.loading')}</span>}
                 {sessionsError && <span className="dsh-atb-isolation-note">{t('form.session.unavailable')}</span>}
                 {!sessionsLoading && !sessionsError && sessionChoice.startsWith('selected:') && !projectSessions.some(session => session.id === sessionChoice.slice('selected:'.length)) && (
@@ -755,10 +776,16 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
 
             {mode === 'once' && (
               <Field label={t('form.field.reuseSession')} full>
-                <select value={sessionChoice.startsWith('selected:') ? sessionChoice : 'fresh'} onChange={e => setSessionChoice(e.target.value === 'fresh' ? 'fresh' : `selected:${e.target.value}`)}>
-                  <option value="fresh">{t('form.session.new')}</option>
-                  {projectSessions.map(session => <option key={session.id} value={session.id}>{session.title ?? session.id}</option>)}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.reuseSession')}
+                  value={sessionChoice.startsWith('selected:') ? sessionChoice : 'fresh'}
+                  onChange={v => setSessionChoice(v === 'fresh' ? 'fresh' : `selected:${v}`)}
+                  options={[
+                    { value: 'fresh', label: t('form.session.new') },
+                    ...projectSessions.map(session => ({ value: session.id, label: session.title ?? session.id })),
+                  ]}
+                />
                 {sessionsLoading && <span className="dsh-atb-isolation-note">{t('shared.loading')}</span>}
                 {sessionsError && <span className="dsh-atb-isolation-note">{t('form.session.unavailable')}</span>}
                 {!sessionsLoading && !sessionsError && sessionChoice.startsWith('selected:') && !projectSessions.some(session => session.id === sessionChoice.slice('selected:'.length)) && (

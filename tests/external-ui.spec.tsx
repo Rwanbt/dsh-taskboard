@@ -9,12 +9,13 @@ import type { BoardController } from '../src/client/controller.ts'
 import { createBuiltinProviders } from '../src/host/external-providers.ts'
 import type { TaskRecord } from '../src/shared/protocol.ts'
 import { waitFor } from './wait-for.ts'
+import { chooseSelect, selectByIndex, selectOptionLabels, selectText, type SelectTrigger } from './select-helpers.ts'
 
 let root: Root | undefined
 beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(async () => { await act(async () => { root?.unmount() }); root = undefined; document.body.innerHTML = ''; vi.unstubAllGlobals() })
-const choose = async (select: HTMLSelectElement, value: string) => {
-  await act(async () => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })) })
+const choose = async (trigger: SelectTrigger, label: string) => {
+  await act(async () => { chooseSelect(trigger, label) })
 }
 const buttonByText = (host: Element, pattern: RegExp) => [...host.querySelectorAll<HTMLButtonElement>('button')].find(b => pattern.test(b.textContent ?? ''))!
 
@@ -70,16 +71,19 @@ describe('provider-driven external UI', () => {
     await act(async () => { tabs[1]!.click() })
     expect(panels[0]!.hidden).toBe(true); expect(panels[1]!.hidden).toBe(false)
     expect(host.querySelector('.dsh-atb-modal-foot')).toBeNull()
-    await waitFor(() => panels[1]!.querySelector('select')?.value === 'zentao')
+    await waitFor(() => selectText(selectByIndex(panels[1]!, 0)).includes('ZenTao'))
     expect(panels[1]!.querySelectorAll('input[type=password]')).toHaveLength(1)
-    const auth = panels[1]!.querySelectorAll<HTMLSelectElement>('select')[1]!
-    expect(auth.value).toBe('password'); expect(auth.querySelector('option[value=token]')).toBeNull()
-    await choose(panels[1]!.querySelector<HTMLSelectElement>('select')!, 'tapd')
+    const auth = selectByIndex(panels[1]!, 1)
+    expect(selectText(auth)).toContain('Username and password')
+    await act(async () => {
+      expect(selectOptionLabels(auth).some(label => label.includes('Token'))).toBe(false)
+    })
+    await choose(selectByIndex(panels[1]!, 0), 'TAPD')
     await act(async () => { tabs[0]!.click() })
     expect(panels[0]!.querySelectorAll<HTMLElement>('.dsh-atb-mode-opt')[1]!.dataset.on).toBe('true')
     await act(async () => { tabs[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })
     expect(tabs[1]!.getAttribute('aria-selected')).toBe('true')
-    expect(panels[1]!.querySelector<HTMLSelectElement>('select')!.value).toBe('tapd')
+    expect(selectText(selectByIndex(panels[1]!, 0))).toContain('TAPD')
   })
   it('renders auth fields and item types from descriptors, discovers projects, submits generic config', async () => {
     const calls: Array<{ path: string; body: Record<string, unknown> }> = []
@@ -99,14 +103,16 @@ describe('provider-driven external UI', () => {
     }))
     const host = document.createElement('div'); document.body.append(host); root = createRoot(host)
     await act(async () => { root!.render(createElement(ExternalSyncPanel)) })
-    await waitFor(() => host.querySelectorAll('select')[0]?.querySelectorAll('option').length === 2)
-    const selects = () => [...host.querySelectorAll<HTMLSelectElement>('select')]
-    await choose(selects()[0]!, 'tapd')
-    expect(selects()[1]!.value).toBe('basic')
+    await act(async () => {
+      await waitFor(() => host.querySelectorAll('.dsh-atb-sel').length > 0 && selectOptionLabels(selectByIndex(host, 0)).length === 2)
+    })
+    const selects = () => [...host.querySelectorAll<SelectTrigger>('.dsh-atb-sel')]
+    await choose(selects()[0]!, 'TAPD')
+    expect(selectText(selects()[1]!)).toContain('Basic Auth')
     expect(host.querySelectorAll('input[type=password]')).toHaveLength(2)
     expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(3)
     expect((host.querySelector('input') as HTMLInputElement).value).toBe('https://api.tapd.cn')
-    await choose(selects()[1]!, 'bearer')
+    await choose(selects()[1]!, 'Bearer Token')
     expect(host.querySelectorAll('input[type=password]')).toHaveLength(1)
     const inputs = [...host.querySelectorAll<HTMLInputElement>('input')]
     const update = async (input: HTMLInputElement, value: string) => {
@@ -127,18 +133,21 @@ describe('provider-driven external UI', () => {
     expect(calls.at(-1)).toMatchObject({ path: '/dsh-taskboard/external/test', body: { provider: 'tapd', credentials: { accessToken: 'private-access-token' }, mappings: [] } })
     expect(calls.some(c => c.path.endsWith('/config'))).toBe(false)
     await act(async () => { buttonByText(host, /同步项目|Sync project/).click() })
-    await waitFor(() => host.querySelector('option[value="123"]') !== null)
+    const scopeTrigger = () => host.querySelector<SelectTrigger>('.dsh-atb-external-mapping .dsh-atb-sel')!
+    await act(async () => {
+      await waitFor(() => selectOptionLabels(scopeTrigger()).some(label => label.includes('Team project')))
+    })
     expect(calls.at(-1)).toMatchObject({ path: '/dsh-taskboard/external/projects', body: { provider: 'tapd', authMode: 'bearer', account: 'alice', mappings: [], settings: { companyId: '999' } } })
-    await choose(host.querySelector('.dsh-atb-external-mapping select')!, '123')
-    await choose(selects()[2]!, 'todo')
-    await choose(selects()[4]!, 'ws')
+    await choose(scopeTrigger(), 'Team project')
+    await choose(selects()[2]!, 'Todo')
+    await choose(selects()[4]!, 'Local')
     await act(async () => { buttonByText(host, /保存配置|Save configuration/).click() })
     await waitFor(() => calls.some(c => c.path.endsWith('/config')))
     expect(calls.at(-1)!.body).toMatchObject({ provider: 'tapd', authMode: 'bearer', importStatus: 'todo', credentials: { accessToken: 'private-access-token' }, itemTypes: ['bug'], mappings: [{ projectId: '123', workspaceId: 'ws' }] })
     await waitFor(() => host.querySelector<HTMLInputElement>('input[type=password]')?.value === '')
     expect(host.textContent).not.toContain('private-access-token')
-    await choose(selects()[0]!, 'zentao')
-    expect(selects()[1]!.value).toBe('password')
+    await choose(selects()[0]!, 'ZenTao')
+    expect(selectText(selects()[1]!)).toContain('Username and password')
     expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(5)
     expect(host.querySelector<HTMLInputElement>('input[type=password]')!.value).toBe('')
     await update(host.querySelector<HTMLInputElement>('input[autocomplete=username]')!, 'login-alice')
@@ -146,7 +155,7 @@ describe('provider-driven external UI', () => {
     expect(reuse.checked).toBe(true)
     await act(async () => { buttonByText(host, /同步项目|Sync project/).click() })
     expect(calls.at(-1)!.body.account).toBe('login-alice')
-    await choose(host.querySelector('.dsh-atb-external-mapping select')!, 'ws')
+    await choose(host.querySelector<SelectTrigger>('.dsh-atb-external-mapping .dsh-atb-sel')!, 'Local')
     await act(async () => { reuse.click() })
     const assignee = [...host.querySelectorAll<HTMLInputElement>('input')].find(i => /任务处理人账号|Task assignee/.test(i.parentElement?.textContent ?? ''))!
     await update(assignee, 'other-bob')
@@ -179,12 +188,12 @@ describe('provider-driven external UI', () => {
     await refresh()
     expect(requests[0]).toMatchObject({ mappingMode: 'project', itemTypes: ['bug'], mappings: [] })
     expect(host.querySelectorAll('.dsh-atb-external-mapping')).toHaveLength(2)
-    const first = host.querySelector<HTMLSelectElement>('.dsh-atb-external-mapping select')!
-    expect(first.value).toBe('')
+    const first = host.querySelector<SelectTrigger>('.dsh-atb-external-mapping .dsh-atb-sel')!
+    expect(selectText(first)).toContain('Not linked')
     expect(host.querySelector('.dsh-atb-external-remove')).toBeNull()
-    await choose(first, 'ws')
+    await choose(first, 'Local')
     await refresh()
-    expect(host.querySelector<HTMLSelectElement>('.dsh-atb-external-mapping select')!.value).toBe('ws')
+    expect(selectText(host.querySelector<SelectTrigger>('.dsh-atb-external-mapping .dsh-atb-sel')!)).toContain('Local')
     await act(async () => { buttonByText(host, /保存配置|Save configuration/).click() })
     expect(requests.at(-1)).toMatchObject({ mappingMode: 'project', mappings: [{ projectId: 'project:1', workspaceId: 'ws' }] })
     available = false; await refresh()
@@ -198,7 +207,7 @@ describe('provider-driven external UI', () => {
     expect(host.textContent).toContain('Project / Sprint')
     expect(host.textContent).not.toContain('Second project')
     expect(host.querySelector('.dsh-atb-external-mapping input')).toBeNull()
-    await choose(host.querySelector('.dsh-atb-external-mapping select')!, 'ws')
+    await choose(host.querySelector<SelectTrigger>('.dsh-atb-external-mapping .dsh-atb-sel')!, 'Local')
     await act(async () => { buttonByText(host, /保存配置|Save configuration/).click() })
     expect(requests.at(-1)).toMatchObject({ mappingMode: 'execution', mappings: [{ projectId: 'execution:3', workspaceId: 'ws' }] })
   })

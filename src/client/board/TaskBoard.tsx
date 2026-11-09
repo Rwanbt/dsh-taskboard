@@ -22,6 +22,7 @@ import { SettingsModal } from './SettingsModal.tsx'
 import { ImportModal } from './ImportModal.tsx'
 import { TemplateManager } from './TemplateManager.tsx'
 import { useAlert } from './AlertModal.tsx'
+import { Select } from './Select.tsx'
 
 /** Urgency sort rank (urgent first). */
 const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, normal: 1, relaxed: 2 }
@@ -267,26 +268,28 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
           spellCheck={false}
           onChange={e => controller.setSearch(e.target.value)}
         />
-        <select
-          className="dsh-atb-select"
+        <Select
+          ariaLabel={t('board.filter.allProjects')}
           value={state.filters.workspaceId ?? ''}
-          onChange={e => controller.setWorkspaceFilter(e.target.value === '' ? undefined : e.target.value)}
-        >
-          <option value="">{t('board.filter.allProjects')}</option>
-          {state.workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.title || ws.path}</option>)}
-        </select>
-        <select
-          className="dsh-atb-select"
-          value={state.sortBy}
+          onChange={v => controller.setWorkspaceFilter(v === '' ? undefined : v)}
+          options={[
+            { value: '', label: t('board.filter.allProjects') },
+            ...state.workspaces.map(ws => ({ value: ws.id, label: ws.title || ws.path })),
+          ]}
+        />
+        <Select
+          ariaLabel={t('board.sort.title')}
           title={t('board.sort.title')}
-          onChange={e => controller.setSortBy(e.target.value as typeof state.sortBy)}
-        >
-          <option value="default">{t('board.sort.default')}</option>
-          <option value="updated">{t('board.sort.updated')}</option>
-          <option value="urgency">{t('board.sort.urgency')}</option>
-          <option value="created">{t('board.sort.created')}</option>
-          <option value="title">{t('board.sort.byTitle')}</option>
-        </select>
+          value={state.sortBy}
+          onChange={v => controller.setSortBy(v as typeof state.sortBy)}
+          options={[
+            { value: 'default', label: t('board.sort.default') },
+            { value: 'updated', label: t('board.sort.updated') },
+            { value: 'urgency', label: t('board.sort.urgency') },
+            { value: 'created', label: t('board.sort.created') },
+            { value: 'title', label: t('board.sort.byTitle') },
+          ]}
+        />
         {(['urgent', 'normal', 'relaxed'] as const).map(u => (
           <button
             key={u}

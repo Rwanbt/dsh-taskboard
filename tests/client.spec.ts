@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { waitFor } from './wait-for.ts'
+import { chooseSelect, selectByLabel, selectOptionLabels, selectText } from './select-helpers.ts'
 
 /** Stub a route payload. */
 function routeResponse(path: string): unknown {
@@ -380,9 +381,8 @@ describe('client half', () => {
     expect(creates[0]).toMatchObject({ title: 'Iso task', isolation: 'none' })
 
     // Non-git workspace: both options disabled, hint shown, isolation omitted.
-    const wsSelect = host.querySelector<HTMLSelectElement>('select')!
-    wsSelect.value = 'ws-plain'
-    wsSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    const wsSelect = selectByLabel(host, '项目')
+    chooseSelect(wsSelect, 'N')
     await new Promise(r => setTimeout(r, 10))
     expect(isoOpts().every(o => o.disabled)).toBe(true)
     expect(host.querySelector('.dsh-atb-isolation-note')?.textContent).toContain('非 git 仓库')
@@ -393,8 +393,7 @@ describe('client half', () => {
 
     // Multi-repo workspace (0.6.3): worktree stays enabled and the mirror
     // note names the repo count (auto-mirror, no per-task repo selection).
-    wsSelect.value = 'ws-mirror'
-    wsSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    chooseSelect(wsSelect, 'M')
     await new Promise(r => setTimeout(r, 10))
     expect(isoOpts().every(o => !o.disabled)).toBe(true)
     expect(host.querySelector('.dsh-atb-isolation-note[data-mirror]')?.textContent).toContain('3')
@@ -790,10 +789,10 @@ describe('client half', () => {
     await new Promise(r => setTimeout(r, 30))
 
     // The preset select exists and pre-selects the deployment default.
-    const presetSelect = Array.from(host.querySelectorAll<HTMLSelectElement>('select'))
-      .find(s => Array.from(s.options).some(o => o.value === 'standard'))!
+    const presetSelect = selectByLabel(host, '执行模式（preset）')
     expect(presetSelect).toBeTruthy()
-    expect(presetSelect.value).toBe('standard')
+    expect(selectText(presetSelect)).toContain('标准模式')
+    expect(selectText(presetSelect)).toContain('部署默认')
 
     // Fill the title, submit → the default preset id rides along.
     const title = host.querySelector<HTMLInputElement>('input[maxlength="200"]')!
@@ -2025,8 +2024,7 @@ describe('client half', () => {
       createdBy: { kind: 'user' as const }, updatedBy: { kind: 'user' as const },
       comments: [], executions: [],
     })
-    const presetSelectOf = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLSelectElement>('select'))
-      .find(s => Array.from(s.options).some(o => o.value === 'standard'))!
+    const presetSelectOf = (host: HTMLElement) => selectByLabel(host, '执行模式（preset）')
 
     // Follow-default task (no presetId): the roster's deployment default must
     // NOT be pre-selected in edit mode — the select stays on 跟随部署默认.
@@ -2035,7 +2033,7 @@ describe('client half', () => {
     let root = createRoot(host)
     root.render(React.createElement(TaskFormModal, { controller, task: mkTask() as never }))
     await new Promise(r => setTimeout(r, 30))
-    expect(presetSelectOf(host).value).toBe('')
+    expect(selectText(presetSelectOf(host))).toContain('跟随部署默认')
     // Saving keeps following the deployment default (presetId: null).
     ;(Array.from(host.querySelectorAll<HTMLButtonElement>('.dsh-atb-modal-footbtns .dsh-atb-btn')).find(b => b.textContent === '保存修改'))!.click()
     await new Promise(r => setTimeout(r, 10))
@@ -2050,7 +2048,7 @@ describe('client half', () => {
     root = createRoot(host)
     root.render(React.createElement(TaskFormModal, { controller, task: mkTask('liangshen') as never }))
     await new Promise(r => setTimeout(r, 30))
-    expect(presetSelectOf(host).value).toBe('liangshen')
+    expect(selectText(presetSelectOf(host))).toContain('梁神模式')
     root.unmount()
     host.remove()
     controller.dispose()
@@ -2360,14 +2358,12 @@ describe('client half', () => {
     // Verify Title input and pre-filled Model & Reasoning select
     const titleInput = host.querySelector<HTMLInputElement>('input[placeholder="一句话说清要做什么"]')!
     expect(titleInput).not.toBeNull()
-    const selects = host.querySelectorAll('select')
-    // Select 0: Workspace, Select 1: Model, Select 2: Reasoning Effort
-    const modelSelect = selects[1] as HTMLSelectElement
-    expect(modelSelect.value).toBe(JSON.stringify({ provider: 'deepseek', model: 'deepseek-reasoner' }))
+    const modelSelect = selectByLabel(host, '模型（默认 = 会话默认模型）')
+    expect(selectText(modelSelect)).toContain('DeepSeek Reasoner')
 
-    const effortSelect = selects[2] as HTMLSelectElement
-    expect(effortSelect).not.toBeNull()
-    expect(effortSelect.value).toBe('high')
+    const effortSelect = selectByLabel(host, '思考强度（Reasoning Effort）')
+    expect(effortSelect).toBeTruthy()
+    expect(selectText(effortSelect)).toContain('高 (High)')
 
     // Change Title and Submit
     const titleSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -2376,9 +2372,7 @@ describe('client half', () => {
     titleInput.dispatchEvent(new Event('change', { bubbles: true }))
 
     // Change effort to 'low'
-    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
-    selectSetter?.call(effortSelect, 'low')
-    effortSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    chooseSelect(effortSelect, '低 (Low)')
 
     await new Promise(r => setTimeout(r, 20))
 
@@ -2456,24 +2450,22 @@ describe('client half', () => {
     titleInput.dispatchEvent(new Event('change', { bubbles: true }))
 
     // Check permission options: default is workspace-write
-    const permissionSelect = host.querySelector<HTMLSelectElement>('.dsh-atb-permission-select')!
-    const permOpts = Array.from(permissionSelect.options)
+    const permissionSelect = selectByLabel(host, '执行权限')
+    const permOpts = selectOptionLabels(permissionSelect)
     expect(permOpts.length).toBe(3)
-    expect(permOpts[0]!.textContent).toContain('可写入工作区')
-    expect(permOpts[1]!.textContent).toContain('仅可查看')
-    expect(permOpts[2]!.textContent).toContain('完全权限')
-    expect(permissionSelect.value).toBe('workspace-write')
+    expect(permOpts[0]).toContain('可写入工作区')
+    expect(permOpts[1]).toContain('仅可查看')
+    expect(permOpts[2]).toContain('完全权限')
+    expect(selectText(permissionSelect)).toContain('可写入工作区')
 
     // Select '仅可查看' (read-only) and urgent priority.
-    permissionSelect.value = 'read-only'
-    permissionSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    const urgencySelect = host.querySelector<HTMLSelectElement>('.dsh-atb-urgency-select')!
-    expect(urgencySelect.value).toBe('normal')
-    urgencySelect.value = 'urgent'
-    urgencySelect.dispatchEvent(new Event('change', { bubbles: true }))
+    chooseSelect(permissionSelect, '仅可查看')
+    const urgencySelect = selectByLabel(host, '紧急度')
+    expect(selectText(urgencySelect)).toContain('一般')
+    chooseSelect(urgencySelect, '紧急')
     await new Promise(r => setTimeout(r, 20))
-    expect(permissionSelect.value).toBe('read-only')
-    expect(urgencySelect.value).toBe('urgent')
+    expect(selectText(permissionSelect)).toContain('仅可查看')
+    expect(selectText(urgencySelect)).toContain('紧急')
 
     // Find description textarea (SlashPromptInput)
     const textareas = host.querySelectorAll('textarea')

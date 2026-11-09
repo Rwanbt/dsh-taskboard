@@ -163,6 +163,32 @@ Kept deliberately minimal, visually close to upstream:
   accurate, because progress is computed server-side against the full ledger.
 - No permanent sidebar, no extra column, no imposed graph, no animation.
 
+### Design-system alignment (fork)
+
+The board renders inside the DSH web shell, so it must follow the host theme rather than
+carry its own palette. Two rules keep it consistent and maintainable:
+
+- **Token bridge.** A single `--atb-*` layer in `styles.ts` maps every colour, radius,
+  elevation and focus ring to the official DSH tokens (`--dsw-alias-*`,
+  `--dsw-menu-surface-fill`, `--dsw-menu-backdrop-filter`, `--dsw-radius-*`,
+  `--dsw-corner-shape`, `--dsw-elevation-*`, `--dsw-specific-input-major`). DSH publishes
+  those tokens on `<body>`, so the layer also resolves inside portals. No surface, text or
+  border colour is hardcoded below the bridge; light/dark mode is automatic and no
+  `prefers-color-scheme` overrides are needed.
+- **Floating surfaces follow the host recipe.** Menus, popovers, the prerequisite list,
+  the slash popup and the Select dropdown use the DSH menu surface (translucent fill +
+  backdrop blur), a 16px radius with `corner-shape: superellipse(1.5)`, the panel
+  elevation, and a hairline border. Modal dialogs use the opaque layer-1 surface, the
+  20px radius and the prominent elevation, over the host's dark mask token.
+- **Native `<select>` is gone.** A native select opens an OS-drawn, square, system-coloured
+  popup that cannot be themed. `src/client/board/Select.tsx` is an accessible
+  combobox + listbox with the host surface, keyboard navigation, type-ahead, and a
+  fixed-position popup portalled to `<body>` so it is never clipped by a scrolling modal.
+  Every former select (board filters, task form, settings, external sync) uses it.
+- Urgency and status accents map to the DSH state palette (error / done / business /
+  warn / success), so the dots and chips stay distinguishable without leaving the charte.
+
+
 ---
 
 ## 4. Data, compatibility and migration

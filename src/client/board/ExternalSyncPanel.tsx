@@ -1,22 +1,30 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n/runtime.ts'
+import { Select } from './Select.tsx'
 import type { ExternalProject, ExternalSyncStatus, ProviderDescriptor } from '../../shared/external.ts'
 import type { WorkspaceView } from '../../shared/api.ts'
 import { externalRequest, externalTypeLabel } from '../external-api.ts'
 
 type Status = ExternalSyncStatus
-function ScopePicker({ value, projects, loaded, onChange, t }: { value: string; projects: ExternalProject[]; loaded: boolean; onChange: (value: string) => void; t: (key: string) => string }) {
+function ScopePicker({ value, projects, loaded, onChange, t, ariaLabel }: { value: string; projects: ExternalProject[]; loaded: boolean; onChange: (value: string) => void; t: (key: string) => string; ariaLabel: string }) {
   const [manual, setManual] = useState(false)
   return <>
-    <select title={projects.find(p => p.id === value)?.name} value={manual ? '__manual__' : value} onChange={e => {
-      if (e.target.value === '__manual__') setManual(true)
-      else { setManual(false); onChange(e.target.value) }
-    }}>
-      <option value="">{projects.length ? t('ext.chooseScope') : t(loaded ? 'ext.noScopes' : 'ext.syncListFirst')}</option>
-      {value && !projects.some(p => p.id === value) && <option value={value}>ID: {value}</option>}
-      {projects.map(p => <option key={p.id} value={p.id}>ID: {p.id} · {p.name}</option>)}
-      <option value="__manual__">{t('ext.enterScopeId')}</option>
-    </select>
+    <Select
+      full
+      ariaLabel={ariaLabel}
+      title={projects.find(p => p.id === value)?.name}
+      value={manual ? '__manual__' : value}
+      onChange={v => {
+        if (v === '__manual__') setManual(true)
+        else { setManual(false); onChange(v) }
+      }}
+      options={[
+        { value: '', label: projects.length ? t('ext.chooseScope') : t(loaded ? 'ext.noScopes' : 'ext.syncListFirst') },
+        ...(value !== '' && !projects.some(p => p.id === value) ? [{ value, label: 'ID: ' + value }] : []),
+        ...projects.map(p => ({ value: p.id, label: 'ID: ' + p.id + ' · ' + p.name })),
+        { value: '__manual__', label: t('ext.enterScopeId') },
+      ]}
+    />
     {(manual || !projects.length) && <input aria-label={t('ext.enterScopeId')} value={value} onChange={e => onChange(e.target.value)} />}
   </>
 }
@@ -116,17 +124,28 @@ export function ExternalSyncPanel() {
   return <section className="dsh-atb-diag-sec dsh-atb-external">
     <h4>{t('ext.heading')}</h4><p>{t('ext.hint')}</p>
     <fieldset disabled={busy || status?.running} style={{ border: 0, padding: 0 }}>
-      <label>{t('ext.provider')}<select value={providerId} onChange={e => { const p = status?.providers.find(p => p.id === e.target.value); if (p) selectProvider(p) }}>
-        {(status?.providers ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-      </select></label>
+      <label>{t('ext.provider')}<Select
+        full
+        ariaLabel={t('ext.provider')}
+        value={providerId}
+        onChange={v => {
+          const p = status?.providers.find(item => item.id === v)
+          if (p !== undefined) selectProvider(p)
+        }}
+        options={(status?.providers ?? []).map(p => ({ value: p.id, label: p.name }))}
+      /></label>
       <label>{t('ext.url')}<input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} /></label>
       {providerId !== 'zentao' && <>
         <label>{t('ext.account')}<input value={account} onChange={e => setAccount(e.target.value)} /></label>
         {!descriptor?.capabilities.accountDiscovery && <p>{t('ext.manualAccount')}</p>}
       </>}
-      <label>{t('ext.authMode')}<select value={authMode} onChange={e => { setAuthMode(e.target.value); setCredentials({}) }}>
-        {descriptor?.authModes.map(m => <option key={m.id} value={m.id}>{t(m.label)}</option>)}
-      </select></label>
+      <label>{t('ext.authMode')}<Select
+        full
+        ariaLabel={t('ext.authMode')}
+        value={authMode}
+        onChange={v => { setAuthMode(v); setCredentials({}) }}
+        options={(descriptor?.authModes ?? []).map(m => ({ value: m.id, label: t(m.label) }))}
+      /></label>
       {authentication?.fields.map(field => <label key={field.key}>{t(field.label)}<input type={field.secret === false ? 'text' : 'password'} autoComplete={field.secret === false ? 'username' : 'new-password'} value={credentials[field.key] ?? ''}
         placeholder={canKeepCredentials && status?.credentialPresent[field.key] ? t('ext.tokenSaved') : ''}
         onChange={e => setCredentials({ ...credentials, [field.key]: e.target.value })} /></label>)}
@@ -144,9 +163,16 @@ export function ExternalSyncPanel() {
       {descriptor?.settingsFields?.map(field => <label key={field.key}>{t(field.label)}<input value={settings[field.key] ?? field.defaultValue} onChange={e => setSettings({ ...settings, [field.key]: e.target.value })} /></label>)}
       <label>{t('ext.since')}<input type="date" value={since} onChange={e => setSince(e.target.value)} /></label>
       <label>{t('ext.interval')}<input type="number" min="0" max="1440" value={interval} onChange={e => setIntervalMinutes(e.target.value)} /></label>
-      <label>{t('ext.importStatus')}<select value={importStatus} onChange={e => setImportStatus(e.target.value as 'backlog' | 'todo')}>
-        <option value="backlog">{t('ext.importBacklog')}</option><option value="todo">{t('ext.importTodo')}</option>
-      </select></label>
+      <label>{t('ext.importStatus')}<Select
+        full
+        ariaLabel={t('ext.importStatus')}
+        value={importStatus}
+        onChange={v => setImportStatus(v as 'backlog' | 'todo')}
+        options={[
+          { value: 'backlog', label: t('ext.importBacklog') },
+          { value: 'todo', label: t('ext.importTodo') },
+        ]}
+      /></label>
       {providerId === 'zentao' && <div className="dsh-atb-external-options" role="radiogroup" aria-label={t('ext.mappingMode')}>
         <span>{t('ext.mappingMode')}</span>
           {(['project', 'execution'] as const).map(mode => <label key={mode} style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -171,12 +197,19 @@ export function ExternalSyncPanel() {
           {projectsLoaded && !projects.some(p => p.id === m.projectId) && <span role="alert">{t('ext.scopeUnavailable')}</span>}
         </div> : <>
         <label>{t(descriptor?.scopeLabel ?? 'ext.projectId')}
-          <ScopePicker t={t} loaded={projectsLoaded} value={m.projectId} projects={projects}
+          <ScopePicker t={t} ariaLabel={t(descriptor?.scopeLabel ?? 'ext.projectId')} loaded={projectsLoaded} value={m.projectId} projects={projects}
             onChange={value => setMappings(mappings.map((v, i) => i === index ? { ...v, projectId: value } : v))} />
         </label></>}
-        <label>{t('ext.workspace')}<select value={m.workspaceId} onChange={e => setMappings(mappings.map((v, i) => i === index ? { ...v, workspaceId: e.target.value } : v))}>
-          <option value="">{providerId === 'zentao' ? t('ext.unlinked') : '—'}</option>{workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.title}</option>)}
-        </select></label>
+        <label>{t('ext.workspace')}<Select
+          full
+          ariaLabel={t('ext.workspace')}
+          value={m.workspaceId}
+          onChange={v => setMappings(mappings.map((item, i) => i === index ? { ...item, workspaceId: v } : item))}
+          options={[
+            { value: '', label: providerId === 'zentao' ? t('ext.unlinked') : '—' },
+            ...workspaces.map(ws => ({ value: ws.id, label: ws.title })),
+          ]}
+        /></label>
         {providerId !== 'zentao' && <button type="button" className="dsh-atb-external-remove" aria-label={t('ext.removeMapping', { n: index + 1 })} title={t('ext.removeMapping', { n: index + 1 })}
           disabled={mappings.length === 1} onClick={() => setMappings(mappings.filter((_, i) => i !== index))}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" /></svg>
