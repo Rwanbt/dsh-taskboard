@@ -42,7 +42,9 @@ function realDelay(ms: number): Promise<void> {
 }
 
 /** Pump the REAL loop until `predicate` holds (real fs IO settles here). */
-async function waitFor(predicate: () => boolean, budgetMs = 2_000): Promise<boolean> {
+// Budget is real time for ledger file I/O; slow CI runners exceeded 2 s (run 42611324206).
+// waitFor returns as soon as the predicate holds, so a larger budget never weakens it.
+async function waitFor(predicate: () => boolean, budgetMs = 10_000): Promise<boolean> {
   for (let waited = 0; waited < budgetMs; waited += 5) {
     if (predicate()) return true
     await realDelay(5)
