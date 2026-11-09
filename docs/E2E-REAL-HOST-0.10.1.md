@@ -35,4 +35,17 @@ F (no prerequisite) and G (`dependsOn` a manual task P, not done).
 
 Both periodic tasks were then cancelled and deleted.
 
-Not exercised: worktree isolation (`isolation: none` throughout).
+## Worktree isolation (0.10.2, 13:00–13:35)
+
+Project `default-workspace` = mirror of 5 nested repos. W1 (Claude Haiku) adds `sub()`; W2 (GPT-5.6 Luna) depends on W1 and adds a test.
+
+| Step | Observed |
+| --- | --- |
+| W1 run | mirror created under `.dsh-worktrees/<task>/` on branch `task/WT-1-…`; main checkout untouched |
+| **Bug found** | the agent could not `git commit`: a worktree's index lives in `<repo>/.git/worktrees/…`, outside the sandbox. Work stranded uncommitted |
+| Fix 0.10.2 | host auto-commits remaining changes at settlement (`taskboard: <id> agent changes (auto-commit at settlement)`, identity `dsh-taskboard`) |
+| W1 resumed on 0.10.2 | `autoCommitted: [tb-e2e]`; commit `f578e8a` on the task branch |
+| Run W2 before W1 done | refused (dependency) |
+| Merge W1 (board) | tb-e2e merged `--no-ff`; 4 other repos `noop` |
+| W2 run | Codex committed itself (`9f3fede`); auto-commit had nothing to do |
+| Merge W2, worktree-remove + delete branch (board) | both mirrors and `task/*` branches removed; no residue (`.dsh-worktrees` empty → deleted, `git worktree prune` clean) |
