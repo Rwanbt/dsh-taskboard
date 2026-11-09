@@ -1,0 +1,302 @@
+{
+  "label": "FINAL BUILD: working tree on top of a11384e; lib built 2026-11-09T01:35:18.944+01:00; 36 JS files; lead aggregate sha256 93685FEE9AAE3A808FA25D8DD0AA6EB953F988DADA7B26292CFAEECED737D50B; my per-file: protocol.js 9E7450BF..., store.js 34BAABDD..., routes.js 52A54676..., scheduler.js 948C2E21...",
+  "at": "2026-11-09T01:38:04.1106027+01:00",
+  "home": "C:\\Users\\barat\\dsh-tb-test",
+  "port": 64934,
+  "base": "http://127.0.0.1:64934",
+  "gitHead": "a11384e",
+  "libIndex": "2026-11-09T01:35:18.9206050+01:00 (12924 bytes)",
+  "pass": 39,
+  "fail": 0,
+  "info": 9,
+  "results": [
+    {
+      "Phase": "info",
+      "Check": "harness safety",
+      "Result": "INFO",
+      "Detail": "isolated home 'C:\\Users\\barat\\dsh-tb-test' != real 'C:\\Users\\barat\\.dsh'"
+    },
+    {
+      "Phase": "info",
+      "Check": "repo under test",
+      "Result": "INFO",
+      "Detail": "C:\\Users\\barat\\Documents\\deepseek-harness\\default-workspace\\dsh-taskboard"
+    },
+    {
+      "Phase": "info",
+      "Check": "profile reused",
+      "Result": "INFO",
+      "Detail": "C:\\Users\\barat\\dsh-tb-test\\profiles\\tb"
+    },
+    {
+      "Phase": "core",
+      "Check": "plugin installed as link dependency into isolated profile",
+      "Result": "PASS",
+      "Detail": "linked=True bundled=True :: "
+    },
+    {
+      "Phase": "info",
+      "Check": "workspace registry seeded (isolated home only)",
+      "Result": "INFO",
+      "Detail": "id=6f1c2b8e-4a7d-4c3e-9b2a-1d5e7f9a0b3c path=C:\\Users\\barat\\Documents\\deepseek-harness\\default-workspace"
+    },
+    {
+      "Phase": "info",
+      "Check": "isolated plugin ledger reset",
+      "Result": "INFO",
+      "Detail": "C:\\Users\\barat\\dsh-tb-test\\dsh-taskboard.json"
+    },
+    {
+      "Phase": "info",
+      "Check": "seeded blocked scheduled one-shot (pre-boot)",
+      "Result": "INFO",
+      "Detail": "seed-blocked dependsOn seed-prereq, runAt 6min in the past"
+    },
+    {
+      "Phase": "info",
+      "Check": "host booted",
+      "Result": "INFO",
+      "Detail": "http://127.0.0.1:64934 pid=17628"
+    },
+    {
+      "Phase": "core",
+      "Check": "plugin loaded: GET /workspaces returns a registered project",
+      "Result": "PASS",
+      "Detail": "workspace=6f1c2b8e-4a7d-4c3e-9b2a-1d5e7f9a0b3c path=C:\\Users\\barat\\Documents\\deepseek-harness\\default-workspace"
+    },
+    {
+      "Phase": "core",
+      "Check": "plugin loaded: GET /state answers with the ledger envelope",
+      "Result": "PASS",
+      "Detail": "revision=1 tasks=2"
+    },
+    {
+      "Phase": "core",
+      "Check": "D3: boot catchup DEFERS a blocked one-shot (not spent)",
+      "Result": "PASS",
+      "Detail": "mode=scheduled queuedRunAt=1794184306985 runAt= missedComments=0"
+    },
+    {
+      "Phase": "core",
+      "Check": "create A (todo v1)",
+      "Result": "PASS",
+      "Detail": "id=t-mw8j8bnk-lfy237"
+    },
+    {
+      "Phase": "core",
+      "Check": "create B with dependsOn=[A]",
+      "Result": "PASS",
+      "Detail": "id=t-mw8j8bnz-2cjbdj dependsOn=t-mw8j8bnk-lfy237"
+    },
+    {
+      "Phase": "core",
+      "Check": "GET /state derives dependencyProgress for B",
+      "Result": "PASS",
+      "Detail": "{\"total\":1,\"completed\":0,\"pendingIds\":[\"t-mw8j8bnk-lfy237\"],\"missingIds\":[],\"ready\":false}"
+    },
+    {
+      "Phase": "core",
+      "Check": "B not ready while A is todo",
+      "Result": "PASS",
+      "Detail": "ready=False"
+    },
+    {
+      "Phase": "core",
+      "Check": "GATE run B refused with dependency reason",
+      "Result": "PASS",
+      "Detail": "status=400 unsatisfied dependencies: t-mw8j8bnk-lfy237"
+    },
+    {
+      "Phase": "core",
+      "Check": "GATE move B to in_progress refused with dependency reason",
+      "Result": "PASS",
+      "Detail": "status=400 unsatisfied dependencies: t-mw8j8bnk-lfy237"
+    },
+    {
+      "Phase": "core",
+      "Check": "A in_review does NOT satisfy B",
+      "Result": "PASS",
+      "Detail": "A=in_review B.ready=False"
+    },
+    {
+      "Phase": "core",
+      "Check": "A done makes B ready (completed=1)",
+      "Result": "PASS",
+      "Detail": "A=done ready=True"
+    },
+    {
+      "Phase": "core",
+      "Check": "reopen A re-blocks NEW starts of B (move+run)",
+      "Result": "PASS",
+      "Detail": "ready=False move=400 run=400"
+    },
+    {
+      "Phase": "core",
+      "Check": "GATE comment wake refused with dependency reason",
+      "Result": "PASS",
+      "Detail": "status=400 unsatisfied dependencies: t-mw8j8bto-tqibhl"
+    },
+    {
+      "Phase": "info",
+      "Check": "real agent execution/settlement NOT exercised",
+      "Result": "INFO",
+      "Detail": "isolated DSH home has no model credential; run route exercised for gate outcomes only"
+    },
+    {
+      "Phase": "core",
+      "Check": "indirect cycle A->B->A rejected",
+      "Result": "PASS",
+      "Detail": "invalid_input cycle: dependency cycle via t-mw8j8bnz-2cjbdj"
+    },
+    {
+      "Phase": "core",
+      "Check": "self dependency rejected",
+      "Result": "PASS",
+      "Detail": "invalid_input self: a task cannot depend on itself"
+    },
+    {
+      "Phase": "core",
+      "Check": "duplicate dependency rejected",
+      "Result": "PASS",
+      "Detail": "invalid_input duplicate: duplicate dependency: t-mw8j8bnz-2cjbdj"
+    },
+    {
+      "Phase": "core",
+      "Check": "missing dependency rejected",
+      "Result": "PASS",
+      "Detail": "invalid_input missing: dependency not found or trashed: t-does-not-exist"
+    },
+    {
+      "Phase": "core",
+      "Check": "stale version write rejected",
+      "Result": "PASS",
+      "Detail": "version_conflict stale version 1 (current 2)"
+    },
+    {
+      "Phase": "core",
+      "Check": "F1: soft-delete A repairs C.dependsOn (no dangling ref)",
+      "Result": "PASS",
+      "Detail": "trash=True C.dependsOn= missing="
+    },
+    {
+      "Phase": "core",
+      "Check": "F1: dependent C carries sys.prerequisiteRemoved audit comment",
+      "Result": "PASS",
+      "Detail": "comments=1 keys=sys.prerequisiteRemoved"
+    },
+    {
+      "Phase": "core",
+      "Check": "F1: dependent C is startable after the repair",
+      "Result": "PASS",
+      "Detail": "move status=200 "
+    },
+    {
+      "Phase": "core",
+      "Check": "F1: purge of trashed prerequisite leaves no dangling ref in E",
+      "Result": "PASS",
+      "Detail": "purge=True E.dependsOn="
+    },
+    {
+      "Phase": "core",
+      "Check": "F1 (import-merge path): trashed incoming prerequisite repairs its live dependent",
+      "Result": "PASS",
+      "Detail": "merge=200 MB.dependsOn= audit=True"
+    },
+    {
+      "Phase": "core",
+      "Check": "hierarchy: create child with parentId",
+      "Result": "PASS",
+      "Detail": "parent=t-mw8j8c9w-rnvs9y child=t-mw8j8caa-aw1ji3"
+    },
+    {
+      "Phase": "core",
+      "Check": "hierarchy: GET /state exposes subtaskProgress",
+      "Result": "PASS",
+      "Detail": "{\"total\":1,\"done\":0,\"open\":1,\"blocked\":0,\"missing\":0}"
+    },
+    {
+      "Phase": "core",
+      "Check": "hierarchy: delete-with-children refused (has_children)",
+      "Result": "PASS",
+      "Detail": "status=400 has_children: task still has non-trashed subtasks: t-mw8j8caa-aw1ji3"
+    },
+    {
+      "Phase": "core",
+      "Check": "hierarchy: self-parent refused",
+      "Result": "PASS",
+      "Detail": "status=400 self: a task cannot be its own parent"
+    },
+    {
+      "Phase": "core",
+      "Check": "hierarchy: child start is not gated by the parent status",
+      "Result": "PASS",
+      "Detail": "status=200 "
+    },
+    {
+      "Phase": "core",
+      "Check": "restart fixture: created F and G dependsOn F",
+      "Result": "PASS",
+      "Detail": "F=t-mw8j8ccl-yo5we7 G=t-mw8j8cd1-80dkh9"
+    },
+    {
+      "Phase": "info",
+      "Check": "trashed-record round-trip fixture",
+      "Result": "INFO",
+      "Detail": "U=t-mw8j8cdj-30rvwn trashed, V=t-mw8j8ce0-496uas trashed while still linked to U"
+    },
+    {
+      "Phase": "core",
+      "Check": "export -> import(replace) round-trip keeps dependsOn",
+      "Result": "PASS",
+      "Detail": "import=200 tasks=16 F.present=True G.dependsOn=t-mw8j8ccl-yo5we7"
+    },
+    {
+      "Phase": "core",
+      "Check": "export -> import(replace) preserves QUEUED scheduled work",
+      "Result": "PASS",
+      "Detail": "seed-blocked present=True queuedRunAt=1794184306985"
+    },
+    {
+      "Phase": "core",
+      "Check": "export -> import(replace) round-trips a board with TRASHED linked records",
+      "Result": "PASS",
+      "Detail": "U.present=True V.present=True V.trashed=True"
+    },
+    {
+      "Phase": "core",
+      "Check": "import replace rejects a cyclic ledger atomically",
+      "Result": "PASS",
+      "Detail": "status=400 revision=38->38 msg=cycle: dependency cycle via cyc-y"
+    },
+    {
+      "Phase": "core",
+      "Check": "restart: task survives with dependsOn intact",
+      "Result": "PASS",
+      "Detail": "id=t-mw8j8cd1-80dkh9 dependsOn=t-mw8j8ccl-yo5we7"
+    },
+    {
+      "Phase": "core",
+      "Check": "restart: ledger revision is durable (>= pre-restart)",
+      "Result": "PASS",
+      "Detail": "before=38 after=38"
+    },
+    {
+      "Phase": "core",
+      "Check": "restart: dependency gate still enforced",
+      "Result": "PASS",
+      "Detail": "status=400 unsatisfied dependencies: t-mw8j8ccl-yo5we7"
+    },
+    {
+      "Phase": "core",
+      "Check": "restart: ledger file is under the isolated DSH_HOME",
+      "Result": "PASS",
+      "Detail": "C:\\Users\\barat\\dsh-tb-test\\dsh-taskboard.json"
+    },
+    {
+      "Phase": "core",
+      "Check": "restart: deferred blocked one-shot survives unspent (D3)",
+      "Result": "PASS",
+      "Detail": "mode=scheduled queuedRunAt=1794184306985 missedComments=0"
+    }
+  ]
+}
