@@ -11,6 +11,8 @@ export type { TaskModel, TaskRecord }
 /** Derived projections consumed by the client badge/detail panels (D9). */
 export type { DependencyState } from './dependencies.ts'
 export type { SubtaskProgress } from './hierarchy.ts'
+/** 0.10.1 dependency-change approval requests (stored on the task). */
+export type { DependencyChangeKind, DependencyChangeRequest } from './protocol.ts'
 
 /** Route prefix on the shared DSH webserver (same origin as the GUI). */
 export const ROUTE_PREFIX = '/dsh-taskboard'
@@ -25,6 +27,8 @@ export type ApiErrorCode =
   | 'version_conflict'
   | 'invalid_transition'
   | 'forbidden'
+  /** The pending approval request can no longer apply (task gone/trashed). */
+  | 'stale_request'
   | 'internal'
 
 /** Success envelope. */
@@ -138,8 +142,37 @@ export type UpdateTaskBody = {
 /** Move-task request body (ifVersion mandatory; the user MAY move to done). */
 export type MoveTaskBody = { ifVersion: number; status: string; archiveSessions?: boolean }
 
+// ---------------------------------------------------------------------------
+// Dependency-change approval (0.10.1)
+// ---------------------------------------------------------------------------
+
+/** The user decision on one pending dependency-change request. */
+export type DependencyChangeDecision = 'approve' | 'reject'
+
+/** Route suffix values for {@link dependencyChangePath}. */
+export const DEPENDENCY_CHANGE_APPROVE: DependencyChangeDecision = 'approve'
+export const DEPENDENCY_CHANGE_REJECT: DependencyChangeDecision = 'reject'
+
+/**
+ * Build the user-only decision path:
+ * `POST /dsh-taskboard/tasks/:id/changes/:cid/(approve|reject)`.
+ * Approve takes no body; reject takes {@link RejectDependencyChangeBody}.
+ * @param taskId - the task holding the request.
+ * @param changeId - the `dcr-…` request id.
+ * @param decision - approve or reject.
+ */
+export function dependencyChangePath(taskId: string, changeId: string, decision: DependencyChangeDecision): string {
+  return `${ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}/changes/${encodeURIComponent(changeId)}/${decision}`
+}
+
+/** Reject body: optional user note recorded in the system comment. */
+export type RejectDependencyChangeBody = { note?: string }
+
 export type SessionArchiveResult = { archived: string[]; failed: Array<{ sessionId: string; error: string }>; unsupported: string[] }
 export type MoveTaskResponse = TaskSummary & { sessionArchive?: SessionArchiveResult }
+
+/** Approve/reject response: the same task-summary envelope as `/tasks/:id/move`. */
+export type DependencyChangeDecisionResponse = MoveTaskResponse
 
 /**
  * Quick-reject request body (card ✗ button): move back to todo plus an

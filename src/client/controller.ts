@@ -608,6 +608,40 @@ export class BoardController {
     }
   }
 
+  /**
+   * Approve one pending dependency-change request (user-only). The host applies
+   * the change atomically and appends the audit comment; this refreshes the
+   * board so the request disappears and the dependency state is re-rendered.
+   * @returns whether the route accepted the decision.
+   */
+  async approveChange(taskId: string, changeId: string): Promise<boolean> {
+    try {
+      await this.client.approveChange(taskId, changeId)
+      await this.refresh()
+      return true
+    } catch (error) {
+      this.setState({ error: error instanceof Error ? error.message : String(error) })
+      return false
+    }
+  }
+
+  /**
+   * Reject one pending dependency-change request with an optional note the
+   * agent reads from the audit comment.
+   * @returns whether the route accepted the decision.
+   */
+  async rejectChange(taskId: string, changeId: string, note?: string): Promise<boolean> {
+    const body = note !== undefined && note.trim().length > 0 ? { note: note.trim() } : {}
+    try {
+      await this.client.rejectChange(taskId, changeId, body)
+      await this.refresh()
+      return true
+    } catch (error) {
+      this.setState({ error: error instanceof Error ? error.message : String(error) })
+      return false
+    }
+  }
+
   /** Toggle the blocked marker. */
   async toggleBlocked(task: TaskRecord): Promise<void> {
     try {

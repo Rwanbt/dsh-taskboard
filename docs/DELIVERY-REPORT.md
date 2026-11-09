@@ -2,7 +2,13 @@
 
 Date: 2026-11-09. Repository: `Rwanbt/dsh-taskboard` (fork of `cloader/dsh-taskboard`).
 Branch: `feat/dependencies-lite`. Pull request: **#1** → `dev`.
-Status: **ready for review, not merged.** Merge is a human decision.
+Status: **merged** into `dev` and `main` (merge commit `dcbca56`), released as
+**v0.10.0** (`cc85a96`, CI run 42553693686 green on Node 22 and 26 — triggered
+manually after the merge because Actions push triggers were not active on the fork).
+Follow-up hardening (agent changes to the dependency graph require explicit user
+approval, cross-project agent edits refused) is tracked in
+[dependency-approval.md](./dependency-approval.md) for 0.10.1.
+The sections below describe the pre-merge validation as it was executed.
 
 This report is factual: every result below was executed. Anything not executed is
 listed in §6 as not exercised, not glossed over.

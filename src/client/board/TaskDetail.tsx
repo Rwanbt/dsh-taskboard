@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ExternalSourcePanel } from './ExternalSourcePanel.tsx'
 import { PrerequisitePicker } from './PrerequisitePicker.tsx'
+import { ApprovalPanel } from './ApprovalPanel.tsx'
 import type { BoardController } from '../controller.ts'
 import type { TaskIndexEntry } from '../api.ts'
 import type { CommentRecord, ExecutionRecord, TaskRecord } from '../../shared/protocol.ts'
@@ -42,6 +43,11 @@ function shortId(id: string | undefined): string {
  */
 export function commentBody(t: Translate, c: CommentRecord): string {
   if (c.systemKey === undefined) return c.body
+  // The rejected-change comment carries an optional note; use the no-note
+  // variant when it is absent so no literal "{note}" placeholder leaks.
+  if (c.systemKey === 'sys.dcr.rejected' && (c.systemParams?.note === undefined || c.systemParams.note.length === 0)) {
+    return t('sys.dcr.rejectedNoNote', c.systemParams)
+  }
   if (c.systemRows !== undefined) {
     const summary = c.systemRows
       .map(r => {
@@ -691,6 +697,15 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   const associatedSessions = taskAssociatedSessionIds(task)
   const archiveState = controller.getSnapshot()
   const dependency = task.dependencyProgress ?? dependencyState(task, archiveState.ledger.tasks)
+  // 0.10.1: agent-proposed dependency changes awaiting the user's decision.
+  const pendingChanges = task.pendingChanges ?? []
+  // Run is blocked by unmet prerequisites (the server enforces this too); the
+  // tooltip names them so the user understands why the button is disabled.
+  const unmetPrerequisiteTitles = dependency.pendingIds.map(id => archiveState.ledger.tasks.find(item => item.id === id)?.title ?? id)
+  const runBlockedByDependencies = !dependency.ready
+  const runBlockedTitle = runBlockedByDependencies
+    ? t('dependency.runBlocked', { list: unmetPrerequisiteTitles.join(', ') })
+    : undefined
   // Hierarchy (D6): parent breadcrumb + direct-subtask rollup. The loaded
   // ledger is authoritative for titles/statuses; the host index fills cards
   // the collapsed completed column omitted, and the host-derived projection
@@ -909,8 +924,8 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
             <button
               type="button"
               className="dsh-atb-detail-run"
-              title={t('detail.action.reuseTitle')}
-              disabled={actionBusy}
+              title={runBlockedTitle ?? t('detail.action.reuseTitle')}
+              disabled={actionBusy || runBlockedByDependencies}
               onClick={() => runAction(() => controller.run(task.id, true))}
             >
               <Icon name="play" /> {t('detail.action.reuse')}
@@ -920,8 +935,8 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
             <button
               type="button"
               className="dsh-atb-detail-run"
-              title={task.model !== undefined ? t('detail.action.runTitleModel', { model: task.model.model }) : t('detail.action.runTitleDefault')}
-              disabled={actionBusy}
+              title={runBlockedTitle ?? (task.model !== undefined ? t('detail.action.runTitleModel', { model: task.model.model }) : t('detail.action.runTitleDefault'))}
+              disabled={actionBusy || runBlockedByDependencies}
               onClick={() => runAction(() => controller.run(task.id))}
             >
               <Icon name="play" /> {t('detail.action.run')}
@@ -965,6 +980,15 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
           })}
           <span className="dsh-atb-crumb-current">{task.title}</span>
         </nav>
+      )}
+
+      {pendingChanges.length > 0 && (
+        <ApprovalPanel
+          task={task}
+          changes={pendingChanges}
+          controller={controller}
+          resolveTitle={id => hierarchyNode(id)?.title}
+        />
       )}
 
       {task.external && <ExternalSourcePanel task={task} />}

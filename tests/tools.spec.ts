@@ -390,8 +390,11 @@ describe('R1 regression: writes guard inside the serial queue', () => {
     const before = await readFile(store.location(), 'utf8')
     const outsider = { agent: { id: 'session-2', session: { header: { cwd } } } }
     const args = { id, ifVersion: 2, ...(name === 'taskboard_move' ? { status: 'in_review' } : {}) }
+    // 0.10.1: a session outside the task's project is refused by the project
+    // boundary BEFORE the hold check; the same-project foreign session still
+    // hits the explicit hold guard. Both refusals must leave the ledger intact.
     await expect(tool(name).execute(args, outsider))
-      .rejects.toThrow(/forbidden: task is held by session session-1/)
+      .rejects.toThrow(cwd === '/proj/a' ? /forbidden: task is held by session session-1/ : /workspace_mismatch/)
     expect(await readFile(store.location(), 'utf8')).toBe(before)
     expect(store.get(id)).toMatchObject({ status: 'in_progress', claimedBy: 'session-1', version: 2, executions: [] })
     expect(store.get(id)!.trashedAt).toBeUndefined()
@@ -406,18 +409,27 @@ describe('R1 regression: writes guard inside the serial queue', () => {
     await expect(tool('taskboard_delete').execute({ id, ifVersion: 1 }, exec)).rejects.toThrow(/version_conflict/)
     expect(store.get(id)!.claimedBy).toBe('session-1')
     expect(store.get(id)!.trashedAt).toBeUndefined()
-    expect(await tool('taskboard_delete').execute({ id, ifVersion: 2 }, exec)).toEqual({ trashed: true })
+    const deleted = await tool('taskboard_delete').execute({ id, ifVersion: 2 }, exec) as { trashed: boolean; task: { id: string } }
+    expect(deleted).toMatchObject({ trashed: true })
+    expect(deleted.task.id).toBe(id)
     expect(store.get(id)).toMatchObject({ trashedAt: 7_000, version: 3 })
     expect(store.get(id)!.claimedBy).toBeUndefined()
     expect(store.get(id)!.claimedAt).toBeUndefined()
     for (const dispose of disposers) dispose()
   })
 
-  it('keeps unclaimed tasks deletable by another project session', async () => {
+  it('confines agent deletes to the calling project (0.10.1 project boundary)', async () => {
     const { store, disposers, tool, exec } = await setup()
     const created = await tool('taskboard_create').execute({ title: 'Unclaimed task', workspaceId: 'ws-a', urgency: 'normal' }, exec) as { task: { id: string } }
     const outsider = { agent: { id: 'session-2', session: { header: { cwd: '/proj/b' } } } }
-    expect(await tool('taskboard_delete').execute({ id: created.task.id, ifVersion: 1 }, outsider)).toEqual({ trashed: true })
+    // Cross-project deletion is now refused outright (until 0.10.0 an unclaimed
+    // card was deletable by any project; that let one project's agent erase
+    // another project's card).
+    await expect(tool('taskboard_delete').execute({ id: created.task.id, ifVersion: 1 }, outsider))
+      .rejects.toThrow(/workspace_mismatch/)
+    expect(store.get(created.task.id)!.trashedAt).toBeUndefined()
+    // The owning project may still delete it.
+    expect(await tool('taskboard_delete').execute({ id: created.task.id, ifVersion: 1 }, exec)).toMatchObject({ trashed: true })
     expect(store.get(created.task.id)!.trashedAt).toBe(7_000)
     for (const dispose of disposers) dispose()
   })

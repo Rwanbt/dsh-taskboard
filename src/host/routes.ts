@@ -29,8 +29,10 @@ import {
   checklistFromTexts,
   defaultIsolationOf,
   defaultPermissionOf,
+  dependencyChangeIds,
   isValidRelRepoPath,
   newCommentId,
+  newSystemComment,
   newTaskId,
   normalizeBody,
   normalizeChecklist,
@@ -38,6 +40,7 @@ import {
   normalizeModel,
   normalizePrompt,
   normalizeTitle,
+  removeDependencyChange,
   sanitizeCustomBranchName,
   summarize,
   syncClaim,
@@ -71,6 +74,8 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024
 const TASK_DIFF_RE = new RegExp(`^${ROUTE_PREFIX}/tasks/([^/]+)/diff$`)
 const TASK_RE = new RegExp(`^${ROUTE_PREFIX}/tasks/([^/]+)$`)
 const TASK_ACTION_RE = new RegExp(`^${ROUTE_PREFIX}/tasks/([^/]+)/([\\w-]+)$`)
+/** 0.10.1 user decision on one pending dependency-change request. */
+const TASK_CHANGE_RE = new RegExp(`^${ROUTE_PREFIX}/tasks/([^/]+)/changes/([^/]+)/(approve|reject)$`)
 const ASSET_RE = new RegExp(`^${ROUTE_PREFIX}/assets/([a-f0-9]{64}\\.(?:png|jpg|gif|webp))$`)
 
 /** How long a workspace git-detection result stays cached (fail-soft). */
@@ -189,7 +194,7 @@ function json(res: ServerResponse, payload: ApiResult<unknown>, status = 200): v
 function fail(code: ApiFail['error']['code'], message: string): { res: ApiFail; status: number } {
   const status = code === 'invalid_input' || code === 'invalid_transition' ? 400
     : code === 'not_found' ? 404
-      : code === 'version_conflict' ? 409
+      : code === 'version_conflict' || code === 'stale_request' ? 409
         : code === 'forbidden' ? 403
           : 500
   return { res: { ok: false, error: { code, message } }, status }
@@ -269,13 +274,13 @@ function toFail(error: unknown): { res: ApiFail; status: number } {
   // to parse the 'Error: <code>: …' prefix it also renders into the message.
   if (error instanceof ToolError) {
     const mapped = error.code === ERR.workspaceMismatch ? 'forbidden' : error.code
-    const known: ApiFail['error']['code'][] = ['invalid_input', 'not_found', 'version_conflict', 'invalid_transition', 'forbidden', 'internal']
+    const known: ApiFail['error']['code'][] = ['invalid_input', 'not_found', 'version_conflict', 'invalid_transition', 'forbidden', 'internal', 'stale_request']
     if ((known as string[]).includes(mapped)) {
       return fail(mapped as ApiFail['error']['code'], message.slice(7 + error.code.length + 2))
     }
   }
   const code = message.startsWith('Error: ') ? message.slice(7).split(':')[0] : undefined
-  const known2: ApiFail['error']['code'][] = ['invalid_input', 'not_found', 'version_conflict', 'invalid_transition', 'forbidden', 'internal']
+  const known2: ApiFail['error']['code'][] = ['invalid_input', 'not_found', 'version_conflict', 'invalid_transition', 'forbidden', 'internal', 'stale_request']
   if (code !== undefined && (known2 as string[]).includes(code)) {
     return fail(code as ApiFail['error']['code'], message.slice(7 + code.length + 2))
   }
@@ -877,6 +882,142 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
             return [task]
           })
           json(res, { ok: true, value: summarize(task) }, 201)
+        } catch (error) {
+          const f = toFail(error)
+          json(res, f.res, f.status)
+        }
+        return
+      }
+
+      // ------------------------------- POST /tasks/:id/changes/:cid/{approve|reject}
+      // (0.10.1) User-only decision on ONE agent-proposed dependency weakening.
+      // Approve applies the change atomically in this same mutation; reject
+      // only discards the request. Both leave an audit system comment the agent
+      // reads through taskboard_comments.
+      const changeMatch = pathname.match(TASK_CHANGE_RE)
+      if (changeMatch !== null) {
+        const id = changeMatch[1]!
+        const changeId = changeMatch[2]!
+        const decision = changeMatch[3]! as 'approve' | 'reject'
+        try {
+          const noteRaw = decision === 'reject' ? str(body, 'note') : null
+          const note = noteRaw === null ? undefined : (noteRaw.trim().slice(0, 500) || undefined)
+          let nextTask: TaskRecord | undefined
+          let stale: 'missing' | 'trashed' | undefined
+          let missingRequest = false
+          await store.mutate('task-updated', ledger => {
+            const index = ledger.tasks.findIndex(candidate => candidate.id === id)
+            if (index < 0) {
+              stale = 'missing'
+              return undefined
+            }
+            const task = ledger.tasks[index]!
+            const request = (task.pendingChanges ?? []).find(change => change.id === changeId)
+            if (request === undefined) {
+              missingRequest = true
+              return undefined
+            }
+            const now = options.now()
+            const ids = dependencyChangeIds(request)
+            const params: Record<string, string> = {
+              kind: request.kind,
+              ids: ids.join(','),
+              reason: request.reason,
+              ...(note !== undefined ? { note } : {}),
+            }
+            // Stale: the card was trashed after the request was recorded. The
+            // decision is NOT silently applied — discard the request (audit
+            // comment) and answer 409 stale_request.
+            if (task.trashedAt !== undefined) {
+              stale = 'trashed'
+              nextTask = structuredClone(task)
+              removeDependencyChange(nextTask, changeId)
+              nextTask.comments.push(newSystemComment(
+                'sys.dcr.stale',
+                '[系统] 依赖变更请求已失效：任务已被删除，请求已丢弃。',
+                params,
+                now,
+              ))
+              nextTask.version = task.version + 1
+              nextTask.updatedAt = now
+              nextTask.updatedBy = { kind: 'user' }
+              ledger.tasks[index] = nextTask
+              return [nextTask]
+            }
+            const next = structuredClone(task)
+            if (decision === 'approve') {
+              if (request.kind === 'remove-prerequisites') {
+                const drop = new Set(request.remove ?? [])
+                const kept = (next.dependsOn ?? []).filter(prerequisite => !drop.has(prerequisite))
+                if (kept.length > 0) next.dependsOn = kept
+                else delete next.dependsOn
+                removeDependencyChange(next, changeId)
+                next.comments.push(newSystemComment(
+                  'sys.dcr.approved',
+                  `[系统] 用户已批准移除前置依赖：${ids.length > 0 ? ids.join(', ') : '（已无对应依赖）'}。`,
+                  params,
+                  now,
+                ))
+              } else {
+                // trash-prerequisite: the same atomic trash + dependent repair
+                // as a manual delete. Live children and a running execution
+                // still refuse (D7/S5) and the request stays pending so the
+                // user can retry afterwards.
+                if (task.executions.some(execution => execution.outcome === 'running')) {
+                  throw new Error('Error: invalid_input: 任务有正在运行的执行，请先取消或等它结束')
+                }
+                assertNoChildren(id, ledger.tasks)
+                next.trashedAt = now
+                delete next.claimedBy
+                delete next.claimedAt
+                next.blocked = false
+                removeDependencyChange(next, changeId)
+                next.comments.push(newSystemComment(
+                  'sys.dcr.approved',
+                  `[系统] 用户已批准删除前置任务「${task.title}」。`,
+                  params,
+                  now,
+                ))
+                next.version = task.version + 1
+                next.updatedAt = now
+                next.updatedBy = { kind: 'user' }
+                ledger.tasks[index] = next
+                const repaired = detachPrerequisitesOfTrashed(ledger, [{ id, title: task.title }], now)
+                nextTask = next
+                return [next, ...repaired]
+              }
+            } else {
+              removeDependencyChange(next, changeId)
+              next.comments.push(newSystemComment(
+                'sys.dcr.rejected',
+                `[系统] 用户已拒绝依赖变更（${request.kind}）${note !== undefined ? `。说明：${note}` : ''}`,
+                params,
+                now,
+              ))
+            }
+            next.version = task.version + 1
+            next.updatedAt = now
+            next.updatedBy = { kind: 'user' }
+            ledger.tasks[index] = next
+            nextTask = next
+            return [next]
+          })
+          if (stale === 'missing') {
+            const f = fail('stale_request', 'the task no longer exists; the pending request is void')
+            json(res, f.res, f.status)
+            return
+          }
+          if (missingRequest) {
+            const f = fail('not_found', 'no such pending dependency-change request')
+            json(res, f.res, f.status)
+            return
+          }
+          if (stale === 'trashed') {
+            const f = fail('stale_request', 'the task was deleted; the pending request was discarded')
+            json(res, f.res, f.status)
+            return
+          }
+          json(res, { ok: true, value: summarize(nextTask!) })
         } catch (error) {
           const f = toFail(error)
           json(res, f.res, f.status)
