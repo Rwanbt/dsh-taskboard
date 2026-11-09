@@ -19,7 +19,14 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 
 **零配置**：安装即用——无需 Token、无需 API Key、无需额外服务或数据库。
 
-## 分支说明（`feat/dependencies-lite`）
+## Rwanbt 分支 — v0.10.2
+
+稳定版本：[v0.10.2](https://github.com/Rwanbt/dsh-taskboard/releases/tag/v0.10.2)。改动已合入本分支的 `main` 与 `dev`；上游 `cloader/dsh-taskboard` 未修改。上方 npm 徽章与下方 npm 安装命令指向上游；安装本分支请参阅[安装指南](./docs/INSTALL-FORK.md)。
+
+- **用户显式审批（0.10.1）**：agent 可直接增加前置依赖，但移除依赖或删除仍被依赖的任务仅生成带理由的审批请求。用户在 GUI 批准前约束保持有效，agent 可继续其他工作。请求计入「待我处理」（包括已完成任务）；拒绝 agent 跨项目修改、删除或移动任务。
+- **Worktree 结算（0.10.2）**：agent 应尽可能自行提交；沙箱阻止提交时，宿主在收集证据前以 `dsh-taskboard` 身份提交任务分支上的剩余改动。hook 拒绝会记录错误并保留工作，多仓库镜像逐仓处理。
+- **不限定模型供应商**：看板工具面向 DSH 会话，受会话 preset 与项目权限约束，不要求使用 DeepSeek 账户。真实宿主测试覆盖 Claude/Anthropic、GPT/Codex、Gemini/Google、Mistral、GLM/OpenCode；Gemini 成功记录请求后触发供应商配额限制。
+- **真实宿主验证**：依赖阻塞、审批与拒绝、跨项目拒绝、周期 cron 延迟重放、worktree 隔离、合并与清理见 [E2E 报告](./docs/E2E-REAL-HOST-0.10.1.md)。这些是有限场景验证，不代表穷尽所有生产情况。
 
 本分支在上游基础上新增以下能力。完整设计见 [docs/dependencies-lite.md](./docs/dependencies-lite.md)，审计与验收标准见 [docs/fork-audit.md](./docs/fork-audit.md)，安装说明见 [docs/INSTALL-FORK.md](./docs/INSTALL-FORK.md)。
 
@@ -29,7 +36,8 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 - **DSH 设计规范**：颜色、圆角、阴影全部取自 `--dsw-*` 设计令牌（亮/暗主题）。原生 `<select>` 替换为主题化、可访问的 `Select`（弹层挂载到 `<body>`，完整键盘支持）。看板采用无边框布局（以色调与阴影区分层级），图标统一为单色 SVG，不再使用 emoji。
 - **健壮性**：台账锁在 Windows 上遇到瞬时 `EPERM`/`EACCES`/`ENOENT` 时按争用处理并重试。
 
-测试：`npm run build && npm test`（70 个文件，975 个用例）。覆盖率：`npm run test:coverage`（v8，行覆盖约 88.6%，见 [tests/qa/COVERAGE.md](./tests/qa/COVERAGE.md)）。
+测试：`npm run build && npm test`（v0.10.2：74 个文件、1026 个用例），发布前 CI 在 Node 22 与 26 上通过。覆盖率：`npm run test:coverage`；[覆盖率报告](./tests/qa/COVERAGE.md)记录的是较早的 975 用例基线（行覆盖约 88.6%），并非 v0.10.2 的重新测量。
+
 ## 界面
 
 <p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="任务看板" width="880"></p>
