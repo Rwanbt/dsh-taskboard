@@ -866,6 +866,15 @@ export type ExecutionRecord = {
   diffStat?: string
   /** How many files differ between baseCommit and headCommit. */
   changedFiles?: number
+  /**
+   * Repos (mirror keys; `''` = the workspace root repo) whose remaining agent
+   * changes the HOST auto-committed at settlement (0.10.2). A worktree's index
+   * lives outside the agent sandbox, so the host commits the leftovers before
+   * collecting evidence; absent when nothing was committed.
+   */
+  autoCommitted?: string[]
+  /** Fail-soft detail when a settlement auto-commit failed (settlement still proceeds). */
+  autoCommitError?: string
   /** Per-repo facts of a multi-repo mirror run (0.6.3; absent on single-repo runs). */
   repos?: ExecutionRepoEvidence[]
   /** The agent's structured report, submitted via taskboard_execution_report. */
@@ -2088,6 +2097,11 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
           ...(typeof xe.dirtyFilesTotal === 'number' ? { dirtyFilesTotal: xe.dirtyFilesTotal } : {}),
           ...(typeof xe.diffStat === 'string' ? { diffStat: xe.diffStat } : {}),
           ...(typeof xe.changedFiles === 'number' ? { changedFiles: xe.changedFiles } : {}),
+          // 0.10.2 settlement auto-commit evidence survives export/import.
+          ...(Array.isArray(xe.autoCommitted)
+            ? { autoCommitted: xe.autoCommitted.filter((repo): repo is string => typeof repo === 'string' && isValidRelRepoPath(repo)).slice(0, MAX_MIRROR_REPOS) }
+            : {}),
+          ...(typeof xe.autoCommitError === 'string' ? { autoCommitError: xe.autoCommitError.slice(0, 1000) } : {}),
           ...(Array.isArray(xe.repos) ? { repos: xe.repos.slice(0, MAX_MIRROR_REPOS).map(normalizeRepoEvidence).filter((r): r is ExecutionRepoEvidence => r !== undefined) } : {}),
           ...(typeof xe.report === 'object' && xe.report !== null ? { report: normalizeExecutionReport(xe.report) } : {}),
         })

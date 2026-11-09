@@ -30,6 +30,8 @@ export const TASKBOARD_PROTOCOL = [
   '8. 模型与定时只读：任务的 model 与 execution 配置归创建者/用户所有，update 工具不允许你修改这两个字段。',
   '9. 依赖审批：通过工具移除前置依赖、或删除被其他任务依赖的前置任务时，必须提供 reason；改动只记录为待用户审批（pending_approval），不会立即生效——立即继续其他工作，不要等待审批。跨项目的 update/delete/move 会被拒绝（workspace_mismatch）。',
   '9. Dependency approval: removing prerequisites or deleting a prerequisite through a tool requires `reason`; the change only becomes a pending user approval (`pending_approval`) and never applies immediately — continue other work instead of waiting for the decision. Cross-project update/delete/move is refused with `workspace_mismatch`.',
+  '工作区隔离：Git Worktree 模式下请自行 git commit 你的改动；若沙箱限制导致无法提交，看板会在执行结束时自动提交剩余改动（message `taskboard: <taskId> agent changes (auto-commit at settlement)`），不要因此丢弃已完成的修改。',
+  'Worktree isolation: commit your changes yourself when you can; if the sandbox blocks `git commit`, the board auto-commits the remaining changes at settlement (message `taskboard: <taskId> agent changes (auto-commit at settlement)`) — never drop finished work because of that.',
   '项目边界：默认只有属于任务所在项目的会话才能认领（todo→in_progress）或执行它；仅当看板开启 allowClaimFromLinkedRoots 且任务项目是本会话已挂载的关联工作区时，才可跨主根认领。任务归属不变，读写、构建和 git 操作必须使用任务所属项目的目录；关联根可见性不代表写入权限。',
   '用户提到「任务看板/看板/认领任务」时即指本插件，请据此协作。',
   '需要用户提供信息、登录、扫码或决策时，用 taskboard_update 设置 waitingForHuman=true 和 waitingReason；原因只写所需操作，不写凭据。解除等待时设置 false，此标记与 blocked 独立。',

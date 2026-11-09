@@ -5,8 +5,8 @@
  *
  * Design invariants (plan §3.4/§3.5):
  * - NARROW interface: detect / binaryAvailable / prepareWorktree / collect /
- *   merge / isAncestor / removeWorktree / deleteBranch — nothing else leaks
- *   into the plugin.
+ *   commitWorktree / merge / isAncestor / removeWorktree / deleteBranch —
+ *   nothing else leaks into the plugin.
  * - FAIL-SOFT: every call has a timeout and resolves to a benign result
  *   (false / undefined / empty facts) on ANY git failure — a missing git,
  *   a locked worktree, or a damaged repo degrades execution to the original
@@ -110,6 +110,24 @@ export function worktreeStatusError(path: string, cause?: unknown): Error & { co
   })
 }
 
+/**
+ * Host-side settlement auto-commit outcome (0.10.2). A linked git worktree's
+ * index lives under `<mainrepo>/.git/worktrees/<name>/`, OUTSIDE the DSH
+ * sandbox writable root, so a `workspace-write` agent cannot `git commit` at
+ * all. The host commits the agent's remaining changes at settlement (it is not
+ * sandboxed), and reports the outcome without ever throwing.
+ */
+export type AutoCommitOutcome = 'committed' | 'clean' | 'branch-mismatch' | 'failed'
+
+/** Facts of one auto-commit attempt. */
+export interface AutoCommitResult {
+  outcome: AutoCommitOutcome
+  /** The new commit hash when outcome = 'committed'. */
+  commit?: string
+  /** Verbatim failure detail (capped) when outcome = 'failed'. */
+  error?: string
+}
+
 /** Facts needed to open an isolated execution. */
 export interface WorktreeInfo {
   /** Absolute worktree path (the session's cwd). */
@@ -163,6 +181,24 @@ export interface GitFace {
    * never clean: destructive callers must refuse it.
    */
   dirtyLines(cwd: string): Promise<string[] | undefined>
+  /**
+   * Commit the agent's remaining changes in ONE prepared worktree on its task
+   * branch (0.10.2). Runs host-side because the sandboxed agent cannot write
+   * that worktree's index (`<mainrepo>/.git/worktrees/<name>/` is outside its
+   * writable root). Structural mirror noise under `excludeRelPaths` (the
+   * nested repo worktrees) is never committed. Fail-soft: never throws —
+   * clean / wrong branch / git failure are reported via {@link AutoCommitResult}.
+   * @param worktreePath - the prepared worktree path.
+   * @param branch - the task branch that MUST be checked out there.
+   * @param message - commit message.
+   * @param excludeRelPaths - repo-relative structural noise to keep uncommitted.
+   */
+  commitWorktree?(
+    worktreePath: string,
+    branch: string,
+    message: string,
+    excludeRelPaths?: readonly string[],
+  ): Promise<AutoCommitResult>
   /**
    * Merge `branch` into the main worktree (`--no-ff`); THROWS with a readable
    * reason. `exemptRelPaths` extends the main-clean exemption beyond
@@ -390,6 +426,56 @@ export function createGitFace(exec: ExecFn = realExec): GitFace {
     },
 
     dirtyLines,
+
+    // 0.10.2: settlement auto-commit. The agent sandbox cannot write a linked
+    // worktree's index (it lives under <mainrepo>/.git/worktrees/<name>/), so
+    // the host commits the agent's remaining work here, AFTER the session went
+    // idle but BEFORE evidence collection. Only the task branch is eligible;
+    // structural mirror noise is excluded from the index and an empty commit is
+    // never created. Never throws (fail-soft): the caller records the outcome.
+    commitWorktree: (worktreePath, branch, message, excludeRelPaths) => withRootLock(worktreePath, async (): Promise<AutoCommitResult> => {
+      try {
+        // The worktree must be ON the task branch: committing agent leftovers
+        // onto a user's own branch checked out at that path would be theft.
+        const head = await quick(['rev-parse', '--abbrev-ref', 'HEAD'], worktreePath)
+        if (!head.ok || head.stdout.trim() !== branch) return { outcome: 'branch-mismatch' }
+        const status = await quick(['status', '--porcelain'], worktreePath)
+        if (!status.ok) return { outcome: 'failed', error: 'git status unavailable; worktree index not committable' }
+        const realDirty = status.stdout.split('\n')
+          .filter(line => line.trim().length > 0)
+          .filter(line => !statusLineUnder(line, excludeRelPaths ?? []))
+        if (realDirty.length === 0) return { outcome: 'clean' }
+        // Pathspec exclusion keeps mirror-structural noise (nested repo
+        // worktrees / gitlink drift) out of the index entirely — staging it
+        // would record an embedded-repository gitlink in the agent's commit.
+        const excludes = (excludeRelPaths ?? [])
+          .filter(rel => rel.length > 0)
+          .map(rel => `:(exclude)${rel.replaceAll('\\', '/')}`)
+        const added = await heavy(['add', '-A', '--', '.', ...excludes], worktreePath)
+        if (!added.ok) {
+          return { outcome: 'failed', error: (added.stderr.trim() || added.stdout.trim() || 'git add failed').slice(0, 500) }
+        }
+        const staged = await quick(['diff', '--cached', '--quiet'], worktreePath)
+        // exit 0 (= ok) means nothing staged: everything was structural noise.
+        if (staged.ok) return { outcome: 'clean' }
+        // Fixed identity via -c: never depend on (or mutate) global git config.
+        const committed = await heavy([
+          '-c', 'user.name=dsh-taskboard',
+          '-c', 'user.email=taskboard@localhost',
+          'commit', '-m', message,
+        ], worktreePath)
+        if (!committed.ok) {
+          return {
+            outcome: 'failed',
+            error: (committed.stderr.trim() || committed.stdout.trim() || 'git commit failed').slice(0, 500),
+          }
+        }
+        const hash = await quick(['rev-parse', 'HEAD'], worktreePath)
+        return { outcome: 'committed', ...(hash.ok ? { commit: hash.stdout.trim() } : {}) }
+      } catch (error) {
+        return { outcome: 'failed', error: (error instanceof Error ? error.message : String(error)).slice(0, 500) }
+      }
+    }),
 
     merge: (root, branch, exemptRelPaths) => withRootLock(root, async () => {
       // Main-clean check. The plugin's own worktree directory
