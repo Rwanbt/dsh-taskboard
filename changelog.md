@@ -1,5 +1,11 @@
 # 更新日志 / Changelog
 
+### 0.10.2 — 2026-11-09
+
+- **Worktree 自动提交**：沙箱中的 agent 无法在 worktree 内 `git commit`；结算时由宿主自动提交剩余改动（固定身份 dsh-taskboard），工作不再滞留为未提交状态。
+
+**English:** Worktree auto-commit: sandboxed agents cannot `git commit` inside a task worktree (the index lives outside the sandbox), so the host now commits remaining changes at settlement with a fixed identity; fail-soft, recorded in execution evidence.
+
 ### 0.10.1 — 2026-11-09
 
 - **依赖变更需用户批准**：agent 移除前置任务或删除仍被依赖的任务时，只生成待审批请求（需填写理由），agent 可继续其他工作；用户在详情页批准或拒绝后才生效。待审批任务计入「待我处理」。
