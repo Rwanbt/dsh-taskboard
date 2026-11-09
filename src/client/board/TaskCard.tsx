@@ -15,8 +15,9 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import type { BoardController } from '../controller.ts'
 import { taskSessionId, type TaskRecord } from '../../shared/protocol.ts'
 import { dependencyState } from '../../shared/dependencies.ts'
+import { subtaskProgress } from '../../shared/hierarchy.ts'
 import { checkNeedsHuman, fmtTime, isStaleClaim } from './format.ts'
-import { OUTCOME_KEYS, URGENCY_KEYS } from './labels.ts'
+import { OUTCOME_KEYS, URGENCY_KEYS, statusText } from './labels.ts'
 import { useT } from '../i18n/runtime.ts'
 import { externalTypeLabel } from '../external-api.ts'
 
@@ -54,6 +55,25 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   const stale = now !== undefined && isStaleClaim(task, now)
   const reviewing = task.status === 'in_review' && task.trashedAt === undefined
   const dependency = task.dependencyProgress ?? dependencyState(task, controller.getSnapshot().ledger.tasks)
+  // The card badge is information, never an error: its tooltip carries the
+  // actual prerequisite names + statuses (the detail belongs there, not on
+  // the card). Missing/trashed ids are resolved from the loaded ledger; a
+  // prerequisite omitted by the collapsed completed column still shows its id.
+  const dependencyTitle = (task.dependsOn ?? []).map(id => {
+    const source = controller.getSnapshot().ledger.tasks.find(item => item.id === id)
+    if (source !== undefined && source.trashedAt === undefined) {
+      return `${source.title} (${statusText(t, source.status)})`
+    }
+    // The loaded ledger omits done cards while the completed column is
+    // collapsed; the host-derived projection still tells missing from merely
+    // not-loaded, so only genuinely dangling ids are labelled as deleted.
+    if (dependency.missingIds.includes(id)) return `${source?.title ?? id} (${t('dependency.missing')})`
+    return source?.title ?? id
+  }).join(' · ')
+  // Hierarchy progress (D6/D9): prefer the host's derived projection, fall
+  // back to counting the loaded ledger. Only shown when direct children exist.
+  const subtasks = task.subtaskProgress ?? subtaskProgress(task.id, controller.getSnapshot().ledger.tasks)
+  const subtaskTitle = t('hierarchy.badgeTitle', { done: subtasks.done, total: subtasks.total, open: subtasks.open })
   const needsHuman = checkNeedsHuman(task, t)
   const latestReport = last?.report
   const latestWithGit = last
@@ -212,9 +232,23 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
         <span className="dsh-atb-badge">{t(URGENCY_KEYS[task.urgency])}</span>
         {task.blocked && <span className="dsh-atb-badge" data-kind="blocked">{t('shared.blocked')}</span>}
         {dependency.total > 0 && (
-          <span className="dsh-atb-badge" data-kind={dependency.ready ? 'checklist' : 'blocked'}
-            title={dependency.ready ? t('dependency.progress', { done: dependency.completed, total: dependency.total }) : t('dependency.waiting', { count: dependency.pendingIds.length })}>
+          <span
+            className="dsh-atb-badge"
+            data-kind="dependency"
+            data-ready={dependency.ready ? 'true' : undefined}
+            title={t('dependency.badgeTitle', { list: dependencyTitle })}
+          >
             🔗 {dependency.completed}/{dependency.total}
+          </span>
+        )}
+        {subtasks.total > 0 && (
+          <span
+            className="dsh-atb-badge"
+            data-kind="subtasks"
+            data-ready={subtasks.open === 0 ? 'true' : undefined}
+            title={subtaskTitle}
+          >
+            ▸ {subtasks.done}/{subtasks.total}
           </span>
         )}
         {stale && <span className="dsh-atb-badge" data-kind="stale">{t('card.badge.stale')}</span>}

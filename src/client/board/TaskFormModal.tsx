@@ -174,6 +174,12 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
   const state = controller.getSnapshot()
   const { alert: showAlert, el: alertEl } = useAlert()
   const prefill: TaskTemplateSpec | undefined = state.templatePrefill
+  // "Add subtask" (D6): the create form submits this parent id; the host
+  // validates same-workspace/cycle/depth atomically. Edit mode never uses it.
+  const subtaskParentId = task === undefined ? state.subtaskParentId : undefined
+  const subtaskParent = subtaskParentId === undefined
+    ? undefined
+    : state.ledger.tasks.find(item => item.id === subtaskParentId)
   const editing = task !== undefined
   const [title, setTitle] = useState(task?.title ?? prefill?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? '')
@@ -442,6 +448,7 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
         presetId: presetOut ?? null,
         permission,
         ...(rows.length > 0 ? { checklist: rows.map(r => r.text) } : {}),
+        ...(subtaskParentId !== undefined ? { parentId: subtaskParentId } : {}),
       })
     void action.catch(() => undefined).finally(() => setBusy(false))
   }
@@ -487,6 +494,7 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
           presetId: presetOut ?? null,
           permission,
           ...(rows.length > 0 ? { checklist: rows.map(r => r.text) } : {}),
+          ...(subtaskParentId !== undefined ? { parentId: subtaskParentId } : {}),
         })
         if (id !== undefined) await controller.run(id)
       }
@@ -539,7 +547,11 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
           <span className="dsh-atb-modal-headicon">{editing ? '✎' : '✚'}</span>
           <div className="dsh-atb-modal-headtext">
             <h3>{editing ? t('form.title.edit') : t('form.title.create')}</h3>
-            <p>{editing ? t('form.subtitle.edit') : t('form.subtitle.create')}</p>
+            <p>{editing
+              ? t('form.subtitle.edit')
+              : subtaskParentId !== undefined
+                ? t('hierarchy.formSubtitle', { title: subtaskParent?.title ?? subtaskParentId })
+                : t('form.subtitle.create')}</p>
           </div>
           <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeForm()}>✕</button>
         </div>

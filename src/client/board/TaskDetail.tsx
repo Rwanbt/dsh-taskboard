@@ -9,13 +9,16 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ExternalSourcePanel } from './ExternalSourcePanel.tsx'
+import { PrerequisitePicker } from './PrerequisitePicker.tsx'
 import type { BoardController } from '../controller.ts'
+import type { TaskIndexEntry } from '../api.ts'
 import type { CommentRecord, ExecutionRecord, TaskRecord } from '../../shared/protocol.ts'
 import { canTransition, checklistProgress, taskAssociatedSessionIds, taskSessionId } from '../../shared/protocol.ts'
 import { dependencyState } from '../../shared/dependencies.ts'
+import { ancestorsOf } from '../../shared/hierarchy.ts'
 import { useAlert } from './AlertModal.tsx'
 import { checkNeedsHuman, fmtTime, isStaleClaim } from './format.ts'
-import { MOVE_KEYS, OUTCOME_KEYS, STATUS_KEYS, URGENCY_KEYS } from './labels.ts'
+import { MOVE_KEYS, OUTCOME_KEYS, STATUS_KEYS, URGENCY_KEYS, statusText } from './labels.ts'
 import { useT, type Translate } from '../i18n/runtime.ts'
 import { IMAGE_ACCEPT, acceptedImageFiles, imageAlt, imageMarkdown, insertImageMarkdown } from '../image-insert.ts'
 
@@ -639,7 +642,6 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   // share one in-flight guard: a double click used to fire duplicate runs or
   // copies while the first round-trip was still pending (review P0).
   const [actionBusy, setActionBusy] = useState(false)
-  const [prerequisiteId, setPrerequisiteId] = useState('')
   // The task id is the only stable handle to quote when talking about a card
   // from the outside (agents, logs, issue reports) and the detail panel never
   // showed it. Click copies it, the label acknowledges the copy.
@@ -658,6 +660,18 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   }
   // 执行记录默认折叠：细节按需展开，避免长卡（用户要求 0.9.x）。
   const [execOpen, setExecOpen] = useState(false)
+  // Untrashed workspace index for prerequisite rows and the picker (F9).
+  // Resolving prerequisites through it keeps navigation working while the
+  // completed column is collapsed (the loaded ledger then omits done cards).
+  const [taskIndex, setTaskIndex] = useState<TaskIndexEntry[] | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    setTaskIndex(undefined)
+    void controller.fetchTaskIndex(task.workspaceId).then(entries => {
+      if (alive) setTaskIndex(entries)
+    })
+    return () => { alive = false }
+  }, [controller, task.workspaceId])
   const { alert: showAlert, el: alertEl } = useAlert()
   const ws = controller.getSnapshot().workspaces.find(w => w.id === task.workspaceId)
   const runningExecution = task.executions.find(e => e.outcome === 'running')
@@ -675,6 +689,43 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   const associatedSessions = taskAssociatedSessionIds(task)
   const archiveState = controller.getSnapshot()
   const dependency = task.dependencyProgress ?? dependencyState(task, archiveState.ledger.tasks)
+  // Hierarchy (D6): parent breadcrumb + direct-subtask rollup. The loaded
+  // ledger is authoritative for titles/statuses; the host index fills cards
+  // the collapsed completed column omitted, and the host-derived projection
+  // (when present) wins for the counts.
+  const parentChain = ancestorsOf(task.id, archiveState.ledger.tasks)
+  const hierarchyNode = (id: string): { title: string; status: string } | undefined => {
+    const ledgerNode = archiveState.ledger.tasks.find(item => item.id === id)
+    if (ledgerNode !== undefined) return { title: ledgerNode.title, status: ledgerNode.status }
+    const indexNode = taskIndex?.find(entry => entry.id === id)
+    return indexNode === undefined ? undefined : { title: indexNode.title, status: indexNode.status }
+  }
+  const childCandidates = new Map<string, { id: string; title: string; status: string; trashed: boolean }>()
+  for (const entry of taskIndex ?? []) {
+    if (entry.parentId === task.id) childCandidates.set(entry.id, { id: entry.id, title: entry.title, status: entry.status, trashed: false })
+  }
+  for (const item of archiveState.ledger.tasks) {
+    if (item.parentId === task.id) {
+      childCandidates.set(item.id, { id: item.id, title: item.title, status: item.status, trashed: item.trashedAt !== undefined })
+    }
+  }
+  const subtaskChildren = [...childCandidates.values()]
+    .filter(child => !child.trashed)
+    .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
+  const doneSubtasks = subtaskChildren.filter(child => child.status === 'done').length
+  const derivedSubtaskOpen = subtaskChildren.length - doneSubtasks
+  const subtaskTotal = task.subtaskProgress?.total ?? subtaskChildren.length
+  const subtaskDone = task.subtaskProgress?.done ?? doneSubtasks
+  const subtaskOpen = task.subtaskProgress?.open ?? derivedSubtaskOpen
+  /** Open a parent/child card, unfolding the completed column when needed. */
+  const openHierarchyTask = (id: string): void => {
+    const node = archiveState.ledger.tasks.find(item => item.id === id)
+    if (node !== undefined && node.trashedAt === undefined) controller.select(id)
+    else {
+      controller.setDoneCollapsed(false)
+      void controller.refresh().then(() => controller.select(id))
+    }
+  }
   const canEditDependencies = task.status !== 'in_progress' && task.status !== 'archived' && task.trashedAt === undefined
   const archiveResult = archiveState.sessionArchive?.taskId === task.id ? archiveState.sessionArchive.result : undefined
   const isReviewOrDone = task.status === 'in_review' || task.status === 'done'
@@ -774,6 +825,14 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               <Chip icon="☑" tone={task.status === 'in_review' && task.checklist.some(i => !i.checked) ? 'urgent' : undefined}>
                 {t('detail.chip.checklist', { done: checklistProgress(task).done, total: task.checklist.length })}
               </Chip>
+            )}
+            {subtaskTotal > 0 && (
+              <Chip icon="▸" title={t('hierarchy.badgeTitle', { done: subtaskDone, total: subtaskTotal, open: subtaskOpen })}>
+                {subtaskDone}/{subtaskTotal}
+              </Chip>
+            )}
+            {isReviewOrDone && subtaskOpen > 0 && (
+              <Chip icon="▸" title={t('hierarchy.openWarning', { n: subtaskOpen })}>{t('hierarchy.openChildren', { n: subtaskOpen })}</Chip>
             )}
             {task.branch !== undefined && (
               <Chip icon="🌿" tone={undefined}>Worktree · {task.branch.length > 28 ? `${task.branch.slice(0, 28)}…` : task.branch}</Chip>
@@ -889,6 +948,23 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
           <button type="button" className="dsh-atb-detail-close" aria-label={t('shared.close')} onClick={() => controller.select(undefined)}>✕</button>
         </div>
       </div>
+
+      {parentChain.length > 0 && (
+        <nav className="dsh-atb-crumbs" aria-label={t('hierarchy.breadcrumbLabel')}>
+          {[...parentChain].reverse().map(id => {
+            const node = hierarchyNode(id)
+            return (
+              <span key={id} className="dsh-atb-crumb">
+                <button type="button" className="dsh-atb-crumb-link" title={id} onClick={() => openHierarchyTask(id)}>
+                  {node?.title ?? id}
+                </button>
+                <span className="dsh-atb-crumb-sep" aria-hidden="true">›</span>
+              </span>
+            )
+          })}
+          <span className="dsh-atb-crumb-current">{task.title}</span>
+        </nav>
+      )}
 
       {task.external && <ExternalSourcePanel task={task} />}
 
@@ -1060,20 +1136,51 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
           <div className="dsh-atb-commentlist">
             {dependency.total === 0 && <div className="dsh-atb-empty2">{t('dependency.empty')}</div>}
             {(task.dependsOn ?? []).map(id => {
-              const source = archiveState.ledger.tasks.find(item => item.id === id)
-              const isCompleted = !dependency.pendingIds.includes(id)
+              const ledgerSource = archiveState.ledger.tasks.find(item => item.id === id)
+              const indexSource = taskIndex?.find(entry => entry.id === id)
+              // D2: a trashed/missing prerequisite keeps blocking (missing),
+              // but is shown as a distinct state with a one-click removal.
+              // The host index resolves cards the loaded ledger omits (the
+              // completed column is collapsed → done prerequisites are absent
+              // from the ledger but present in the index).
+              const missing = ledgerSource !== undefined ? ledgerSource.trashedAt !== undefined : indexSource === undefined
+              const title = ledgerSource?.title ?? indexSource?.title ?? id
+              const status = ledgerSource?.status ?? indexSource?.status
+              const completed = !missing && status === 'done'
+              const selectable = ledgerSource === undefined ? indexSource !== undefined : ledgerSource.trashedAt === undefined
+              // The host appends this system comment when a delete repairs the
+              // link (F1/D2); surface its presence next to the dangling row.
+              const audit = task.comments.find(comment => comment.systemKey === 'sys.prerequisiteRemoved'
+                && comment.systemParams?.id === id)
               return (
-                <div key={id} className="dsh-atb-bubble" data-from="user">
-                  <div className="dsh-atb-bubble-avatar">{isCompleted ? '✓' : '○'}</div>
+                <div key={id} className="dsh-atb-bubble" data-from="user" data-missing={missing ? 'true' : undefined}>
+                  <div className="dsh-atb-bubble-avatar">{missing ? '⚠' : completed ? '✓' : '○'}</div>
                   <div className="dsh-atb-bubble-main">
-                    <button type="button" className="dsh-atb-btn" title={id}
-                      onClick={() => {
-                        if (source !== undefined) controller.select(id)
-                        else if (archiveState.doneCollapsed) {
-                          controller.setDoneCollapsed(false)
-                          void controller.refresh().then(() => controller.select(id))
-                        }
-                      }}>{source?.title ?? id}</button>
+                    <div className="dsh-atb-prereq-row">
+                      {selectable
+                        ? (
+                            <button type="button" className="dsh-atb-btn" title={id}
+                              onClick={() => {
+                                if (ledgerSource !== undefined && ledgerSource.trashedAt === undefined) controller.select(id)
+                                else {
+                                  // Not on the board right now (collapsed completed
+                                  // column): unfold it, refetch, then open the card.
+                                  controller.setDoneCollapsed(false)
+                                  void controller.refresh().then(() => controller.select(id))
+                                }
+                              }}>{title}</button>
+                          )
+                        : <code className="dsh-atb-prereq-id" title={id}>{title}</code>}
+                      <span className="dsh-atb-prereq-state" data-state={missing ? 'missing' : completed ? 'done' : 'pending'}>
+                        {missing ? t('dependency.missing') : status !== undefined ? statusText(t, status) : ''}
+                      </span>
+                      {audit !== undefined && (
+                        <span className="dsh-atb-prereq-audit" title={t('dependency.auditNote', { id })}>
+                          ⚑ {t('dependency.audit')}
+                        </span>
+                      )}
+                    </div>
+                    {missing && <div className="dsh-atb-prereq-missing-hint">{t('dependency.missingHint')}</div>}
                   </div>
                   {canEditDependencies && (
                     <button type="button" className="dsh-atb-btn" disabled={actionBusy}
@@ -1088,26 +1195,41 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               <div className="dsh-atb-empty2">{t('dependency.waiting', { count: dependency.pendingIds.length })} · {t('dependency.notice')}</div>
             )}
             {canEditDependencies && (
-              <div>
-                <input type="text" list="dsh-atb-prerequisite-suggestions"
-                  aria-label={t('dependency.placeholder')}
-                  placeholder={t('dependency.placeholder')} value={prerequisiteId}
-                  onChange={event => setPrerequisiteId(event.target.value)}
-                />
-                <datalist id="dsh-atb-prerequisite-suggestions">
-                  {archiveState.ledger.tasks
-                    .filter(item => item.id !== task.id && item.workspaceId === task.workspaceId
-                      && item.trashedAt === undefined && !(task.dependsOn ?? []).includes(item.id))
-                    .map(item => <option key={item.id} value={item.id} label={item.title} />)}
-                </datalist>
-                <button type="button" className="dsh-atb-btn" disabled={actionBusy || prerequisiteId.trim().length === 0}
-                  onClick={() => runAction(async () => {
-                    const ok = await controller.update(task.id, task.version, {
-                      dependsOn: [...(task.dependsOn ?? []), prerequisiteId.trim()],
-                    })
-                    if (ok) setPrerequisiteId('')
-                  })}>{t('dependency.add')}</button>
+              <PrerequisitePicker task={task} controller={controller} linkedIds={task.dependsOn ?? []} index={taskIndex} />
+            )}
+          </div>
+        </details>
+      </div>
+
+      <div className="dsh-atb-section" data-section="task-subtasks">
+        <details>
+          <summary>
+            ▸ {t('hierarchy.subtasks')}{subtaskTotal > 0 ? ` · ${subtaskDone}/${subtaskTotal}` : ''}
+          </summary>
+          <div className="dsh-atb-commentlist">
+            {subtaskChildren.length === 0 && <div className="dsh-atb-empty2">{t('hierarchy.empty')}</div>}
+            {subtaskChildren.map(child => (
+              <div key={child.id} className="dsh-atb-bubble" data-from="system">
+                <div className="dsh-atb-bubble-avatar">▸</div>
+                <div className="dsh-atb-bubble-main">
+                  <div className="dsh-atb-prereq-row">
+                    <button type="button" className="dsh-atb-btn" title={child.id} onClick={() => openHierarchyTask(child.id)}>
+                      {child.title}
+                    </button>
+                    <span className="dsh-atb-prereq-state" data-state={child.status === 'done' ? 'done' : 'pending'}>
+                      {statusText(t, child.status)}
+                    </span>
+                  </div>
+                </div>
               </div>
+            ))}
+            {isReviewOrDone && subtaskOpen > 0 && (
+              <div className="dsh-atb-subtask-warn">⚠ {t('hierarchy.openWarning', { n: subtaskOpen })}</div>
+            )}
+            {task.trashedAt === undefined && (
+              <button type="button" className="dsh-atb-btn" onClick={() => controller.newSubtask(task.id)}>
+                ＋ {t('hierarchy.addSubtask')}
+              </button>
             )}
           </div>
         </details>

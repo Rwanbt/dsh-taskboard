@@ -11,7 +11,7 @@ import type { SessionArchiveResult } from '../shared/api.ts'
 import type { AttachmentUpload, ChangeEvent, DiagnosticsResponse, QueueClearResponse, QueueSummary, DiffResponse, ImportCommitResponse, ImportPreviewResponse, MergeRepoResult, PromptCompletionsResponse, StorageStatus, TaskTemplate, TaskTemplateSpec, UpdateTaskBody, WorkspaceView } from '../shared/api.ts'
 import type { ChecklistItem, TaskLedger, TaskRecord, Urgency } from '../shared/protocol.ts'
 import { emptyLedger } from '../shared/protocol.ts'
-import type { TaskboardClient } from './api.ts'
+import type { TaskboardClient, TaskIndexEntry } from './api.ts'
 import type { SessionJumpResult } from './session-jump.ts'
 import { translate } from './i18n/runtime.ts'
 
@@ -100,6 +100,8 @@ export interface ControllerState {
   storageNotice?: { path: string; warnings: string[] }
   /** Fields a chosen template prefills into the create form (consumed on open). */
   templatePrefill?: TaskTemplateSpec
+  /** Parent id the create form should submit as a subtask (D6 "add subtask"). */
+  subtaskParentId?: string
   /** Transient error surface (action failures); cleared on next success. */
   error?: string
 }
@@ -347,18 +349,28 @@ export class BoardController {
   select(id?: string): void { this.setState({ selectedId: id }) }
 
   /** Show/hide the task form (create mode when opening); always blank (no template prefill). */
-  setComposer(open: boolean): void { this.setState({ composerOpen: open, editingId: undefined, templatePrefill: undefined }) }
+  setComposer(open: boolean): void { this.setState({ composerOpen: open, editingId: undefined, templatePrefill: undefined, subtaskParentId: undefined }) }
 
   /** Open the create form prefilled from a chosen template (0.4.0). */
   newFromTemplate(spec: TaskTemplateSpec): void {
-    this.setState({ composerOpen: true, editingId: undefined, templatePrefill: spec })
+    this.setState({ composerOpen: true, editingId: undefined, templatePrefill: spec, subtaskParentId: undefined })
+  }
+
+  /**
+   * Open the create form as a direct subtask of `parentId` (D6 "add subtask"):
+   * the form's normal create path submits `parentId`, and the host validates
+   * workspace/cycle/depth atomically. No other field is prefilled.
+   * @param parentId - the parent task id.
+   */
+  newSubtask(parentId: string): void {
+    this.setState({ composerOpen: true, editingId: undefined, templatePrefill: undefined, subtaskParentId: parentId })
   }
 
   /** Open the form modal editing an existing task (clears any template prefill). */
-  openEditor(id: string): void { this.setState({ composerOpen: true, editingId: id, templatePrefill: undefined }) }
+  openEditor(id: string): void { this.setState({ composerOpen: true, editingId: id, templatePrefill: undefined, subtaskParentId: undefined }) }
 
   /** Close the form modal whatever its mode. */
-  closeForm(): void { this.setState({ composerOpen: false, editingId: undefined, templatePrefill: undefined }) }
+  closeForm(): void { this.setState({ composerOpen: false, editingId: undefined, templatePrefill: undefined, subtaskParentId: undefined }) }
 
   /** Toggle the secondary tab. */
   toggleSecondary(): void { this.setState({ secondaryOpen: !this.state.secondaryOpen }) }
@@ -439,6 +451,24 @@ export class BoardController {
     const sessions = (await this.client.projectSessions(workspaceId)).sessions
     const titles = this.sessionTitles?.() ?? {}
     return sessions.map(session => ({ ...session, title: titles[session.id]?.displayTitle ?? titles[session.id]?.title }))
+  }
+
+  /**
+   * Untrashed task index of one workspace for the prerequisite picker (F9).
+   * The host route is read-only and cheap; when it is absent (older host) or
+   * fails, the caller falls back to the loaded ledger — this method never
+   * throws and never blocks the board.
+   * @param workspaceId - the workspace to index.
+   * @returns the entries, or undefined when the route is unavailable.
+   */
+  async fetchTaskIndex(workspaceId: string): Promise<TaskIndexEntry[] | undefined> {
+    if (this.client.taskIndex === undefined) return undefined
+    try {
+      const value = await this.client.taskIndex(workspaceId)
+      return value.tasks
+    } catch {
+      return undefined
+    }
   }
 
   async fetchModelCatalog(): Promise<Array<{
@@ -825,7 +855,12 @@ export class BoardController {
     }
   }
 
-  /** Duplicate a task into a fresh todo card (same project/urgency/prompt/execution/model/isolation/checklist). */
+  /**
+   * Duplicate a task into a fresh todo card (same project/urgency/prompt/execution/model/isolation/checklist).
+   * D8: structure is copied too — `dependsOn` (same workspace, re-validated by
+   * the host) and the hierarchy `parentId` — so a duplicate of a blocked or
+   * nested card never silently becomes an immediately runnable root.
+   */
   async duplicate(task: TaskRecord): Promise<void> {
     try {
       await this.client.create({
@@ -845,6 +880,10 @@ export class BoardController {
         ...(task.presetId !== undefined ? { presetId: task.presetId } : {}),
         ...(task.permission !== undefined ? { permission: task.permission } : {}),
         ...(task.checklist !== undefined && task.checklist.length > 0 ? { checklist: task.checklist.map(i => i.text) } : {}),
+        // D8: a duplicate keeps its structure — prerequisites (same workspace,
+        // re-validated by the host) and the hierarchy parent.
+        ...(task.dependsOn !== undefined && task.dependsOn.length > 0 ? { dependsOn: [...task.dependsOn] } : {}),
+        ...(task.parentId !== undefined ? { parentId: task.parentId } : {}),
       })
       await this.refresh()
     } catch (error) {

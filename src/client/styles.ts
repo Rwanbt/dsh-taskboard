@@ -1013,6 +1013,18 @@ color: var(--dsw-alias-state-business-primary, #3e63dd);
 .dsh-atb-imp-row-status { font-size: 10.5px; color: var(--dsw-alias-label-tertiary, gray); flex-shrink: 0; }
 .dsh-atb-imp-result { font-size: 12px; color: var(--dsw-alias-state-success-primary, #30a46c); margin-top: 10px; }
 .dsh-atb-badge[data-kind="checklist"] { color: var(--dsw-alias-label-secondary, inherit); }
+/* Prerequisite badge: neutral information, not an error. The red/pink chip is
+   reserved for the genuinely blocked marker; the ready state is quieter still
+   (a muted neutral chip, no green). Single line, never wraps at 360px. */
+.dsh-atb-badge[data-kind="dependency"] {
+  background: var(--dsw-bg-inset, rgba(128,128,128,.14));
+  color: var(--dsw-text-secondary, gray);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dsh-atb-badge[data-kind="dependency"][data-ready="true"] { opacity: .78; }
 .dsh-atb-set { max-width: 860px; width: min(860px, 96vw); height: min(780px, 90vh); max-height: 90vh; }
 .dsh-atb-settings-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .dsh-atb-settings-nav { flex: 0 0 138px; padding: 16px 10px; border-right: 1px solid var(--dsw-border, rgba(128,128,128,.2)); display: flex; flex-direction: column; gap: 6px; }
@@ -1273,6 +1285,77 @@ color: var(--dsw-alias-state-business-primary, #3e63dd);
   color: #d97706;
   font-weight: 600;
 }
+
+/* ---- Prerequisite picker (F9) ------------------------------------------- */
+/* The combobox lives inside the collapsed dependency <details>: a full-width
+   text input with an absolutely positioned listbox. No animation, no colour
+   overload — the status/workspace meta stays quiet grey, and only the
+   missing-prerequisite row (D2) earns a dashed warning edge. */
+.dsh-atb-prereq-picker { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dsh-atb-prereq-input { width: 100%; min-width: 0; box-sizing: border-box; }
+.dsh-atb-prereq-input:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #3e63dd); outline-offset: 1px; }
+.dsh-atb-prereq-list {
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 8;
+  max-height: 220px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  display: flex; flex-direction: column; border-radius: 8px;
+  background: var(--dsw-alias-bg-overlay, #fff); color: var(--dsw-alias-label-primary, inherit);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.25));
+  box-shadow: var(--dsw-shadow-lv3, 0 12px 32px rgba(0,0,0,.18));
+}
+.dsh-atb-prereq-list[hidden] { display: none; }
+.dsh-atb-prereq-opt {
+  display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; border-radius: 6px;
+  cursor: pointer; font-size: 12px; min-width: 0;
+}
+.dsh-atb-prereq-opt[data-active="true"] { background: var(--dsw-alias-interactive-bg-hover, rgba(128,128,128,.14)); }
+.dsh-atb-prereq-opt-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-atb-prereq-opt-meta { font-size: 10.5px; color: var(--dsw-text-secondary, gray); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-atb-prereq-opt-id { font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 10.5px; }
+.dsh-atb-prereq-empty { font-size: 11.5px; color: var(--dsw-text-secondary, gray); padding: 4px 2px; overflow-wrap: anywhere; }
+.dsh-atb-prereq-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.dsh-atb-prereq-row > .dsh-atb-btn { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-atb-prereq-id {
+  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px; overflow-wrap: anywhere;
+}
+.dsh-atb-prereq-state { font-size: 10.5px; color: var(--dsw-text-secondary, gray); flex-shrink: 0; }
+.dsh-atb-prereq-state[data-state="missing"] { color: var(--dsw-alias-state-error-primary, #e5484d); }
+.dsh-atb-prereq-state[data-state="done"] { color: var(--dsw-alias-state-success-primary, #2ea043); }
+.dsh-atb-prereq-missing-hint { font-size: 11px; line-height: 1.4; color: var(--dsw-text-secondary, gray); overflow-wrap: anywhere; }
+.dsh-atb-prereq-audit { font-size: 10.5px; color: var(--dsw-alias-label-tertiary, gray); cursor: help; flex-shrink: 0; }
+.dsh-atb-bubble[data-missing="true"] .dsh-atb-bubble-main {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5484d) 40%, transparent);
+}
+.dsh-atb-bubble[data-missing="true"] .dsh-atb-bubble-avatar { color: var(--dsw-alias-state-error-primary, #e5484d); }
+
+/* ---- Hierarchy surface (D6) --------------------------------------------- */
+/* The subtask badge is a neutral outline chip (distinct from 🔗 by glyph and
+   tooltip, never by a second loud colour) and stays single-line at 360px. */
+.dsh-atb-badge[data-kind="subtasks"] {
+  background: transparent;
+  color: var(--dsw-text-secondary, gray);
+  border: 1px solid var(--dsw-border, rgba(128,128,128,.3));
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dsh-atb-badge[data-kind="subtasks"][data-ready="true"] { opacity: .75; }
+/* Parent breadcrumb above the detail body: quiet, wraps instead of scrolling. */
+.dsh-atb-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11.5px; min-width: 0; }
+.dsh-atb-crumb { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.dsh-atb-crumb-link {
+  border: none; background: none; padding: 0; font: inherit; cursor: pointer; color: inherit;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px;
+}
+.dsh-atb-crumb-link:hover { text-decoration-style: solid; }
+.dsh-atb-crumb-link:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #3e63dd); outline-offset: 1px; border-radius: 3px; }
+.dsh-atb-crumb-sep { color: var(--dsw-text-secondary, gray); }
+.dsh-atb-crumb-current { color: var(--dsw-text-secondary, gray); overflow-wrap: anywhere; min-width: 0; }
+.dsh-atb-subtask-warn { font-size: 11px; color: var(--dsw-text-secondary, gray); padding: 2px 0; overflow-wrap: anywhere; }
+
 `
 
 /** Style element id (stable since 0.1.x: hook for tests and debugging). */

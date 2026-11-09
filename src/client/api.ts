@@ -32,6 +32,7 @@ import type {
   StateResponse,
   TaskRecord,
   TaskTemplate,
+  TaskIndexResponse,
   TemplatesResponse,
   UpdateSettingsBody,
   UpdateTaskBody,
@@ -39,6 +40,9 @@ import type {
   WorkspaceView,
 } from '../shared/api.ts'
 import type { CommentRecord, TaskSummary } from '../shared/protocol.ts'
+
+/** Re-exported for the board views (single source: the shared contract). */
+export type { TaskIndexEntry, TaskIndexResponse } from '../shared/api.ts'
 
 /** Unwrap the envelope while keeping transport and payload failures distinct. */
 async function unwrap<T>(pending: Response | Promise<Response>, path: string, signal?: AbortSignal): Promise<T> {
@@ -117,6 +121,11 @@ export interface TaskboardClient {
   state(options?: { excludeDone?: boolean }): Promise<StateResponse>
   workspaces(): Promise<WorkspaceView[]>
   projectSessions(workspaceId: string): Promise<{ sessions: ProjectSessionView[] }>
+  /**
+   * Untrashed task index for one workspace (read-only; optional because a
+   * host that predates the route must degrade to the loaded ledger).
+   */
+  taskIndex?(workspaceId: string): Promise<TaskIndexResponse>
   create(body: CreateTaskBody): Promise<TaskSummary>
   get(id: string): Promise<TaskRecord>
   update(id: string, body: UpdateTaskBody): Promise<TaskSummary>
@@ -182,6 +191,7 @@ export function createClient(): TaskboardClient {
     },
     workspaces: () => get<WorkspaceView[]>('/dsh-taskboard/workspaces'),
     projectSessions: workspaceId => get<{ sessions: ProjectSessionView[] }>(`/dsh-taskboard/project-sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
+    taskIndex: workspaceId => get<TaskIndexResponse>(`/dsh-taskboard/task-index?workspaceId=${encodeURIComponent(workspaceId)}`),
     create: body => post('/dsh-taskboard/tasks', body),
     get: id => get<TaskRecord>(`/dsh-taskboard/tasks/${encodeURIComponent(id)}`),
     update: (id, body) => post(`/dsh-taskboard/tasks/${encodeURIComponent(id)}/update`, body),
