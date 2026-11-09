@@ -9,6 +9,7 @@
  * @module dsh-taskboard/shared/protocol
  */
 
+import { MAX_TASK_DEPENDENCIES } from './dependencies.ts'
 import { normalizeExternalSource, normalizeExternalSyncRecords } from './external.ts'
 import { applyHumanWaitingPatch } from './human-wait.ts'
 
@@ -862,6 +863,17 @@ export type TaskRecord = {
   dependsOn?: string[]
   /** Derived GET /state field; never stored as an execution gate or source of truth. */
   dependencyProgress?: import('./dependencies.ts').DependencyState
+  /**
+   * Hierarchy parent (D6): another task of the SAME workspace, or absent for a
+   * root task. Purely organizational — a parent is not a prerequisite and is
+   * never auto-completed.
+   */
+  parentId?: string
+  /**
+   * Derived GET /state projection of direct-child progress (D9); never stored,
+   * never persisted by the host, never used as an execution gate.
+   */
+  subtaskProgress?: import('./hierarchy.ts').SubtaskProgress
   /** Omitted = infer; true = explicit human wait; false = suppress inference. */
   waitingForHuman?: boolean
   /** Explanation only; never put credentials or secret values here. */
@@ -981,6 +993,10 @@ export function spawnNextCycle(source: TaskRecord, prevExecutionId: string | und
     status: 'todo',
     blocked: false,
     ...(source.dependsOn !== undefined ? { dependsOn: [...source.dependsOn] } : {}),
+    // The successor is the next cycle of the SAME card, so it stays in the
+    // same hierarchy slot as its predecessor (D6; dependencies above it never
+    // become a prerequisite of the new cycle, but the organizing parent does).
+    ...(source.parentId !== undefined ? { parentId: source.parentId } : {}),
     execution: { mode: 'scheduled', cron, nextRunAt: next, periodicCompletion: source.execution.periodicCompletion ?? DEFAULT_PERIODIC_COMPLETION,
       ...(source.execution.reuseSessionId !== undefined ? { reuseSessionId: source.execution.reuseSessionId } : {}),
       ...(source.execution.sessionReuseMode !== undefined ? { sessionReuseMode: source.execution.sessionReuseMode } : {}),
@@ -1154,21 +1170,77 @@ function normalizeRunAt(raw: unknown): number | undefined {
   throw new Error('execution.runAt must be an epoch ms number or an ISO date string')
 }
 
+/** Largest representable Date value (epoch ms); anything above is garbage. */
+const MAX_EPOCH_MARKER_MS = 8_640_000_000_000_000
+
+/**
+ * Validate one scheduler-owned epoch-ms marker. A marker may legitimately sit
+ * in the PAST — a prerequisite-blocked one-shot is deferred indefinitely (D3)
+ * — so only integer-ness and the representable range are enforced. NaN,
+ * negatives, fractions and absurd values are dropped, never stored.
+ */
+function epochMarker(raw: unknown): number | undefined {
+  return typeof raw === 'number' && Number.isSafeInteger(raw) && raw > 0 && raw <= MAX_EPOCH_MARKER_MS
+    ? raw
+    : undefined
+}
+
+/** The scheduler-owned fields of a persisted execution record. */
+interface QueueMarkerInput {
+  queuedRunAt?: unknown
+  queuedAt?: unknown
+  dispatchingRunAt?: unknown
+  lastTriggeredAt?: unknown
+}
+
+/**
+ * Read the durable queue marker of an exported/imported scheduled record. A
+ * one-shot that already reached the queue has had its `runAt` consumed by
+ * `queueRunAt`, so the ONLY evidence left is the marker: without it the record
+ * would be indistinguishable from an unschedulable task and be dropped on
+ * import (P0 defect: queued work silently lost).
+ *
+ * A `dispatchingRunAt` (host died after reserving, before opening the run) is
+ * deliberately demoted to a queued window: the reservation cannot survive the
+ * move and re-queueing is loss-free because dispatch is idempotent — the
+ * scheduler's own restart repair (`restoreQueued`) does exactly the same.
+ */
+function queueMarkerOf(raw: QueueMarkerInput): { window: number; queuedAt?: number; lastTriggeredAt?: number } | undefined {
+  const window = epochMarker(raw.queuedRunAt) ?? epochMarker(raw.dispatchingRunAt)
+  if (window === undefined) return undefined
+  const queuedAt = epochMarker(raw.queuedAt)
+  const lastTriggeredAt = epochMarker(raw.lastTriggeredAt)
+  return {
+    window,
+    ...(queuedAt !== undefined ? { queuedAt } : {}),
+    ...(lastTriggeredAt !== undefined ? { lastTriggeredAt } : {}),
+  }
+}
+
 /**
  * Validate an execution config request from raw tool/route input.
  * `scheduled` requires either a valid cron (periodic, 定期执行) or a runAt
  * instant (one-shot, 定时执行); the two are mutually exclusive. A cron's
  * first `nextRunAt` is computed from `now`.
+ *
+ * IMPORT-ONLY extra shape (`opts.allowQueueMarkers`): a scheduled record whose
+ * trigger was already consumed into the durable queue has neither cron nor
+ * runAt, only `queuedRunAt` (+ optional `queuedAt` / `lastTriggeredAt`). User
+ * request paths keep the option off, so a caller can never fabricate queued
+ * work through create/update.
  * @param raw - raw execution input ({@link ExecutionConfig} fields, untyped).
  * @param now - current epoch ms.
  * @param opts - `allowPastRunAt` lets the import path keep a historical
- *   one-shot instant instead of rejecting it.
+ *   one-shot instant instead of rejecting it; `allowQueueMarkers` accepts a
+ *   trigger that is represented only by durable queue markers.
  * @returns the normalized config.
  */
 export function normalizeExecution(
-  raw: { mode?: string; cron?: string; runAt?: unknown; periodicCompletion?: unknown; reuseSessionId?: unknown; sessionReuseMode?: unknown },
+  raw: {
+    mode?: string; cron?: string; runAt?: unknown; periodicCompletion?: unknown; reuseSessionId?: unknown; sessionReuseMode?: unknown
+  } & QueueMarkerInput,
   now: number,
-  opts?: { allowPastRunAt?: boolean },
+  opts?: { allowPastRunAt?: boolean; allowQueueMarkers?: boolean },
 ): ExecutionConfig {
   const mode = raw.mode ?? 'claim'
   if (mode !== 'claim' && mode !== 'scheduled') {
@@ -1193,6 +1265,23 @@ export function normalizeExecution(
   const cron = (raw.cron ?? '').trim()
   if (cron.length > 0 && runAt !== undefined) {
     throw new Error('execution: cron and runAt are mutually exclusive (periodic vs one-shot)')
+  }
+  // P0: a one-shot whose runAt was already consumed into the durable queue has
+  // NO cron and NO runAt left. On import that shape is valid evidence of
+  // pending scheduled work, not an invalid execution: rebuild the queue marker
+  // instead of dropping the task. Periodic records keep their cron path below
+  // (the marker is then attached by the import preservation step).
+  if (opts?.allowQueueMarkers === true && cron.length === 0 && runAt === undefined) {
+    const queueMarker = queueMarkerOf(raw)
+    if (queueMarker !== undefined) {
+      return {
+        mode,
+        queuedRunAt: queueMarker.window,
+        ...(queueMarker.queuedAt !== undefined ? { queuedAt: queueMarker.queuedAt } : {}),
+        ...(queueMarker.lastTriggeredAt !== undefined ? { lastTriggeredAt: queueMarker.lastTriggeredAt } : {}),
+        ...reuseSession,
+      }
+    }
   }
   if (runAt !== undefined) {
     if (raw.periodicCompletion !== undefined) throw new Error('execution.periodicCompletion requires a cron schedule')
@@ -1575,6 +1664,107 @@ export function normalizeRepoEvidence(raw: unknown): ExecutionRepoEvidence | und
 }
 
 /**
+ * Structural gate for one `dependsOn` value (F8/D10): at most
+ * {@link MAX_TASK_DEPENDENCIES} legal task ids, no duplicate and no self
+ * reference. Shape-only — existence, workspace and cycles need the whole
+ * ledger and are validated by the shared dependency module.
+ * @param raw - the untyped `dependsOn` value.
+ * @param id - the record's own id (a self reference is invalid at every layer).
+ */
+function isPlausibleDependsOn(raw: unknown, id: string): boolean {
+  if (!Array.isArray(raw) || raw.length > MAX_TASK_DEPENDENCIES) return false
+  const seen = new Set<string>()
+  for (const value of raw as unknown[]) {
+    if (typeof value !== 'string' || !isValidTaskId(value)) return false
+    if (value === id || seen.has(value)) return false
+    seen.add(value)
+  }
+  return true
+}
+
+/**
+ * Structural gate for one optional `parentId` (F8/D10): a legal task id that
+ * is not the record itself. Existence, workspace and depth need the ledger and
+ * are checked by `validateParent`/`validateHierarchyLinks`.
+ */
+function isPlausibleParentId(raw: unknown, id: string): boolean {
+  if (raw === undefined) return true
+  return typeof raw === 'string' && isValidTaskId(raw) && raw !== id
+}
+
+/**
+ * LOAD-time shape gate for `dependsOn` — deliberately weaker than
+ * {@link isPlausibleDependsOn}: ids must still be legal (R4) and capped, but
+ * duplicates and self references are NOT fatal here. A corrupt local ledger
+ * must stay readable; {@link repairTaskLinks} drops those entries with a
+ * diagnostic during `store.load()`. Imports stay strict (external input).
+ */
+function isLoadableDependsOn(raw: unknown): boolean {
+  return Array.isArray(raw) && raw.length <= MAX_TASK_DEPENDENCIES
+    && (raw as unknown[]).every(value => typeof value === 'string' && isValidTaskId(value))
+}
+
+/** LOAD-time shape gate for `parentId`: any string is kept for the repair pass. */
+function isLoadableParentId(raw: unknown): boolean {
+  return raw === undefined || typeof raw === 'string'
+}
+
+/**
+ * Load-time repair for the two optional link fields (F8/D10): a corrupt but
+ * otherwise readable ledger degrades to "link dropped + diagnostic" instead of
+ * making the whole board unloadable. `store.load()` runs this on every record
+ * after the structural gate; imports never use it because an import is
+ * external input and must be rejected outright (`validateImportedTask`).
+ *
+ * Only LINK CONTENT is repaired. Missing/trashed targets stay as they are:
+ * `dependencyState` keeps classifying a dangling id as blocking (D2) and an
+ * inert dangling `parentId` is harmless until the host repairs it.
+ * @param task - the loaded record; mutated in place.
+ * @returns human-readable diagnostics, empty when nothing had to be dropped.
+ */
+export function repairTaskLinks(task: TaskRecord): string[] {
+  const diagnostics: string[] = []
+  if (task.dependsOn !== undefined) {
+    const kept: string[] = []
+    const seen = new Set<string>()
+    for (const id of task.dependsOn) {
+      // Defense in depth: the load gate already promises strings, but repair
+      // must never emit a non-string id even if called on a hand-built record.
+      if (typeof id !== 'string' || !isValidTaskId(id)) {
+        diagnostics.push(`dependsOn: dropped invalid id '${String(id)}'`)
+        continue
+      }
+      if (id === task.id) {
+        diagnostics.push(`dependsOn: dropped self reference '${id}'`)
+        continue
+      }
+      if (seen.has(id)) {
+        diagnostics.push(`dependsOn: dropped duplicate '${id}'`)
+        continue
+      }
+      seen.add(id)
+      kept.push(id)
+    }
+    if (kept.length > MAX_TASK_DEPENDENCIES) {
+      diagnostics.push(`dependsOn: truncated ${kept.length} links to ${MAX_TASK_DEPENDENCIES}`)
+      kept.length = MAX_TASK_DEPENDENCIES
+    }
+    if (kept.length === 0) delete task.dependsOn
+    else task.dependsOn = kept
+  }
+  if (task.parentId !== undefined) {
+    if (!isValidTaskId(task.parentId)) {
+      diagnostics.push(`parentId: dropped invalid id '${task.parentId}'`)
+      delete task.parentId
+    } else if (task.parentId === task.id) {
+      diagnostics.push('parentId: dropped self reference')
+      delete task.parentId
+    }
+  }
+  return diagnostics
+}
+
+/**
  * Validate ONE imported task record (pure): rebuilds it field by field with
  * the normal validators, minting missing ids and re-arming cron. Executions
  * left `running` by the exporting machine are marked failed — their
@@ -1588,10 +1778,14 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
   const e = raw as Record<string, unknown>
   const id = typeof e.id === 'string' ? e.id.trim() : ''
   const fail = (reason: string): { ok: false; reason: string } => ({ ok: false, reason })
-  if (e.dependsOn !== undefined && (!Array.isArray(e.dependsOn) || e.dependsOn.length > 32
-    || e.dependsOn.some((id: unknown) => typeof id !== 'string' || !isValidTaskId(id))
-    || new Set(e.dependsOn).size !== e.dependsOn.length || e.dependsOn.includes(id))) {
+  // F8: shape-only rejection of duplicate/self prerequisites happens here so
+  // `store.load()` can never ingest a self-loop; cross-record rules stay with
+  // the dependency module, which sees the ledger.
+  if (e.dependsOn !== undefined && !isPlausibleDependsOn(e.dependsOn, id)) {
     return fail('invalid dependsOn prerequisite IDs')
+  }
+  if (!isPlausibleParentId(e.parentId, id)) {
+    return fail('invalid parentId')
   }
   // R4①: length alone let traversal-shaped ids (`../../x`, `..\..\x`) into
   // the ledger; the charset gate is the primary defense for every downstream
@@ -1599,12 +1793,12 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
   if (!isValidTaskId(id)) return fail('missing/invalid id (must match ^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$)')
   try {
     const rawExecution = typeof e.execution === 'object' && e.execution !== null
-      ? e.execution as { mode?: string; cron?: string; runAt?: unknown; periodicCompletion?: unknown; reuseSessionId?: unknown; sessionReuseMode?: unknown; autoReuseSessionId?: unknown; autoReuseSessionKey?: unknown; queuedRunAt?: unknown; queuedAt?: unknown; dispatchingRunAt?: unknown }
+      ? e.execution as { mode?: string; cron?: string; runAt?: unknown; periodicCompletion?: unknown; reuseSessionId?: unknown; sessionReuseMode?: unknown; autoReuseSessionId?: unknown; autoReuseSessionKey?: unknown; queuedRunAt?: unknown; queuedAt?: unknown; dispatchingRunAt?: unknown; lastTriggeredAt?: unknown }
       : {}
     const execution = normalizeExecution(
       rawExecution,
       now,
-      { allowPastRunAt: true },
+      { allowPastRunAt: true, allowQueueMarkers: true },
     )
     // These pointers are host-owned runtime state. Retain only well-formed
     // values from an exported ledger; a stale pointer merely falls back to a
@@ -1618,15 +1812,19 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
     }
     // Queue markers are scheduler-owned, but must survive export/import: an
     // online-and-queued window is not equivalent to an offline missed window.
-    const queuedWindow = typeof rawExecution.queuedRunAt === 'number' && Number.isFinite(rawExecution.queuedRunAt)
-      ? rawExecution.queuedRunAt
-      : typeof rawExecution.dispatchingRunAt === 'number' && Number.isFinite(rawExecution.dispatchingRunAt)
-        ? rawExecution.dispatchingRunAt
-        : undefined
-    if (execution.mode === 'scheduled' && queuedWindow !== undefined && typeof rawExecution.queuedAt === 'number'
-      && Number.isFinite(rawExecution.queuedAt)) {
-      execution.queuedRunAt = queuedWindow
-      execution.queuedAt = rawExecution.queuedAt
+    // This is ALSO the only trigger evidence for a queued one-shot (its runAt
+    // was consumed at queue time), so the marker is attached after
+    // normalization for every scheduled shape — periodic records keep their
+    // cron meanwhile, and no synthetic runAt is ever invented. Optional
+    // markers are validated (integer, positive, representable); garbage is
+    // dropped instead of stored.
+    if (execution.mode === 'scheduled') {
+      const queueMarker = queueMarkerOf(rawExecution)
+      if (queueMarker !== undefined) {
+        execution.queuedRunAt = queueMarker.window
+        if (queueMarker.queuedAt !== undefined) execution.queuedAt = queueMarker.queuedAt
+        if (queueMarker.lastTriggeredAt !== undefined) execution.lastTriggeredAt = queueMarker.lastTriggeredAt
+      }
     }
     const comments: CommentRecord[] = []
     if (Array.isArray(e.comments)) {
@@ -1720,9 +1918,13 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
       urgency: asUrgency(strOr(e, 'urgency', 'normal')),
       status,
       blocked: e.blocked === true,
-      ...(Array.isArray(e.dependsOn) && e.dependsOn.length <= 32
-        && e.dependsOn.every((id: unknown) => typeof id === 'string' && isValidTaskId(id))
-        ? { dependsOn: [...e.dependsOn] as string[] }
+      ...(isPlausibleDependsOn(e.dependsOn, id) ? { dependsOn: [...(e.dependsOn as string[])] } : {}),
+      // Hierarchy link: shape was validated above; the host revalidates
+      // existence/workspace/depth against the merged ledger before writing.
+      // Derived projections (dependencyProgress / subtaskProgress) are NEVER
+      // rebuilt onto an imported record — they are GET-only (D9).
+      ...(typeof e.parentId === 'string' && isValidTaskId(e.parentId) && e.parentId !== id
+        ? { parentId: e.parentId }
         : {}),
       execution,
       ...(typeof e.model === 'object' && e.model !== null ? { model: normalizeModel(e.model) } : {}),
@@ -1767,8 +1969,12 @@ export function isPlausibleTaskRecord(raw: unknown): boolean {
     && typeof t.workspaceId === 'string' && (t.workspaceId.length > 0 || normalizeExternalSource(t.external)?.provider === 'zentao')
     && ALL_STATUSES.includes(t.status as TaskStatus)
     && typeof t.version === 'number' && Number.isFinite(t.version) && t.version >= 1
-    && (t.dependsOn === undefined || (Array.isArray(t.dependsOn) && t.dependsOn.length <= 32
-      && t.dependsOn.every((id: unknown) => typeof id === 'string' && isValidTaskId(id))))
+    // F8/D10: the LOAD gate stays structural (legal ids, capped) so a corrupt
+    // optional link cannot brick the whole board. Duplicate/self references are
+    // dropped with a diagnostic by `repairTaskLinks` on load; imports remain
+    // strict and reject them outright.
+    && (t.dependsOn === undefined || isLoadableDependsOn(t.dependsOn))
+    && isLoadableParentId(t.parentId)
     && Array.isArray(t.comments) && Array.isArray(t.executions)
     && typeof t.execution === 'object' && t.execution !== null
     && (t.execution as { mode?: unknown }).mode !== undefined
@@ -1823,6 +2029,8 @@ export type TaskSummary = {
   status: TaskStatus
   blocked: boolean
   dependsOn?: string[]
+  /** Hierarchy parent id, when the task is a subtask (D6). */
+  parentId?: string
   waitingForHuman?: boolean
   waitingReason?: string
   executionMode: ExecutionMode
@@ -1853,6 +2061,7 @@ export function summarize(task: TaskRecord): TaskSummary {
     status: task.status,
     blocked: task.blocked,
     ...(task.dependsOn?.length ? { dependsOn: [...task.dependsOn] } : {}),
+    ...(task.parentId !== undefined ? { parentId: task.parentId } : {}),
     ...(typeof task.waitingForHuman === 'boolean' ? { waitingForHuman: task.waitingForHuman } : {}),
     ...(task.waitingForHuman === true && task.waitingReason ? { waitingReason: task.waitingReason } : {}),
     executionMode: task.execution.mode,
