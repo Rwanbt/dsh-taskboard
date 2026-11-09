@@ -30,7 +30,6 @@ This fork adds the following on top of upstream. Full design: [docs/dependencies
 - **Robustness**: the ledger lock now treats transient Windows `EPERM`/`EACCES`/`ENOENT` like contention and retries.
 
 Tests: `npm run build && npm test` (70 files, 975 tests). Coverage: `npm run test:coverage` (v8, ~88.6 % lines; see [tests/qa/COVERAGE.md](./tests/qa/COVERAGE.md)).
-npm run test:coverage           # v8 coverage (text-summary + json-summary)
 ## Screenshots
 
 <p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="Task board" width="880"></p>
@@ -241,6 +240,7 @@ git clone https://github.com/cloader/dsh-taskboard.git
 cd dsh-taskboard
 npm install && npm run build    # dual build: host ESM + client CJS
 npm test                        # full vitest suite (including real-git mirror integration tests)
+npm run test:coverage           # v8 coverage (text-summary + json-summary)
 node tests/manual-git-e2e.mjs   # real-git end-to-end manual test (full worktree chain + resume + diff viewer)
 ```
 
