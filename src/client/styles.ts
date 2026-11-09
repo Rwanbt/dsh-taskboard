@@ -47,6 +47,9 @@ body {
   --atb-elevation-prominent: var(--dsw-elevation-prominent, 0 0 0 .5px #00000029, 0 3px 8px #0000000a, 0 0 20px #0000000d);
   --atb-focus: 0 0 0 2px color-mix(in srgb, var(--atb-accent) 40%, transparent);
   --atb-input: var(--dsw-specific-input-major, var(--dsw-alias-bg-layer-1, #fff));
+  /* Neutral column tint (the pre-fork look): a flat grey overlay, identical in
+     light and dark because it is a mid-grey mix, not a theme accent. */
+  --atb-surface-sunken: color-mix(in srgb, #808080 7%, var(--atb-bg));
 }
 .dsh-atb-external-mapping { display: flex; gap: 8px; margin: 12px 0; align-items: flex-end; }
 .dsh-atb-external-options { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 9px 0; font-size: 12px; }
@@ -166,7 +169,7 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
   padding: 10px 12px; box-shadow: 0 -4px 18px rgba(0,0,0,.12);
 }
 .dsh-atb-detailpanel .dsh-atb-detail { flex: 1; min-height: 0; }
-.dsh-atb-column { display: flex; flex-direction: column; flex: 1 1 0; min-width: 200px; min-height: 0; border-radius: 10px; background: var(--atb-bg-inset, rgba(128,128,128,.07)); padding: 8px; gap: 8px; transition: flex-basis .15s ease, min-width .15s ease, max-width .15s ease; }
+.dsh-atb-column { display: flex; flex-direction: column; flex: 1 1 0; min-width: 200px; min-height: 0; border-radius: 10px; background: var(--atb-surface-sunken); padding: 8px; gap: 8px; transition: flex-basis .15s ease, min-width .15s ease, max-width .15s ease; }
 .dsh-atb-column[data-collapsed="true"] {
   flex: 0 0 42px;
   min-width: 42px;
