@@ -1,5 +1,20 @@
 # 更新日志 / Changelog
 
+### 0.10.0 — 2026-11-09
+
+- **任务依赖（dependsOn）**：同项目前置任务全部经人验收 `done` 前不可认领/执行/调度；拒绝环、自引用、跨项目；前置任务删除时自动解除并写审计评论。
+- **子任务（parentId）**：任务树（最深 8 层、无环），卡片进度与详情面包屑。
+- **界面**：全面接入 DSH 设计令牌；可访问的主题化下拉框替换原生 `<select>`；无边框布局与单色 SVG 图标。
+- **修复**：下拉框中按 Esc 不再关闭整个表单；Home/End 跳过禁用项；Windows 下台账锁遇瞬时 EPERM 自动重试。
+- **测试**：975 个用例，新增 `npm run test:coverage`。
+
+**English:**
+
+- **Task dependencies (`dependsOn`)**: a task cannot be claimed, run or scheduled until all same-project prerequisites are human-approved `done`; cycles, self-links and cross-project links are rejected; trashing a prerequisite detaches it with an audit comment.
+- **Subtasks (`parentId`)**: acyclic task tree (max depth 8), card progress and detail breadcrumb.
+- **UI**: full DSH design-token alignment; accessible themed `Select` replaces native `<select>`; borderless layout and monochrome SVG icons.
+- **Fixes**: Escape in a dropdown no longer closes the whole form; Home/End skip disabled options; ledger lock retries transient Windows EPERM.
+- **Tests**: 975 tests, new `npm run test:coverage`.
 ### 0.9.11 — 2026-11-05
 
 - **看板级分支命名预设**：看板设置新增「分支命名」——四预设（`task/标题+ID` 默认 / `task/ID` / `前缀/ID` / `前缀/标题+ID`）+ 条件前缀输入与实时示例预览，中文标题也能生成纯英文分支（[#98](https://github.com/cloader/dsh-taskboard/issues/98)）。
