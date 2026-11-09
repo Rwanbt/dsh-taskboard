@@ -226,6 +226,8 @@ export interface RunOptions {
 
 /** One live execution tracked for settlement and cancellation. */
 interface RunEntry {
+  /** The card this run belongs to (auto-commit message + evidence). */
+  taskId: string
   sessionId: string
   /** Task mirror prepared for this run (evidence collection at ANY settlement). */
   prepared?: PreparedMirror
@@ -246,6 +248,10 @@ interface PendingSettlement {
   writing?: Promise<boolean>
   evidenceReady?: boolean
   evidence?: Array<{ repo: PreparedMirrorRepo; facts: SettlementFacts }>
+  /** Repos the host auto-committed at settlement (0.10.2). */
+  autoCommitted?: string[]
+  /** Fail-soft auto-commit failure detail (settlement never blocks on it). */
+  autoCommitError?: string
 }
 
 const SETTLEMENT_RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 60_000] as const
@@ -346,9 +352,10 @@ export class ExecutionService {
   }
 
   /** Attach a new-generation settlement watcher without taking ownership of the live agent. */
-  private adoptLiveRun(executionId: string, sessionId: string, agent: LiveAgentFace, prepared: PreparedMirror | undefined): void {
+  private adoptLiveRun(executionId: string, taskId: string, sessionId: string, agent: LiveAgentFace, prepared: PreparedMirror | undefined): void {
     if (this.runs.has(executionId)) return
     this.watchRun(executionId, agent, {
+      taskId,
       sessionId,
       ...(prepared !== undefined ? { prepared } : {}),
       // The hot-reloaded service did not create this agent, but it can still
@@ -402,12 +409,12 @@ export class ExecutionService {
         else await entry.stopping
         if (this.disposed || this.runs.get(executionId) !== entry) return false
         await this.flushCommentDelivery(executionId, entry)
-        let settled = await this.settleExecution(executionId, entry.sessionId, entry.prepared, pending)
+        let settled = await this.settleExecution(executionId, entry.sessionId, entry.prepared, pending, entry.taskId)
         // Cancellation may arrive after this attempt entered the store queue.
         // A skipped write waits for the agent stop before trying its new intent.
         if (!settled && !this.disposed) {
           await entry.stopping
-          settled = await this.settleExecution(executionId, entry.sessionId, entry.prepared, pending)
+          settled = await this.settleExecution(executionId, entry.sessionId, entry.prepared, pending, entry.taskId)
         }
         if (!settled) return false
         if (this.runs.get(executionId) === entry) this.runs.delete(executionId)
@@ -462,6 +469,44 @@ export class ExecutionService {
       }
     }
     return out.length > 0 ? out : undefined
+  }
+
+  /**
+   * 0.10.2: auto-commit the agent's remaining work in every prepared worktree
+   * at settlement. A linked worktree's index lives under
+   * `<mainrepo>/.git/worktrees/<name>/` — outside the DSH sandbox writable
+   * root — so a `workspace-write` agent cannot `git commit`; without this the
+   * edits stay uncommitted, evidence records dirty files and merge/removal
+   * treat the run as unfinished. Runs for EVERY settlement outcome.
+   *
+   * Fail-soft by design: git problems/skips are collected into one string and
+   * never block settlement. Mirror-structural noise (nested repo worktrees) is
+   * excluded so it is never committed into the root repo.
+   * @returns committed repo keys (`''` = root) and an aggregated failure note.
+   */
+  private async autoCommitWork(
+    prepared: PreparedMirror | undefined,
+    taskId: string,
+  ): Promise<{ repos: string[]; error?: string }> {
+    const git = this.deps.git
+    if (prepared === undefined || git?.commitWorktree === undefined || prepared.repos.length === 0) return { repos: [] }
+    const nestedRels = prepared.repos.filter(repo => repo.repo !== '').map(repo => repo.repo)
+    const message = `taskboard: ${taskId} agent changes (auto-commit at settlement)`
+    const repos: string[] = []
+    const errors: string[] = []
+    for (const repo of prepared.repos) {
+      const label = repo.repo === '' ? '(root)' : repo.repo
+      const excludes = repo.repo === '' && nestedRels.length > 0 ? nestedRels : undefined
+      try {
+        const result = await git.commitWorktree(repo.worktreePath, repo.branch, message, excludes)
+        if (result.outcome === 'committed') repos.push(repo.repo)
+        else if (result.outcome === 'failed') errors.push(`${label}: ${result.error ?? 'unknown error'}`)
+      } catch (error) {
+        // commitWorktree is contractually fail-soft; this is defense in depth.
+        errors.push(`${label}: ${(error instanceof Error ? error.message : String(error)).slice(0, 300)}`)
+      }
+    }
+    return { repos, ...(errors.length > 0 ? { error: errors.join('; ').slice(0, 1000) } : {}) }
   }
 
   /** Map one repo's settlement facts onto evidence record fields. */
@@ -895,6 +940,7 @@ export class ExecutionService {
     // metadata shares the settlement retry path, so a disk error cannot orphan
     // the agent or make the already queued comments eligible for redelivery.
     const entry: RunEntry = {
+      taskId,
       sessionId,
       ...(prepared !== undefined ? { prepared } : {}),
       dispose: () => handle.dispose(),
@@ -924,8 +970,18 @@ export class ExecutionService {
     sessionId: string,
     prepared: PreparedMirror | undefined,
     pending: PendingSettlement,
+    taskId: string,
   ): Promise<boolean> {
     if (!pending.evidenceReady) {
+      // 0.10.2: the agent sandbox cannot write a linked worktree's index, so a
+      // workspace-write agent physically cannot `git commit`. The HOST commits
+      // the remaining changes for EVERY settlement outcome BEFORE evidence
+      // collection — otherwise the work is stranded as dirty files (blocks
+      // merge/removal and carries no commit evidence). Fail-soft: a failed
+      // auto-commit is recorded but never blocks settlement.
+      const autoCommit = await this.autoCommitWork(prepared, taskId)
+      if (autoCommit.repos.length > 0) pending.autoCommitted = autoCommit.repos
+      if (autoCommit.error !== undefined) pending.autoCommitError = autoCommit.error
       pending.evidence = await this.collectEvidence(prepared)
       pending.evidenceReady = true
     }
@@ -935,6 +991,13 @@ export class ExecutionService {
     const result = await this.deps.store.mutate('execution-recorded', (ledger) => {
       if (this.disposed) return undefined
       if (pending.outcome === 'cancelled' && !this.runs.get(executionId)?.stopped) return undefined
+      // Append the auto-commit fact to whatever system note settlement writes,
+      // so the human reviewing the card sees that the host saved the work.
+      const autoCommitNote = pending.autoCommitted !== undefined && pending.autoCommitted.length > 0
+        ? `（宿主已自动提交残留改动：${pending.autoCommitted.map(repo => repo === '' ? '(root)' : repo).join(', ')}）`
+        : pending.autoCommitError !== undefined
+          ? '（宿主自动提交残留改动失败，改动保持未提交）'
+          : ''
       for (const t of ledger.tasks) {
         const execution = t.executions.find(e => e.id === executionId)
         if (execution !== undefined && execution.outcome === 'running') {
@@ -942,6 +1005,9 @@ export class ExecutionService {
           execution.outcome = pending.outcome
           execution.endedAt = now
           this.applyFacts(execution, prepared, evidence)
+          // 0.10.2 evidence: which repos the host auto-committed / why not.
+          if (pending.autoCommitted !== undefined) execution.autoCommitted = pending.autoCommitted
+          if (pending.autoCommitError !== undefined) execution.autoCommitError = pending.autoCommitError
           // A settled scheduled run leaves a one-shot (定时一次) spent: its
           // runAt was consumed at queue time and the cron path below hands
           // the schedule to a successor — a one-shot has neither. Normalize
@@ -965,7 +1031,7 @@ export class ExecutionService {
                 const error = (pending.error ?? 'execution failed').slice(0, 300)
                 t.comments.push({
                   id: newCommentId(),
-                  body: normalizeBody(`[系统] 执行失败：${error}；任务已退回待办。`),
+                  body: normalizeBody(`[系统] 执行失败：${error}；任务已退回待办。${autoCommitNote}`),
                   systemKey: 'sys.execFailed', systemParams: { error },
                   threadId: sessionId, version: 1, createdAt: now,
                 })
@@ -989,7 +1055,7 @@ export class ExecutionService {
             t.updatedBy = { kind: 'system' }
             t.comments.push({
               id: newCommentId(),
-              body: normalizeBody('[系统] 定期任务本轮执行完成，已按设置自动回到待办，等待下一次触发。'),
+              body: normalizeBody(`[系统] 定期任务本轮执行完成，已按设置自动回到待办，等待下一次触发。${autoCommitNote}`),
               systemKey: 'sys.periodicRearmed',
               threadId: sessionId,
               version: 1,
@@ -1008,7 +1074,7 @@ export class ExecutionService {
               t.execution = { mode: 'claim' }
               t.comments.push({
                 id: newCommentId(),
-                body: normalizeBody(`[系统] 定期任务本轮执行完毕，已按设置新建待办卡 ${successor.id} 承接下一轮，请审查本卡后验收。`),
+                body: normalizeBody(`[系统] 定期任务本轮执行完毕，已按设置新建待办卡 ${successor.id} 承接下一轮，请审查本卡后验收。${autoCommitNote}`),
                 systemKey: 'sys.periodicHandoff',
                 systemParams: { nextTaskId: successor.id },
                 threadId: sessionId,
@@ -1035,9 +1101,9 @@ export class ExecutionService {
             const commented = t.comments.some(c => c.threadId === sessionId && c.systemKey === undefined && c.createdAt >= (execution.startedAt ?? 0))
             t.comments.push({
               id: newCommentId(),
-              body: normalizeBody(commented
+              body: normalizeBody((commented
                 ? '[系统] 执行会话已结束并留有评论，但未移至待验收；系统自动移入待验收。'
-                : '[系统] 执行会话已结束，但未按协议交接（无评论、未移至待验收）；系统自动移入待验收，请审查后退回或验收。'),
+                : '[系统] 执行会话已结束，但未按协议交接（无评论、未移至待验收）；系统自动移入待验收，请审查后退回或验收。') + autoCommitNote),
               systemKey: commented ? 'sys.endedWithComment' : 'sys.endedNoHandoff',
               threadId: sessionId,
               version: 1,
@@ -1073,7 +1139,7 @@ export class ExecutionService {
               t.execution = { mode: 'claim' }
               t.comments.push({
                 id: newCommentId(),
-                body: normalizeBody('[系统] 定期表达式已无未来触发时间，本轮结束后定时停用；如需继续请重新设置。'),
+                body: normalizeBody(`[系统] 定期表达式已无未来触发时间，本轮结束后定时停用；如需继续请重新设置。${autoCommitNote}`),
                 systemKey: 'sys.cronDead',
                 threadId: sessionId,
                 version: 1,
@@ -1186,6 +1252,7 @@ export class ExecutionService {
       // Borrow the live registry handle to stop activity without disposing it.
       // Startup cancellation can still precede creation of any live agent.
       entry = {
+        taskId,
         sessionId,
         prepared: this.preparedFromExecution(running),
         dispose: async () => {
@@ -1215,12 +1282,13 @@ export class ExecutionService {
     await this.deps.store.load()
     // A clean startup needs no write lane or cross-process lock at all.
     if (!this.deps.store.snapshot().tasks.some(task => task.executions.some(execution => execution.outcome === 'running'))) return
-    const adopted = new Map<string, { sessionId: string; agent: LiveAgentFace; prepared: PreparedMirror | undefined }>()
+    const adopted = new Map<string, { taskId: string; sessionId: string; agent: LiveAgentFace; prepared: PreparedMirror | undefined }>()
     for (const task of this.deps.store.snapshot().tasks) {
       for (const execution of task.executions) {
         if (execution.outcome !== 'running' || execution.sessionId === undefined) continue
         const agent = this.deps.liveAgent?.(execution.sessionId)
         if (agent !== undefined) adopted.set(execution.id, {
+          taskId: task.id,
           sessionId: execution.sessionId,
           agent,
           prepared: this.preparedFromExecution(execution),
@@ -1258,7 +1326,7 @@ export class ExecutionService {
       const stillRunning = this.deps.store.snapshot().tasks.some(task =>
         task.executions.some(execution => execution.id === executionId && execution.outcome === 'running'))
       if (!stillRunning) continue
-      this.adoptLiveRun(executionId, entry.sessionId, entry.agent, entry.prepared)
+      this.adoptLiveRun(executionId, entry.taskId, entry.sessionId, entry.agent, entry.prepared)
     }
   }
 
