@@ -17,6 +17,7 @@ import {
   isPlausibleTaskRecord,
   newCommentId,
   normalizeBody,
+  normalizePendingChanges,
   pruneExecutions,
   repairTaskLinks,
   type TaskLedger,
@@ -187,6 +188,11 @@ export class TaskStore {
         // blocking so legacy ledgers behave exactly as before.
         const droppedLinks = repairTaskLinks(task)
         if (droppedLinks.length > 0) console.warn('[dsh-taskboard] dropped invalid task links on load:', task.id, droppedLinks)
+        // 0.10.1: pending approval requests are shape-tolerant too — a corrupt
+        // request degrades to "dropped" instead of bricking the board.
+        const pendingChanges = normalizePendingChanges(task.pendingChanges, task.id)
+        if (pendingChanges.length > 0) task.pendingChanges = pendingChanges
+        else delete task.pendingChanges
         if (task.status === 'in_progress' && task.claimedBy === undefined
           && task.updatedBy?.kind === 'agent' && typeof task.updatedBy.sessionId === 'string') {
           task.claimedBy = task.updatedBy.sessionId

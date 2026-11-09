@@ -333,20 +333,32 @@ describe('deleting a prerequisite repairs dependents atomically (F1/D2)', () => 
     expect(dependencyState(c, h.store.snapshot().tasks).ready).toBe(true)
   })
 
-  it('agent taskboard_delete repairs dependents identically', async () => {
+  it('agent delete of a prerequisite becomes an approval request; approving repairs dependents', async () => {
     const h = await host()
     const a = await h.tool('taskboard_create').execute({ title: 'Agent A', workspaceId: 'ws-a', urgency: 'normal' }, exec) as { task: { id: string } }
     const b = await h.tool('taskboard_create').execute({ title: 'Agent B', workspaceId: 'ws-a', urgency: 'normal', dependsOn: [a.task.id] }, exec) as { task: { id: string } }
+    // 0.10.1: an agent may not trash a live prerequisite directly — it records
+    // a pending approval request instead (the graph stays enforced).
+    const requested = await h.tool('taskboard_delete').execute({ id: a.task.id, ifVersion: 1, reason: 'A is obsolete' }, exec) as {
+      pendingApproval: { id: string; kind: string; affected: string[] }
+    }
+    expect(requested.pendingApproval).toMatchObject({ kind: 'trash-prerequisite', affected: [b.task.id] })
+    expect(h.store.get(a.task.id)!.trashedAt).toBeUndefined()
+    expect(h.store.get(b.task.id)!.dependsOn).toEqual([a.task.id])
+
+    // The user approves → the same atomic trash + dependent repair runs.
     const changes: Array<{ tasks: readonly TaskRecord[] }> = []
     const unsubscribe = h.store.subscribe(change => changes.push({ tasks: change.tasks }))
-    await h.tool('taskboard_delete').execute({ id: a.task.id, ifVersion: 1 }, exec)
+    const res = await h.post(`/dsh-taskboard/tasks/${a.task.id}/changes/${requested.pendingApproval.id}/approve`, {})
     unsubscribe()
+    expect(res.status).toBe(200)
+    expect(h.store.get(a.task.id)!.trashedAt).toBeDefined()
     const repaired = h.store.get(b.task.id)!
     expect(repaired.dependsOn).toBeUndefined()
     expect(repaired.version).toBe(2)
-    expect(repaired.comments.at(-1)!.systemKey).toBe('sys.prerequisiteRemoved')
-    // SSE/change-list coherence: the repaired dependent is in the committed
-    // change set, so the GUI cannot keep a stale dependency badge.
+    expect(repaired.comments.filter(comment => comment.systemKey === 'sys.prerequisiteRemoved').length).toBe(1)
+    // SSE/change-list coherence: the trashed card and the repaired dependent
+    // are in the committed change set.
     expect(changes).toHaveLength(1)
     expect(changes[0]!.tasks.map(task => task.id).sort()).toEqual([a.task.id, b.task.id].sort())
   })

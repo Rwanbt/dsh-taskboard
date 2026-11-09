@@ -56,6 +56,8 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   const stale = now !== undefined && isStaleClaim(task, now)
   const reviewing = task.status === 'in_review' && task.trashedAt === undefined
   const dependency = task.dependencyProgress ?? dependencyState(task, controller.getSnapshot().ledger.tasks)
+  // 0.10.1: agent-proposed dependency changes awaiting the user's decision.
+  const pendingApprovals = task.pendingChanges ?? []
   // The card badge is information, never an error: its tooltip carries the
   // actual prerequisite names + statuses (the detail belongs there, not on
   // the card). Missing/trashed ids are resolved from the loaded ledger; a
@@ -232,6 +234,15 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
       <div className="dsh-atb-card-meta">
         <span className="dsh-atb-badge">{t(URGENCY_KEYS[task.urgency])}</span>
         {task.blocked && <span className="dsh-atb-badge" data-kind="blocked"><Icon name="warning" /> {t('shared.blocked')}</span>}
+        {pendingApprovals.length > 0 && (
+          <span
+            className="dsh-atb-badge"
+            data-kind="approval"
+            title={t('card.badge.approvalTitle', { n: pendingApprovals.length })}
+          >
+            <Icon name="hand" /> {t('card.badge.approval')}
+          </span>
+        )}
         {dependency.total > 0 && (
           <span
             className="dsh-atb-badge"

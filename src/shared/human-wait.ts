@@ -17,11 +17,22 @@ export function applyHumanWaitingPatch(task: TaskRecord, patch: { waitingForHuma
   if (task.waitingForHuman !== true) delete task.waitingReason
 }
 
-export type HumanWaiting = { needs: boolean; source?: 'explicit' | 'inferred'; reason?: string; reasonKey?: string }
+export type HumanWaiting = { needs: boolean; source?: 'explicit' | 'inferred' | 'approval'; reason?: string; reasonKey?: string }
 
-/** Inference is a suggestion only; an explicit false always overrides it. */
+/**
+ * Whether a task needs the human right now.
+ *
+ * 0.10.1: an agent-proposed dependency weakening (pendingChanges) is an
+ * OBJECTIVE pending human action, so it wins over an explicit
+ * `waitingForHuman: false` — the user still has to approve or reject it, and
+ * the "Waiting for Me" filter must surface it. Only terminal/trashed cards are
+ * excluded.
+ */
 export function humanWaiting(task: TaskRecord): HumanWaiting {
   if (task.trashedAt !== undefined || ['done', 'archived', 'canceled'].includes(task.status)) return { needs: false }
+  if ((task.pendingChanges?.length ?? 0) > 0) {
+    return { needs: true, source: 'approval', reasonKey: 'human.reason.approval' }
+  }
   if (typeof task.waitingForHuman === 'boolean') {
     return task.waitingForHuman ? { needs: true, source: 'explicit', reason: task.waitingReason, reasonKey: 'human.reason.manual' } : { needs: false }
   }

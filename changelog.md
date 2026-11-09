@@ -1,5 +1,16 @@
 # 更新日志 / Changelog
 
+### 0.10.1 — 2026-11-09
+
+- **依赖变更需用户批准**：agent 移除前置任务或删除仍被依赖的任务时，只生成待审批请求（需填写理由），agent 可继续其他工作；用户在详情页批准或拒绝后才生效。待审批任务计入「待我处理」。
+- **跨项目保护**：agent 不能修改、删除或移动其会话所属项目之外的任务（`workspace_mismatch`）。
+- **界面**：前置任务未完成时禁用「执行」按钮并提示缺失的前置任务。
+
+**English:**
+
+- **Dependency changes need user approval**: when an agent removes a prerequisite or deletes a task others still depend on, only a pending request (with a required reason) is recorded and the agent keeps working; the change applies after the user approves it in the detail pane. Pending approvals appear under "Waiting for Me".
+- **Cross-project guard**: agents can no longer update, delete or move tasks outside their session's project (`workspace_mismatch`).
+- **UI**: Run is disabled while prerequisites are unmet, with a tooltip naming them.
 ### 0.10.0 — 2026-11-09
 
 - **任务依赖（dependsOn）**：同项目前置任务全部经人验收 `done` 前不可认领/执行/调度；拒绝环、自引用、跨项目；前置任务删除时自动解除并写审计评论。

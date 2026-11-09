@@ -14,6 +14,7 @@ import type { TaskTemplateSpec } from '../../shared/api.ts'
 import type { ChecklistItem, IsolationMode, PermissionMode, PeriodicCompletion, TaskRecord, Urgency } from '../../shared/protocol.ts'
 import { MAX_CHECKLIST_ITEMS, asPermission, branchNameModeOf, branchNamePrefixOf, buildBranchName, defaultIsolationOf, defaultPermissionOf, nextCronTime, parseCron } from '../../shared/protocol.ts'
 import { fmtTime, initialWorkspaceId } from './format.ts'
+import { dependencyState } from '../../shared/dependencies.ts'
 import { useT, type Translate } from '../i18n/runtime.ts'
 import { Icon } from './Icon.tsx'
 import { SlashPromptInput } from './SlashPromptInput.tsx'
@@ -358,6 +359,15 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
 
   // A task already in progress cannot be run again (host rejects it).
   const runBlocked = editing && task.status === 'in_progress'
+  // 0.10.1: Run now is also blocked while a prerequisite is not done (the host
+  // enforces it too); the tooltip names the unmet prerequisites.
+  const editDependency = editing && task !== undefined
+    ? (task.dependencyProgress ?? dependencyState(task, state.ledger.tasks))
+    : undefined
+  const runBlockedByDependencies = editDependency !== undefined && !editDependency.ready
+  const runBlockedByDependenciesTitle = runBlockedByDependencies
+    ? t('dependency.runBlocked', { list: editDependency.pendingIds.map(id => state.ledger.tasks.find(item => item.id === id)?.title ?? id).join(', ') })
+    : undefined
 
   // Isolation editability: locked once the task has execution history (the
   // branch and its baseline depend on the choice — plan §3.1).
@@ -457,7 +467,7 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
 
   /** Save the form, then immediately trigger a manual run of the task. */
   const submitAndRun = (): void => {
-    if (!valid || runBlocked || busy || imageUploading) return
+    if (!valid || runBlocked || runBlockedByDependencies || busy || imageUploading) return
     const picked = buildPickedModel()
     if (!editing) saveLastModel(picked)
     const isolationOut = isolationPayload()
@@ -891,8 +901,8 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
             <button
               type="button"
               className="dsh-atb-btn"
-              disabled={!valid || runBlocked || busy || imageUploading}
-              title={runBlocked ? t('form.action.runBlockedTitle') : busy || imageUploading ? t('form.action.runBusyTitle') : t('form.action.runTitle')}
+              disabled={!valid || runBlocked || runBlockedByDependencies || busy || imageUploading}
+              title={runBlockedByDependenciesTitle ?? (runBlocked ? t('form.action.runBlockedTitle') : busy || imageUploading ? t('form.action.runBusyTitle') : t('form.action.runTitle'))}
               onClick={submitAndRun}
             >
               <Icon name="play" /> {t('form.action.run')}

@@ -703,6 +703,42 @@ export type CommentRecord = {
 export type CommitInfo = { hash: string; subject: string }
 
 // ---------------------------------------------------------------------------
+// Dependency change approval (0.10.1)
+// ---------------------------------------------------------------------------
+
+/** The two dependency-graph weakenings an agent may only PROPOSE to the user. */
+export type DependencyChangeKind = 'remove-prerequisites' | 'trash-prerequisite'
+
+/**
+ * One agent-proposed dependency-graph weakening awaiting the user's decision
+ * (0.10.1). Stored on the task it concerns — the task whose `dependsOn` would
+ * shrink, or the prerequisite proposed for deletion. Never an execution gate:
+ * prerequisites stay enforced until the user approves. At most one request per
+ * (kind, taskId); a re-request keeps the id and refreshes the fields.
+ */
+export type DependencyChangeRequest = {
+  id: string
+  kind: DependencyChangeKind
+  /** The task the decision applies to (same record that stores the request). */
+  taskId: string
+  /** kind=remove-prerequisites: prerequisite ids to drop (already-absent ids are ignored). */
+  remove?: string[]
+  /** kind=trash-prerequisite: live dependents observed when the request was made. */
+  affected?: string[]
+  /** Agent-provided justification (1..500 chars). */
+  reason: string
+  requestedBy: { kind: 'agent'; sessionId: string }
+  createdAt: number
+}
+
+/** One pending request per kind, so a record carries at most two. */
+export const MAX_PENDING_CHANGES = 2
+
+/** Longest accepted approval-request reason. */
+export const MAX_DEPENDENCY_CHANGE_REASON = 500
+
+
+// ---------------------------------------------------------------------------
 // Multi-repo mirror isolation (0.6.3)
 // ---------------------------------------------------------------------------
 
@@ -869,6 +905,12 @@ export type TaskRecord = {
    * never auto-completed.
    */
   parentId?: string
+  /**
+   * Agent-proposed dependency weakenings awaiting the user's decision (0.10.1).
+   * Storage only — never persisted as an execution gate; the prerequisite
+   * enforcement keeps reading `dependsOn` until the user approves.
+   */
+  pendingChanges?: DependencyChangeRequest[]
   /**
    * Derived GET /state projection of direct-child progress (D9); never stored,
    * never persisted by the host, never used as an execution gate.
@@ -1090,6 +1132,25 @@ export function newChecklistItemId(): string {
 /** Mint an execution id. */
 export function newExecutionId(): string {
   return `e-${Date.now().toString(36)}-${suffix()}`
+}
+
+/** Mint a dependency-change request id (0.10.1). */
+export function newDependencyChangeId(): string {
+  return `dcr-${Date.now().toString(36)}-${suffix()}`
+}
+
+/**
+ * Validate/normalize an agent-provided approval reason (1..500 chars).
+ * @param raw - the raw reason.
+ * @returns the trimmed reason.
+ * @throws when empty or too long.
+ */
+export function normalizeDependencyChangeReason(raw: string): string {
+  const reason = raw.trim()
+  if (reason.length === 0 || reason.length > MAX_DEPENDENCY_CHANGE_REASON) {
+    throw new Error(`reason must be 1..${MAX_DEPENDENCY_CHANGE_REASON} characters`)
+  }
+  return reason
 }
 
 // ---------------------------------------------------------------------------
@@ -1765,6 +1826,135 @@ export function repairTaskLinks(task: TaskRecord): string[] {
 }
 
 /**
+ * Structural gate for one dependency-change request id (0.10.1): bounded,
+ * filesystem-safe shape (requests never ride into paths, but the ledger stays
+ * uniformly strict).
+ */
+function isPlausibleChangeId(raw: unknown): raw is string {
+  return typeof raw === 'string' && raw.length > 0 && raw.length <= 100 && /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(raw)
+}
+
+/** Shape gate for a request's id list (remove/affected). */
+function isPlausibleChangeIdList(raw: unknown): raw is string[] {
+  return Array.isArray(raw) && raw.length <= MAX_TASK_DEPENDENCIES
+    && (raw as unknown[]).every(value => typeof value === 'string' && isValidTaskId(value))
+}
+
+/**
+ * Normalize the optional `pendingChanges` field on LOAD and IMPORT (0.10.1).
+ *
+ * Shape-only, like the other optional link fields: unknown ids are allowed
+ * (a prerequisite may already be gone), duplicates are rejected per kind (at
+ * most one request per (kind, taskId)), and malformed entries are dropped
+ * instead of making the whole board/import unloadable. `taskId` is always
+ * forced to the record the list is stored on, so a hand-edited mismatch cannot
+ * point an approval at another card.
+ * @param raw - the untyped field.
+ * @param taskId - the record's own id.
+ * @returns the accepted requests, in ledger order.
+ */
+export function normalizePendingChanges(raw: unknown, taskId: string): DependencyChangeRequest[] {
+  if (!Array.isArray(raw)) return []
+  const result: DependencyChangeRequest[] = []
+  const kinds = new Set<DependencyChangeKind>()
+  for (const entry of raw) {
+    if (result.length >= MAX_PENDING_CHANGES) break
+    if (typeof entry !== 'object' || entry === null) continue
+    const e = entry as Record<string, unknown>
+    const kind = e.kind
+    if (kind !== 'remove-prerequisites' && kind !== 'trash-prerequisite') continue
+    if (kinds.has(kind)) continue
+    if (!isPlausibleChangeId(e.id)) continue
+    if (typeof e.reason !== 'string') continue
+    const reason = e.reason.trim()
+    if (reason.length === 0 || reason.length > MAX_DEPENDENCY_CHANGE_REASON) continue
+    const requestedBy = e.requestedBy as { kind?: unknown; sessionId?: unknown } | null
+    if (typeof requestedBy !== 'object' || requestedBy === null || requestedBy.kind !== 'agent') continue
+    if (typeof requestedBy.sessionId !== 'string' || requestedBy.sessionId.length === 0 || requestedBy.sessionId.length > 256) continue
+    if (typeof e.createdAt !== 'number' || !Number.isFinite(e.createdAt) || e.createdAt < 0) continue
+    const list = kind === 'remove-prerequisites' ? e.remove : e.affected
+    if (list !== undefined && !isPlausibleChangeIdList(list)) continue
+    kinds.add(kind)
+    const request: DependencyChangeRequest = {
+      id: e.id,
+      kind,
+      taskId,
+      reason,
+      requestedBy: { kind: 'agent', sessionId: requestedBy.sessionId },
+      createdAt: e.createdAt,
+    }
+    if (kind === 'remove-prerequisites') {
+      if (list !== undefined) request.remove = [...(list as string[])]
+    } else if (list !== undefined) {
+      request.affected = [...(list as string[])]
+    }
+    result.push(request)
+  }
+  return result
+}
+
+/**
+ * Store one request on its task, replacing the previous request of the SAME
+ * kind (the existing id is kept, matching the contract: a re-request refreshes
+ * fields but never forks a second pending row for the same kind).
+ * @param task - the task being written (mutated in place).
+ * @param request - the fresh request.
+ * @returns the stored request (same id as the replaced one, when any).
+ */
+export function upsertDependencyChange(task: TaskRecord, request: DependencyChangeRequest): DependencyChangeRequest {
+  const existing = (task.pendingChanges ?? []).find(change => change.kind === request.kind)
+  const stored: DependencyChangeRequest = existing === undefined
+    ? { ...request, taskId: task.id }
+    : { ...request, id: existing.id, taskId: task.id }
+  const others = (task.pendingChanges ?? []).filter(change => change.kind !== stored.kind)
+  task.pendingChanges = [...others, stored]
+  return stored
+}
+
+/** Remove one pending request from a task (in place); undefined when absent. */
+export function removeDependencyChange(task: TaskRecord, changeId: string): DependencyChangeRequest | undefined {
+  const request = (task.pendingChanges ?? []).find(change => change.id === changeId)
+  if (request === undefined) return undefined
+  const remaining = (task.pendingChanges ?? []).filter(change => change.id !== changeId)
+  if (remaining.length > 0) task.pendingChanges = remaining
+  else delete task.pendingChanges
+  return request
+}
+
+/** The ids a request is about — remove ids, or the dependents observed for a trash. */
+export function dependencyChangeIds(request: DependencyChangeRequest): string[] {
+  return request.kind === 'remove-prerequisites' ? [...(request.remove ?? [])] : [...(request.affected ?? [])]
+}
+
+/**
+ * Build one host-generated system comment. `systemKey` values use the dotted
+ * `sys.*` namespace (e.g. `sys.dcr.approved`); `body` stays a zh fallback for
+ * agent tools / raw JSON while the GUI localizes the key (0.10.1).
+ * @param systemKey - i18n key (`sys.*`).
+ * @param body - zh fallback body.
+ * @param systemParams - flat string interpolation params.
+ * @param now - epoch ms.
+ * @param threadId - stable source tag (default `host`).
+ */
+export function newSystemComment(
+  systemKey: string,
+  body: string,
+  systemParams: Record<string, string>,
+  now: number,
+  threadId = 'host',
+): CommentRecord {
+  return {
+    id: newCommentId(),
+    body: normalizeBody(body),
+    systemKey,
+    systemParams,
+    threadId,
+    version: 1,
+    createdAt: now,
+  }
+}
+
+/**
  * Validate ONE imported task record (pure): rebuilds it field by field with
  * the normal validators, minting missing ids and re-arming cron. Executions
  * left `running` by the exporting machine are marked failed — their
@@ -1844,7 +2034,7 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
           ...(typeof ce.deliveredAt === 'number' && Number.isFinite(ce.deliveredAt)
             ? { deliveredAt: ce.deliveredAt, ...(typeof ce.deliveredExecutionId === 'string' ? { deliveredExecutionId: ce.deliveredExecutionId } : {}) }
             : {}),
-          ...(typeof ce.systemKey === 'string' && /^sys\.[A-Za-z0-9]+$/.test(ce.systemKey) && ce.systemKey.length <= 100
+          ...(typeof ce.systemKey === 'string' && /^sys\.[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*$/.test(ce.systemKey) && ce.systemKey.length <= 100
             ? {
                 systemKey: ce.systemKey,
                 ...(typeof ce.systemParams === 'object' && ce.systemParams !== null && !Array.isArray(ce.systemParams)
@@ -1908,6 +2098,7 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
       ? { kind: 'agent', sessionId: (v as { sessionId: string }).sessionId }
       : { kind: 'user' })
     const branchesMap = normalizeBranchesMap(e.branches)
+    const pendingChanges = normalizePendingChanges(e.pendingChanges, id)
     const task: TaskRecord = {
       id,
       title: normalizeTitle(strOr(e, 'title', '')),
@@ -1943,6 +2134,9 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
       updatedBy: actorOf(e.updatedBy),
       comments,
       executions,
+      // 0.10.1 approval requests: shape-normalized (unknown prerequisite ids
+      // allowed — the target may already be gone); never an execution gate.
+      ...(pendingChanges.length > 0 ? { pendingChanges } : {}),
       ...(typeof e.executionsPruned === 'number' ? { executionsPruned: e.executionsPruned } : {}),
       ...(typeof e.trashedAt === 'number' ? { trashedAt: e.trashedAt } : {}),
     }
@@ -1975,6 +2169,9 @@ export function isPlausibleTaskRecord(raw: unknown): boolean {
     // strict and reject them outright.
     && (t.dependsOn === undefined || isLoadableDependsOn(t.dependsOn))
     && isLoadableParentId(t.parentId)
+    // 0.10.1: the request list stays shape-tolerant on load (entries are
+    // normalized/repaired in store.load like the optional link fields).
+    && (t.pendingChanges === undefined || Array.isArray(t.pendingChanges))
     && Array.isArray(t.comments) && Array.isArray(t.executions)
     && typeof t.execution === 'object' && t.execution !== null
     && (t.execution as { mode?: unknown }).mode !== undefined
@@ -2031,6 +2228,8 @@ export type TaskSummary = {
   dependsOn?: string[]
   /** Hierarchy parent id, when the task is a subtask (D6). */
   parentId?: string
+  /** Pending dependency-change approvals (0.10.1) — list/detail must expose them. */
+  pendingChanges?: DependencyChangeRequest[]
   waitingForHuman?: boolean
   waitingReason?: string
   executionMode: ExecutionMode
@@ -2062,6 +2261,9 @@ export function summarize(task: TaskRecord): TaskSummary {
     blocked: task.blocked,
     ...(task.dependsOn?.length ? { dependsOn: [...task.dependsOn] } : {}),
     ...(task.parentId !== undefined ? { parentId: task.parentId } : {}),
+    ...(task.pendingChanges !== undefined && task.pendingChanges.length > 0
+      ? { pendingChanges: task.pendingChanges.map(change => ({ ...change })) }
+      : {}),
     ...(typeof task.waitingForHuman === 'boolean' ? { waitingForHuman: task.waitingForHuman } : {}),
     ...(task.waitingForHuman === true && task.waitingReason ? { waitingReason: task.waitingReason } : {}),
     executionMode: task.execution.mode,

@@ -12,6 +12,7 @@ import type {
   CommentRunResponse,
   CreateTaskBody,
   DeleteTaskBody,
+  DependencyChangeDecisionResponse,
   DiagnosticsResponse,
   QueueClearResponse,
   DiffResponse,
@@ -25,6 +26,7 @@ import type {
   PromptCompletionsResponse,
   ProjectSessionView,
   RejectTaskBody,
+  RejectDependencyChangeBody,
   RunTaskBody,
   SettingsResponse,
   StorageMigrationResult,
@@ -39,6 +41,7 @@ import type {
   WorktreeRemoveBody,
   WorkspaceView,
 } from '../shared/api.ts'
+import { dependencyChangePath } from '../shared/api.ts'
 import type { CommentRecord, TaskSummary } from '../shared/protocol.ts'
 
 /** Re-exported for the board views (single source: the shared contract). */
@@ -133,6 +136,10 @@ export interface TaskboardClient {
   archiveSessions?(id: string): Promise<SessionArchiveResult>
   /** Quick-reject (card ✗): back to todo + optional comment, one mutation. */
   reject(id: string, body: RejectTaskBody): Promise<TaskSummary>
+  /** Approve one pending dependency-change request (user-only, atomic host mutation). */
+  approveChange(taskId: string, changeId: string): Promise<DependencyChangeDecisionResponse>
+  /** Reject one pending dependency-change request, with an optional note for the agent. */
+  rejectChange(taskId: string, changeId: string, body: RejectDependencyChangeBody): Promise<DependencyChangeDecisionResponse>
   comment(id: string, bodyText: string): Promise<CommentRecord>
   /** Issue #51: deliver pending user comments to the task's conversation (optionally posting one first). */
   commentRun(id: string, bodyText: string): Promise<CommentRunResponse>
@@ -198,6 +205,8 @@ export function createClient(): TaskboardClient {
     move: (id, body) => post(`/dsh-taskboard/tasks/${encodeURIComponent(id)}/move`, body),
     archiveSessions: id => post(`/dsh-taskboard/tasks/${encodeURIComponent(id)}/archive-sessions`, {}),
     reject: (id, body) => post(`/dsh-taskboard/tasks/${encodeURIComponent(id)}/reject`, body),
+    approveChange: (taskId, changeId) => post(dependencyChangePath(taskId, changeId, 'approve'), {}),
+    rejectChange: (taskId, changeId, body) => post(dependencyChangePath(taskId, changeId, 'reject'), body),
     comment: (id, bodyText) => post(`/dsh-taskboard/tasks/${encodeURIComponent(id)}/comment`, { body: bodyText }),
     commentRun: (id, bodyText) => post(`/dsh-taskboard/tasks/${encodeURIComponent(id)}/comment-run`, { body: bodyText }),
     uploadImage,

@@ -44,8 +44,11 @@ import {
   isClaimedBy,
   newChecklistItemId,
   newCommentId,
+  newDependencyChangeId,
+  newSystemComment,
   newTaskId,
   normalizeBody,
+  normalizeDependencyChangeReason,
   normalizeExecution,
   normalizeExecutionReport,
   normalizeModel,
@@ -54,8 +57,10 @@ import {
   sanitizeCustomBranchName,
   summarize,
   syncClaim,
+  upsertDependencyChange,
   type Actor,
   type ChecklistItem,
+  type DependencyChangeKind,
   type TaskLedger,
   type TaskModel,
   type TaskRecord,
@@ -83,6 +88,8 @@ function taskLine(t: {
   }
   waitingForHuman?: boolean
   waitingReason?: string
+  /** 0.10.1: pending dependency-change approvals waiting for the user. */
+  pendingChanges?: Array<{ kind: string }>
   executionMode: string
   commentCount?: number
   lastExecutionOutcome?: string
@@ -100,6 +107,7 @@ function taskLine(t: {
     parts.push(t.dependencyProgress.ready ? '·可执行' : `·等待前置${t.dependencyProgress.pendingIds.length}项`)
   }
   if (t.waitingForHuman === true) parts.push(`·待人工${t.waitingReason ? `：${t.waitingReason}` : ''}`)
+  if (t.pendingChanges !== undefined && t.pendingChanges.length > 0) parts.push(`·待审批${t.pendingChanges.length}`)
   if (t.executionMode === 'scheduled') parts.push('·定时')
   if (t.commentCount !== undefined && t.commentCount > 0) parts.push(`·评论${t.commentCount}`)
   if (t.checklist !== undefined && t.checklist.total > 0) parts.push(`·清单${t.checklist.done}/${t.checklist.total}`)
@@ -137,8 +145,10 @@ function taskDetail(t: TaskRecord & { effectivePrompt?: string } & TaskDetailDep
   ]
   const holder = isClaimedBy(t)
   const waiting = humanWaiting(t)
-  if (waiting.needs) lines.push(`人工等待: ${waiting.source === 'inferred' ? '疑似，需确认' : '已标记'}${waiting.reason ? ` · ${waiting.reason}` : ''}`)
-  else if (t.waitingForHuman === false) lines.push('人工等待: 已明确解除（不自动识别）')
+  if (waiting.needs) {
+    const label = waiting.source === 'approval' ? '依赖变更待审批' : waiting.source === 'inferred' ? '疑似，需确认' : '已标记'
+    lines.push(`人工等待: ${label}${waiting.reason ? ` · ${waiting.reason}` : ''}`)
+  } else if (t.waitingForHuman === false) lines.push('人工等待: 已明确解除（不自动识别）')
   if (holder !== undefined) lines.push(`认领: agent ${String(holder).slice(0, 24)}（持有期间其他会话不可移动或删除）`)
   // D6: hierarchy is a separate concept from dependencies — never a gate, but
   // both the parent link and the derived direct-children progress must be
@@ -174,6 +184,16 @@ function taskDetail(t: TaskRecord & { effectivePrompt?: string } & TaskDetailDep
     const shown = t.completionUnblocks.slice(0, 10).map(task => `${task.id}「${task.title}」(${task.status})`)
     const more = t.completionUnblocks.length - shown.length
     lines.push(`完成后可解锁 ${t.completionUnblocks.length} 个下游任务: ${shown.join(', ')}${more > 0 ? `（另有 ${more} 个）` : ''}`)
+  }
+  // 0.10.1: pending dependency-change approvals are NOT applied yet; the agent
+  // must see the request id (for reference) and keep working.
+  if (t.pendingChanges !== undefined && t.pendingChanges.length > 0) {
+    lines.push(`待用户审批的依赖变更 (${t.pendingChanges.length}):`)
+    for (const change of t.pendingChanges) {
+      const ids = change.kind === 'remove-prerequisites' ? (change.remove ?? []) : (change.affected ?? [])
+      lines.push(`  - ${change.id} [${change.kind}] 涉及: ${ids.length > 0 ? ids.join(', ') : '（无）'} · 理由: ${change.reason}`
+        + ` · 请求者 agent ${String(change.requestedBy.sessionId).slice(0, 24)} · ${new Date(change.createdAt).toISOString()}`)
+    }
   }
   if (t.execution.nextRunAt !== undefined) lines.push(`下次触发: ${new Date(t.execution.nextRunAt).toISOString()}`)
   if (t.model !== undefined) lines.push(`固定模型: ${t.model.provider}/${t.model.model}${t.model.reasoningEffort !== undefined ? ` (思考强度: ${t.model.reasoningEffort})` : ''}`)
@@ -364,6 +384,33 @@ async function callerClaimScope(deps: ToolDeps, exec: ToolRunContext): Promise<C
 
 /** How many registered projects a not_found detail may enumerate. */
 const KNOWN_PROJECTS_SHOWN = 8
+
+/**
+ * The `pendingApproval` envelope a deferred agent write returns (0.10.1): the
+ * write was accepted as a REQUEST, not applied; the agent must continue other
+ * work instead of waiting for the user.
+ */
+type PendingApproval = { id: string; kind: DependencyChangeKind; remove?: string[]; affected?: string[] }
+
+/**
+ * 0.10.1 project boundary for EVERY agent write (update/delete/move), not just
+ * a claim: a session may only modify tasks of its own project — plus the
+ * linked workspace roots when the board enables `allowClaimFromLinkedRoots`.
+ * Cross-project edits are refused (`workspace_mismatch`), never turned into an
+ * approval request: approval covers a task's graph, not another project's
+ * autonomy.
+ * @param scope - the caller's resolved claim scope.
+ * @param linkedEnabled - the board's linked-root policy.
+ * @param task - the FRESH task record the mutation is about.
+ */
+function assertProjectAccess(scope: ClaimScope | undefined, linkedEnabled: boolean, task: TaskRecord): void {
+  const reached = scope?.wsId === task.workspaceId
+    || (linkedEnabled && scope !== undefined && scope.linkedWsIds.has(task.workspaceId))
+  if (reached) return
+  throw new ToolError(ERR.workspaceMismatch, linkedEnabled
+    ? "only a session inside this task's project (or one of its linked workspace roots) may edit it"
+    : "only a session inside this task's project may edit it")
+}
 
 /** Longest project title a tool error may inline (kept single-line). */
 const TITLE_IN_ERROR_MAX = 60
@@ -799,6 +846,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     description:
       'Update a task\'s title/description/prompt/urgency/blocked/waitingForHuman/waitingReason/permission/dependsOn/parentId. Requires ifVersion (read first). '
       + 'parentId takes a same-workspace task id to make this a subtask, or null to detach it from its parent (omitted = unchanged; hierarchy is not an execution gate). '
+      + 'dependency approval (0.10.1): removing an existing prerequisite is a WEAKENING — additions still apply immediately, but removals need `reason` and only become a pending user approval (pending_approval); never wait for it, continue other work. '
+      + 'Cross-project writes are refused (workspace_mismatch). '
       + 'The model and execution config are read-only through this tool (they belong to the task owner/user).',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id.' },
@@ -808,7 +857,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       prompt: { type: 'string', description: 'New execution prompt.' },
       urgency: { type: 'string', description: 'urgent | normal | relaxed.' },
       blocked: { type: 'boolean', description: 'Blocked marker (work cannot continue right now).' },
-      dependsOn: { type: 'array', items: { type: 'string' }, description: 'Replace prerequisites by same-workspace task IDs; [] clears, cycles rejected.' },
+      dependsOn: { type: 'array', items: { type: 'string' }, description: 'Replace prerequisites by same-workspace task IDs; [] clears, cycles rejected. REMOVING an existing id requires reason and waits for user approval; additions apply immediately.' },
+      reason: { type: 'string', description: 'Why a prerequisite must be removed/weakened (1..500 chars). Required only when dependsOn drops an existing id; recorded in the approval request and audit comment. Never include credentials.' },
       // The author-facing spec cannot express `string | null`; the JSON node
       // keeps BOTH a new parent id and an explicit null detach available (the
       // host validates the value with validateParent). The parameter's meaning
@@ -822,9 +872,15 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     output: {
       schema: JSON_OUT,
       render: (_args, value) => {
-        const v = value as { task?: { id?: string; status?: string; version?: number }; sessionArchive?: SessionArchiveResult }
+        const v = value as { task?: { id?: string; status?: string; version?: number }; pendingApproval?: PendingApproval; sessionArchive?: SessionArchiveResult }
         const t = v.task
-        return [{ type: 'text', text: t === undefined ? '更新失败。' : `已更新任务 ${t.id}，当前 v${t.version} [${t.status}]。` }]
+        if (t === undefined) return [{ type: 'text', text: '更新失败。' }]
+        const base = `已更新任务 ${t.id}，当前 v${t.version} [${t.status}]。`
+        // 0.10.1: the removal did NOT apply — the agent must continue other work.
+        const pending = v.pendingApproval === undefined
+          ? ''
+          : `\nPrerequisite removal awaits user approval (${v.pendingApproval.id}); continue other work.`
+        return [{ type: 'text', text: base + pending }]
       },
     },
     async execute(args: {
@@ -836,6 +892,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       urgency?: string
       blocked?: boolean
       dependsOn?: string[]
+      reason?: string
       parentId?: string | null
       waitingForHuman?: boolean
       waitingReason?: string
@@ -843,13 +900,18 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     }, exec: unknown) {
       try {
         const { actor } = caller(exec as ToolRunContext)
+        // Claim/project scope is async, so resolve it BEFORE the mutation; the
+        // comparison itself runs on the FRESH draft inside the mutation.
+        const claimScope = await callerClaimScope(deps, exec as ToolRunContext)
         // R1: lookup + version guard + write run inside the serial-queue
         // mutation, on the fresh draft — a pre-read clone could pass its
         // version check and then blind-overwrite a concurrent writer.
         let next: TaskRecord | undefined
+        let pendingApproval: PendingApproval | undefined
         await store.mutate('task-updated', ledger => {
           const { index, task } = liveTaskAt(ledger, args.id)
           versionGuard(task, args.ifVersion)
+          assertProjectAccess(claimScope, allowClaimFromLinkedRootsOf(ledger.settings), task)
           if (task.status === 'archived') throw new ToolError(ERR.invalidTransition, 'archived tasks are immutable')
           next = structuredClone(task)
           if (args.title !== undefined) next.title = normalizeTitle(args.title)
@@ -871,9 +933,43 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
             if (task.status === 'in_progress' || task.executions.some(e => e.outcome === 'running')) {
               throw new ToolError(ERR.invalidInput, 'dependencies cannot change while the task is running')
             }
-            const ids = validateDependencies(next, args.dependsOn, projected, buildDependencyIndex(projected))
-            if (ids.length) next.dependsOn = ids
-            else delete next.dependsOn
+            const proposed = validateDependencies(next, args.dependsOn, projected, buildDependencyIndex(projected))
+            const current = task.dependsOn ?? []
+            // 0.10.1: only REMOVING an existing prerequisite is a weakening.
+            // Additions (and no-op replacements) apply immediately, as before.
+            const removed = current.filter(id => !proposed.includes(id))
+            if (removed.length === 0) {
+              if (proposed.length) next.dependsOn = proposed
+              else delete next.dependsOn
+            } else {
+              if (args.reason === undefined || args.reason.trim().length === 0) {
+                throw new ToolError(ERR.invalidInput, 'reason required to request prerequisite removal')
+              }
+              const reason = normalizeDependencyChangeReason(args.reason)
+              // Keep the current graph, apply the ADDITIONS, and defer only the
+              // removals: the task must not lose its protection before the
+              // user decides, but additions are safe and immediate.
+              const additions = proposed.filter(id => !current.includes(id))
+              const kept = [...current, ...additions]
+              if (kept.length) next.dependsOn = kept
+              else delete next.dependsOn
+              const request = upsertDependencyChange(next, {
+                id: newDependencyChangeId(),
+                kind: 'remove-prerequisites',
+                taskId: task.id,
+                remove: removed,
+                reason,
+                requestedBy: { kind: 'agent', sessionId: actor.sessionId },
+                createdAt: deps.now(),
+              })
+              pendingApproval = { id: request.id, kind: request.kind, remove: removed }
+              next.comments.push(newSystemComment(
+                'sys.dcr.requested',
+                `[系统] Agent 请求移除前置依赖 ${removed.join(', ')}，等待用户审批。理由：${reason}`,
+                { kind: request.kind, ids: removed.join(','), reason },
+                deps.now(),
+              ))
+            }
           }
           applyHumanWaitingPatch(next, args)
           if (args.permission !== undefined) next.permission = asPermission(args.permission)
@@ -883,7 +979,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           ledger.tasks[index] = next
           return [next]
         })
-        return json({ task: summarize(next!) })
+        return json({ task: summarize(next!), ...(pendingApproval !== undefined ? { pendingApproval } : {}) })
       } catch (error) { fail(error) }
     },
   })) as () => void)
@@ -914,12 +1010,12 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       try {
         const { actor } = caller(exec as ToolRunContext)
         const to = asStatus(args.status)
-        // Claim boundary (policy gate): resolving the caller's workspace is
-        // async, so it happens BEFORE the mutation — the comparison runs INSIDE
-        // against the FRESH task (stronger than the old stale-clone compare).
-        const claimScope = to === 'in_progress'
-          ? await callerClaimScope(deps, exec as ToolRunContext)
-          : undefined
+        // Project boundary (policy gate, 0.10.1): EVERY agent move — not only a
+        // claim — must stay inside the caller's project (plus linked roots when
+        // the board enables it). Resolving the scope is async, so it happens
+        // BEFORE the mutation; the comparison runs INSIDE against the FRESH
+        // task (stronger than the old stale-clone compare).
+        const claimScope = await callerClaimScope(deps, exec as ToolRunContext)
         // R1: every state guard + the write itself run inside the mutation.
         let next: TaskRecord | undefined
         let beforeTask: TaskRecord | undefined
@@ -927,6 +1023,27 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           const { index, task } = liveTaskAt(ledger, args.id)
           versionGuard(task, args.ifVersion)
           beforeTask = task
+          // Claim/edit boundary (0.10.1): the calling session must belong to
+          // the task's project — either through its own workspace root
+          // (historical rule) or, when the board enables it, through one of its
+          // linked multi-root workspace roots. This applies to EVERY move and
+          // is checked before state guards so a cross-project session always
+          // gets the stable workspace_mismatch reason.
+          const linkedEnabled = allowClaimFromLinkedRootsOf(ledger.settings)
+          const reached = claimScope?.wsId === task.workspaceId
+            || (linkedEnabled && claimScope !== undefined && claimScope.linkedWsIds.has(task.workspaceId))
+          if (!reached) {
+            throw new ToolError(
+              ERR.workspaceMismatch,
+              isClaim(task.status, to)
+                ? (linkedEnabled
+                    ? 'only a session inside this task\'s project (or one of its linked workspace roots) may claim it'
+                    : 'only a session inside this task\'s project may claim it')
+                : (linkedEnabled
+                    ? 'only a session inside this task\'s project (or one of its linked workspace roots) may edit it'
+                    : 'only a session inside this task\'s project may edit it'),
+            )
+          }
 
           // Code-level gate: agents never complete a task.
           if (to === 'done') {
@@ -943,23 +1060,6 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           // (explicit claimedBy — an agent claim or a live execution), no other
           // session may move it (that would be a takeover).
           exclusiveHoldGuard(task, actor.sessionId)
-          // Claim boundary: the calling session must belong to the task's
-          // project — either through its own workspace root (historical rule)
-          // or, when the board enables it, through one of its linked multi-root
-          // workspace roots.
-          if (isClaim(task.status, to)) {
-            const linkedClaim = allowClaimFromLinkedRootsOf(ledger.settings) && claimScope !== undefined
-            const reached = claimScope?.wsId === task.workspaceId
-              || (linkedClaim && claimScope!.linkedWsIds.has(task.workspaceId))
-            if (!reached) {
-              throw new ToolError(
-                ERR.workspaceMismatch,
-                allowClaimFromLinkedRootsOf(ledger.settings)
-                  ? 'only a session inside this task\'s project (or one of its linked workspace roots) may claim it'
-                  : 'only a session inside this task\'s project may claim it',
-              )
-            }
-          }
           next = structuredClone(task)
           next.status = to
           next.version = task.version + 1
@@ -1068,27 +1168,38 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     description:
       'Soft-delete a task (marks it trashed; the user confirms the purge in the GUI). '
       + 'Requires ifVersion. Never delete a task held by another session; running executions must stop first. '
-      + 'Prefer canceled/archived over delete unless the task was a mistake.',
+      + 'dependency approval (0.10.1): deleting a task that is a PREREQUISITE of a live task is a weakening — it needs `reason` and only records a pending user approval (nothing is trashed); any other delete applies immediately. '
+      + 'Cross-project writes are refused (workspace_mismatch). Prefer canceled/archived over delete unless the task was a mistake.',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id.' },
       ifVersion: { type: 'number', required: true, description: 'Task version you read.' },
+      reason: { type: 'string', description: 'Why this prerequisite must be deleted (1..500 chars). Required only when live dependents exist; recorded in the approval request and audit comment. Never include credentials.' },
     },
     output: {
       schema: JSON_OUT,
       render: (_args, value) => {
-        const v = value as { trashed?: boolean }
+        const v = value as { trashed?: boolean; pendingApproval?: PendingApproval }
+        if (v.pendingApproval !== undefined) {
+          return [{ type: 'text', text: `Prerequisite deletion awaits user approval (${v.pendingApproval.id}); continue other work.` }]
+        }
         return [{ type: 'text', text: v.trashed === true ? '任务已标记删除（等待用户在 GUI 清除）。' : '删除失败。' }]
       },
     },
-    async execute(args: { id: string; ifVersion: number }, exec: unknown) {
+    async execute(args: { id: string; ifVersion: number; reason?: string }, exec: unknown) {
       try {
         const { actor } = caller(exec as ToolRunContext)
+        // 0.10.1: resolve the project scope before the mutation; compare on the
+        // fresh draft inside it.
+        const claimScope = await callerClaimScope(deps, exec as ToolRunContext)
+        let next: TaskRecord | undefined
+        let pendingApproval: PendingApproval | undefined
         // R1: guards inside the mutation. S5: a running execution keeps
         // writing to the task (report, settlement) — refuse the soft-delete
         // until it is cancelled or settled. T8: clear claim residue.
         await store.mutate('task-deleted', ledger => {
           const { index, task } = liveTaskAt(ledger, args.id)
           versionGuard(task, args.ifVersion)
+          assertProjectAccess(claimScope, allowClaimFromLinkedRootsOf(ledger.settings), task)
           exclusiveHoldGuard(task, actor.sessionId)
           if (task.executions.some(e => e.outcome === 'running')) {
             throw new ToolError(ERR.invalidInput, '任务有正在运行的执行（先在 GUI 取消或等它结束再删除）')
@@ -1097,12 +1208,47 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           // move/delete the live children first (no silent re-parenting).
           assertNoChildren(args.id, ledger.tasks)
           const now = deps.now()
-          const next = structuredClone(task)
+          const dependentIds = ledger.tasks
+            .filter(other => other.id !== args.id && other.trashedAt === undefined && (other.dependsOn ?? []).includes(args.id))
+            .map(other => other.id)
+          if (dependentIds.length > 0) {
+            // 0.10.1: a prerequisite delete is a graph weakening — record the
+            // request instead of trashing; the prerequisites stay enforced.
+            if (args.reason === undefined || args.reason.trim().length === 0) {
+              throw new ToolError(ERR.invalidInput, 'reason required to request prerequisite deletion')
+            }
+            const reason = normalizeDependencyChangeReason(args.reason)
+            next = structuredClone(task)
+            const request = upsertDependencyChange(next, {
+              id: newDependencyChangeId(),
+              kind: 'trash-prerequisite',
+              taskId: args.id,
+              affected: dependentIds,
+              reason,
+              requestedBy: { kind: 'agent', sessionId: actor.sessionId },
+              createdAt: now,
+            })
+            pendingApproval = { id: request.id, kind: request.kind, affected: dependentIds }
+            next.comments.push(newSystemComment(
+              'sys.dcr.requested',
+              `[系统] Agent 请求删除仍被依赖的前置任务（受影响: ${dependentIds.join(', ')}），等待用户审批。理由：${reason}`,
+              { kind: request.kind, ids: dependentIds.join(','), reason },
+              now,
+            ))
+            next.version = task.version + 1
+            next.updatedAt = now
+            next.updatedBy = actor
+            ledger.tasks[index] = next
+            return [next]
+          }
+          next = structuredClone(task)
           next.trashedAt = now
           next.version = task.version + 1
           delete next.claimedBy
           delete next.claimedAt
           next.blocked = false
+          // A direct delete makes every approval request on this card stale.
+          delete next.pendingChanges
           ledger.tasks[index] = next
           // F1/D2: strip the id from every dependent and append the
           // sys.prerequisiteRemoved audit trace in the SAME transaction, so a
@@ -1111,7 +1257,9 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           const repaired = detachPrerequisitesOfTrashed(ledger, [{ id: args.id, title: task.title }], now)
           return [next, ...repaired]
         })
-        return { trashed: true }
+        return json(pendingApproval !== undefined
+          ? { pendingApproval, task: summarize(next!) }
+          : { trashed: true, task: summarize(next!) })
       } catch (error) { fail(error) }
     },
   })) as () => void)

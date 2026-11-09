@@ -24,7 +24,7 @@ The DSH launcher on Windows lives at
 ```sh
 git clone https://github.com/Rwanbt/dsh-taskboard.git
 cd dsh-taskboard
-git checkout feat/dependencies-lite
+git checkout main   # or a release tag, e.g. v0.10.0
 npm ci
 npm run typecheck
 npm run build      # writes lib/ — required before npm test (two specs import lib/)
@@ -84,7 +84,7 @@ the active data directory.
 
 ```sh
 git fetch origin
-git checkout feat/dependencies-lite
+git checkout main   # or a release tag, e.g. v0.10.0
 git pull --ff-only
 npm ci
 npm run typecheck && npm run build && npm test

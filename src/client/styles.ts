@@ -1522,6 +1522,12 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
 .dsh-atb-ws-group-head { background: linear-gradient(var(--atb-hover), var(--atb-hover)), var(--atb-surface-sunken); border-radius: var(--atb-radius-sm); }
 .dsh-atb-ws-group-count { background: var(--atb-bg); }
 
+/* Approval requests (0.10.1): warm tint so a pending decision stands out. */
+.dsh-atb-approval { display: flex; flex-direction: column; gap: 8px; }
+.dsh-atb-approval .dsh-atb-fieldcard { background: color-mix(in srgb, var(--atb-warn) 9%, var(--atb-bg)); }
+.dsh-atb-badge[data-kind="approval"] { background: color-mix(in srgb, var(--atb-warn) 16%, transparent); color: var(--atb-warn); }
+.dsh-atb-detail-run:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+
 /* Drop target: tint, no dashed frame. */
 .dsh-atb-column[data-dragover] { outline: none; background: var(--atb-active); }
 
