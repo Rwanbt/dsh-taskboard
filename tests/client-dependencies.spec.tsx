@@ -96,9 +96,9 @@ async function setup(tasks: TaskRecord[], options: {
   return { controller, host, root, updates, creates }
 }
 
-/** Find the dependency badge (the 🔗 one) among card badges. */
+/** Find the dependency badge (the neutral 🔗 chip is now an SVG icon). */
 function dependencyBadge(host: HTMLElement): Element | undefined {
-  return [...host.querySelectorAll('.dsh-atb-badge')].find(badge => badge.textContent?.includes('🔗'))
+  return host.querySelector('.dsh-atb-badge[data-kind="dependency"]') ?? undefined
 }
 
 /** React-controlled input setter (jsdom does not run React's value tracking). */
@@ -330,7 +330,7 @@ describe('prerequisite combobox (F9)', () => {
     expect(STYLES).toContain('.dsh-atb-prereq-list')
     expect(STYLES).toContain('.dsh-atb-prereq-opt[data-active="true"]')
     expect(STYLES).not.toContain('.dsh-atb-prereq-list { animation')
-    // Neutral information chips (dependency 🔗 and hierarchy ▸), single line.
+    // Neutral information chips (dependency link and hierarchy subtask), single line.
     expect(STYLES).toContain('.dsh-atb-badge[data-kind="dependency"]')
     expect(STYLES).toContain('.dsh-atb-badge[data-kind="subtasks"]')
     expect(STYLES).toContain('white-space: nowrap')
@@ -362,22 +362,21 @@ describe('hierarchy surface (D6)', () => {
   it('renders the ▸ done/total badge only when the task has direct children', async () => {
     const child = task({ id: 't-child', title: '子任务', parentId: 't-main', status: 'done' })
     const view = await setup([task(), child], { view: 'card' })
-    const badge = [...view.host.querySelectorAll('.dsh-atb-badge')].find(item => item.textContent?.includes('▸'))
-    expect(badge).toBeDefined()
+    const badge = view.host.querySelector('.dsh-atb-badge[data-kind="subtasks"]')
+    expect(badge).not.toBeNull()
     expect(badge!.textContent).toContain('1/1')
-    // Neutral outline chip, visually distinct from 🔗 by glyph + tooltip.
-    expect(badge!.getAttribute('data-kind')).toBe('subtasks')
+    // Neutral outline chip, visually distinct from the dependency chip.
     expect(badge!.getAttribute('title')).toContain('子任务')
-    expect(view.host.textContent).not.toContain('🔗')
+    expect(view.host.querySelector('.dsh-atb-badge[data-kind="dependency"]')).toBeNull()
 
     const without = await setup([task()], { view: 'card' })
-    expect([...without.host.querySelectorAll('.dsh-atb-badge')].some(item => item.textContent?.includes('▸'))).toBe(false)
+    expect(without.host.querySelector('.dsh-atb-badge[data-kind="subtasks"]')).toBeNull()
   })
 
   it('prefers the host-derived subtaskProgress projection when present', async () => {
     const projected = task({ subtaskProgress: { total: 3, done: 1, open: 2, blocked: 0, missing: 0 } })
     const view = await setup([projected], { view: 'card' })
-    const badge = [...view.host.querySelectorAll('.dsh-atb-badge')].find(item => item.textContent?.includes('▸'))
+    const badge = view.host.querySelector('.dsh-atb-badge[data-kind="subtasks"]')
     expect(badge?.textContent).toContain('1/3')
     expect(badge?.getAttribute('title')).toContain('2')
   })

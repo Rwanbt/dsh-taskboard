@@ -1455,7 +1455,7 @@ describe('client half', () => {
       root.render(React.createElement(TaskDetail, { task: task as never, controller, now: 1_000 }))
       await new Promise(r => setTimeout(r, 10))
       const offered = Array.from(host.querySelectorAll<HTMLButtonElement>('.dsh-atb-detail-run'))
-        .some(button => button.textContent === '▶ 立即执行')
+        .some(button => button.textContent?.includes('立即执行'))
       root.unmount()
       host.remove()
       return offered
@@ -1649,7 +1649,7 @@ describe('client half', () => {
     await new Promise(r => setTimeout(r, 20))
     // Groups mirror the menu; built-in rows show a read-only category.
     const tplmCats = Array.from(host.querySelectorAll<HTMLElement>('.dsh-atb-tplm-cathead')).map(el => el.textContent)
-    expect(tplmCats).toEqual(['▍服务 (1)', '▍其他 (1)'])
+    expect(tplmCats).toEqual(['服务 (1)', '其他 (1)'])
     expect(host.querySelectorAll('.dsh-atb-tplm-category').length).toBe(1)
     expect(host.querySelector<HTMLElement>('.dsh-atb-tplm-catstatic')!.textContent).toBe('其他')
 

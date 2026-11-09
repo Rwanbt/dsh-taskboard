@@ -21,6 +21,7 @@ import { checkNeedsHuman, fmtTime, isStaleClaim } from './format.ts'
 import { MOVE_KEYS, OUTCOME_KEYS, STATUS_KEYS, URGENCY_KEYS, statusText } from './labels.ts'
 import { useT, type Translate } from '../i18n/runtime.ts'
 import { IMAGE_ACCEPT, acceptedImageFiles, imageAlt, imageMarkdown, insertImageMarkdown } from '../image-insert.ts'
+import { Icon, type IconName } from './Icon.tsx'
 
 /** Statuses a user may move this task to, per the state machine. */
 function moveTargets(task: TaskRecord): TaskRecord['status'][] {
@@ -64,8 +65,8 @@ function duration(startedAt: number | undefined, endedAt: number | undefined): s
 }
 
 /** Small labelled meta chip. */
-function Chip({ icon, children, tone, title }: { icon?: string; children: ReactNode; tone?: string; title?: string }) {
-  return <span className="dsh-atb-chip2" data-tone={tone} title={title}>{icon !== undefined && <span className="dsh-atb-chip2-icon">{icon}</span>}{children}</span>
+function Chip({ icon, children, tone, title }: { icon?: IconName; children: ReactNode; tone?: string; title?: string }) {
+  return <span className="dsh-atb-chip2" data-tone={tone} title={title}>{icon !== undefined && <span className="dsh-atb-chip2-icon"><Icon name={icon} size={12} /></span>}{children}</span>
 }
 
 /** Render markdown text with embedded clickable images and lightbox preview. */
@@ -113,9 +114,10 @@ function MarkdownContent({ text }: { text: string }) {
               type="button"
               className="dsh-atb-lightbox-close"
               title={t('md.closePreview')}
+              aria-label={t('md.closePreview')}
               onClick={() => setLightboxUrl(null)}
             >
-              ✕
+              <Icon name="close" />
             </button>
           </div>
         </div>
@@ -173,7 +175,7 @@ function DiffView({ controller, task, execution, commit, path, repo }: {
       <div className="dsh-atb-diffview-head">
         <span className="dsh-atb-diffview-title">{commit !== undefined ? t('diff.commit', { hash: shortHash(commit) }) : t('diff.file', { path: path ?? '' })}</span>
         {state.loading && <span className="dsh-atb-diffview-hint">{t('shared.loading')}</span>}
-        {state.truncated === true && <span className="dsh-atb-diffview-hint">{t('diff.truncated')}</span>}
+        {state.truncated === true && <span className="dsh-atb-diffview-hint"><Icon name="warning" /> {t('diff.truncated')}</span>}
       </div>
       {state.failed === true
         ? <div className="dsh-atb-diffview-error">{t('diff.failed')}</div>
@@ -198,7 +200,7 @@ function ChecklistBlock({ task, controller }: { task: TaskRecord; controller: Bo
       <div className="dsh-atb-fieldcard-label">
         {t('checklist.title')}
         <span className="dsh-atb-cl-progress" data-tone={reviewing && unchecked > 0 ? 'bad' : undefined}>
-          ☑ {done}/{total}{reviewing && unchecked > 0 ? t('checklist.unchecked', { n: unchecked }) : done === total ? t('checklist.allDone') : ''}
+          <Icon name="checklist" size={12} /> {done}/{total}{reviewing && unchecked > 0 ? t('checklist.unchecked', { n: unchecked }) : done === total ? t('checklist.allDone') : ''}
         </span>
       </div>
       <div className="dsh-atb-cl-items">
@@ -217,7 +219,7 @@ function ChecklistBlock({ task, controller }: { task: TaskRecord; controller: Bo
             <span className="dsh-atb-cl-text">{item.text}</span>
             <span className="dsh-atb-cl-meta">
               {item.checked
-                ? `${item.checkedBy === 'user' ? t('checklist.byUser') : `🤖 ${shortId(item.checkedBy)}`} · ${fmtTime(item.checkedAt)}`
+                ? <><Icon name={item.checkedBy === 'user' ? 'user' : 'bot'} size={12} /> {item.checkedBy === 'user' ? t('checklist.byUser') : shortId(item.checkedBy)} · {fmtTime(item.checkedAt)}</>
                 : t('checklist.uncheckedItem')}
               {item.note !== undefined && item.note.length > 0 && <span className="dsh-atb-cl-note" title={item.note}>{t('checklist.evidence', { note: item.note })}</span>}
             </span>
@@ -255,9 +257,9 @@ function HumanWaitingBlock({ task, controller }: { task: TaskRecord; controller:
       </label>
       <div className="dsh-atb-human-actions">
         <button type="button" className="dsh-atb-movebtn" data-to="needs-human" disabled={busy}
-          onClick={() => update(true)}>{t(task.waitingForHuman === true ? 'human.saveReason' : 'detail.needsHuman.mark')}</button>
+          onClick={() => update(true)}><Icon name="hand" size={12} /> {t(task.waitingForHuman === true ? 'human.saveReason' : 'detail.needsHuman.mark')}</button>
         <button type="button" className="dsh-atb-movebtn" data-to="needs-human-clear" disabled={busy || task.waitingForHuman === false}
-          onClick={() => update(false)}>{t('detail.needsHuman.unmark')}</button>
+          onClick={() => update(false)}><Icon name="check" size={12} /> {t('detail.needsHuman.unmark')}</button>
         <button type="button" className="dsh-atb-movebtn" data-to="needs-human-auto" disabled={busy || task.waitingForHuman === undefined}
           onClick={() => update(null)}>{t('human.restoreAuto')}</button>
       </div>
@@ -292,8 +294,8 @@ function ReportBlock({ task, execution = task.executions.at(-1), historical = fa
       return (
         <div className="dsh-atb-fieldcard dsh-atb-reviewdesk" data-kind="report-missing">
           <div className="dsh-atb-fieldcard-label">
-            <span>📋 {t('detail.deliv.title')}</span>
-            <span className="dsh-atb-deliv-warn" style={{ marginLeft: 'auto' }}>⚠ {t('detail.deliv.missingReport')}</span>
+            <span><Icon name="file" /> {t('detail.deliv.title')}</span>
+            <span className="dsh-atb-deliv-warn" style={{ marginLeft: 'auto' }}><Icon name="warning" /> {t('detail.deliv.missingReport')}</span>
           </div>
           <div className="dsh-atb-deliv-missing-box">
             <p>{t('detail.deliv.missingHint')}</p>
@@ -307,20 +309,20 @@ function ReportBlock({ task, execution = task.executions.at(-1), historical = fa
   return (
     <div className="dsh-atb-fieldcard dsh-atb-reviewdesk" data-kind="report">
       <div className="dsh-atb-fieldcard-label">
-        <span>📋 {t('detail.deliv.title')}</span>
+        <span><Icon name="file" /> {t('detail.deliv.title')}</span>
         <span className="dsh-atb-cl-progress">
           {t('detail.deliv.execution', { id: execution.id })} · {t('report.submitted', { time: fmtTime(execution.endedAt ?? execution.startedAt) })}
         </span>
       </div>
       
       <div className="dsh-atb-deliv-summary-box">
-        <div className="dsh-atb-rpt-label">🎯 {t('detail.deliv.summaryLabel')}</div>
+        <div className="dsh-atb-rpt-label">{t('detail.deliv.summaryLabel')}</div>
         <div className="dsh-atb-rpt-summary">{report.summary}</div>
       </div>
 
       {report.changedFiles && report.changedFiles.length > 0 && (
         <div className="dsh-atb-rpt-sec">
-          <div className="dsh-atb-rpt-label">📁 {t('card.deliv.reportFiles')} ({report.changedFiles.length})</div>
+          <div className="dsh-atb-rpt-label"><Icon name="folder" /> {t('card.deliv.reportFiles')} ({report.changedFiles.length})</div>
           {copyError && <div role="status">{t('detail.deliv.copyFailed')}</div>}
           <ul className="dsh-atb-rpt-filelist">
             {report.changedFiles.map((file, i) => (
@@ -342,7 +344,7 @@ function ReportBlock({ task, execution = task.executions.at(-1), historical = fa
 
       {report.checks && report.checks.length > 0 && (
         <div className="dsh-atb-rpt-sec">
-          <div className="dsh-atb-rpt-label">🔬 {t('report.checks')} ({report.checks.length})</div>
+          <div className="dsh-atb-rpt-label"><Icon name="checklist" /> {t('report.checks')} ({report.checks.length})</div>
           <ul className="dsh-atb-rpt-checklist">
             {report.checks.map((check, i) => (
               <li key={i} className="dsh-atb-rpt-checkitem">
@@ -356,7 +358,7 @@ function ReportBlock({ task, execution = task.executions.at(-1), historical = fa
 
       {report.artifacts && report.artifacts.length > 0 && (
         <div className="dsh-atb-rpt-sec">
-          <div className="dsh-atb-rpt-label">📦 {t('report.artifacts')}</div>
+          <div className="dsh-atb-rpt-label"><Icon name="file" /> {t('report.artifacts')}</div>
           <ul className="dsh-atb-rpt-list">
             {report.artifacts.map((art, i) => <li key={i}>{art}</li>)}
           </ul>
@@ -365,7 +367,7 @@ function ReportBlock({ task, execution = task.executions.at(-1), historical = fa
 
       {report.risk.length > 0 && (
         <div className="dsh-atb-rpt-sec">
-          <div className="dsh-atb-rpt-label">⚠️ {t('report.risk')}</div>
+          <div className="dsh-atb-rpt-label"><Icon name="warning" /> {t('report.risk')}</div>
           <div className="dsh-atb-rpt-risk">{report.risk}</div>
         </div>
       )}
@@ -525,7 +527,7 @@ function IsolationBlock({ task, controller }: { task: TaskRecord; controller: Bo
       {view.dirtyTotal > 0 && (
         <div className="dsh-atb-iso-dirty">
           <button type="button" className="dsh-atb-iso-dirty-toggle" onClick={() => setDirtyOpen(!dirtyOpen)}>
-            {t('iso.dirty.toggle', { n: view.dirtyTotal })}{dirtyOpen ? t('iso.dirty.collapse') : t('iso.dirty.expand')}
+            {t('iso.dirty.toggle', { n: view.dirtyTotal })} {dirtyOpen ? t('iso.dirty.collapse') : t('iso.dirty.expand')} <Icon name={dirtyOpen ? 'chevronDown' : 'chevronRight'} size={12} />
           </button>
           {dirtyOpen && (
             <div className="dsh-atb-iso-dirty-files">
@@ -578,7 +580,7 @@ function IsolationBlock({ task, controller }: { task: TaskRecord; controller: Bo
                   title={t('iso.merge.title')}
                   onClick={() => setConfirmMerge(true)}
                 >
-                  {t('iso.merge.button')}
+                  <Icon name="branch" /> {t('iso.merge.button')}
                 </button>
               )}
         {!running && (confirmRemove === null
@@ -592,7 +594,7 @@ function IsolationBlock({ task, controller }: { task: TaskRecord; controller: Bo
                   title={t('iso.remove.wtTitle')}
                   onClick={() => setConfirmRemove('wt')}
                 >
-                  {t('iso.remove.wt')}
+                  <Icon name="trash" /> {t('iso.remove.wt')}
                 </button>
                 {task.branch !== undefined && (
                   <button
@@ -603,7 +605,7 @@ function IsolationBlock({ task, controller }: { task: TaskRecord; controller: Bo
                     title={t('iso.remove.wtbTitle')}
                     onClick={() => setConfirmRemove('wtb')}
                   >
-                    {t('iso.remove.wtb')}
+                    <Icon name="trash" /> {t('iso.remove.wtb')}
                   </button>
                 )}
               </>
@@ -803,44 +805,43 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
             <span className="dsh-atb-statuspill" data-status={task.status}>{t(STATUS_KEYS[task.status] ?? task.status)}</span>
           </div>
           <div className="dsh-atb-detail-chips">
-            <Chip tone={task.urgency}>● {t(URGENCY_KEYS[task.urgency] ?? task.urgency)}</Chip>
-            <Chip icon="📁">{ws?.title ?? shortId(task.workspaceId)}</Chip>
+            <Chip tone={task.urgency}>{t(URGENCY_KEYS[task.urgency] ?? task.urgency)}</Chip>
+            <Chip icon="folder">{ws?.title ?? shortId(task.workspaceId)}</Chip>
             {task.model !== undefined && (
               <Chip
-                icon="✦"
                 title={t('card.badge.modelTitle', { model: task.model.provider + '/' + task.model.model }) + (task.model.reasoningEffort !== undefined ? t('card.badge.modelEffort', { effort: task.model.reasoningEffort }) : '')}
               >
                 {task.model.model}{task.model.reasoningEffort !== undefined ? ` · ${task.model.reasoningEffort}` : ''}
               </Chip>
             )}
-            {task.presetId !== undefined && <Chip icon="🎛" >{task.presetId}</Chip>}
+            {task.presetId !== undefined && <Chip>{task.presetId}</Chip>}
             {task.execution.mode === 'scheduled'
               && (task.execution.nextRunAt ?? task.execution.runAt) !== undefined && (
-              <Chip icon="⏰">{t('detail.chip.nextRun', { cron: task.execution.cron ?? '', time: fmtTime(task.execution.nextRunAt ?? task.execution.runAt) })}</Chip>
+              <Chip icon="clock">{t('detail.chip.nextRun', { cron: task.execution.cron ?? '', time: fmtTime(task.execution.nextRunAt ?? task.execution.runAt) })}</Chip>
             )}
-            {task.execution.queuedRunAt !== undefined && <Chip icon="⏳" tone="urgent">{t('detail.chip.queuedRun', { time: fmtTime(task.execution.queuedRunAt) })}</Chip>}
-            {needsHuman.needs && <Chip icon="🙋" tone="urgent" title={needsHuman.reason}>{needsHuman.reason ?? t('detail.chip.needsHuman')}</Chip>}
-            {task.blocked && <Chip icon="⛔" tone="urgent">{t('shared.blocked')}</Chip>}
+            {task.execution.queuedRunAt !== undefined && <Chip icon="clock" tone="urgent">{t('detail.chip.queuedRun', { time: fmtTime(task.execution.queuedRunAt) })}</Chip>}
+            {needsHuman.needs && <Chip icon="hand" tone="urgent" title={needsHuman.reason}>{needsHuman.reason ?? t('detail.chip.needsHuman')}</Chip>}
+            {task.blocked && <Chip icon="warning" tone="urgent">{t('shared.blocked')}</Chip>}
             {task.checklist !== undefined && task.checklist.length > 0 && (
-              <Chip icon="☑" tone={task.status === 'in_review' && task.checklist.some(i => !i.checked) ? 'urgent' : undefined}>
+              <Chip icon="checklist" tone={task.status === 'in_review' && task.checklist.some(i => !i.checked) ? 'urgent' : undefined}>
                 {t('detail.chip.checklist', { done: checklistProgress(task).done, total: task.checklist.length })}
               </Chip>
             )}
             {subtaskTotal > 0 && (
-              <Chip icon="▸" title={t('hierarchy.badgeTitle', { done: subtaskDone, total: subtaskTotal, open: subtaskOpen })}>
+              <Chip icon="subtask" title={t('hierarchy.badgeTitle', { done: subtaskDone, total: subtaskTotal, open: subtaskOpen })}>
                 {subtaskDone}/{subtaskTotal}
               </Chip>
             )}
             {isReviewOrDone && subtaskOpen > 0 && (
-              <Chip icon="▸" title={t('hierarchy.openWarning', { n: subtaskOpen })}>{t('hierarchy.openChildren', { n: subtaskOpen })}</Chip>
+              <Chip icon="subtask" title={t('hierarchy.openWarning', { n: subtaskOpen })}>{t('hierarchy.openChildren', { n: subtaskOpen })}</Chip>
             )}
             {task.branch !== undefined && (
-              <Chip icon="🌿" tone={undefined}>Worktree · {task.branch.length > 28 ? `${task.branch.slice(0, 28)}…` : task.branch}</Chip>
+              <Chip icon="branch" tone={undefined}>Worktree · {task.branch.length > 28 ? `${task.branch.slice(0, 28)}…` : task.branch}</Chip>
             )}
-            {(task.isolation === undefined || task.isolation === 'worktree') && task.branch === undefined && <Chip icon="🌿">{t('detail.chip.isolated')}</Chip>}
-            {task.permission === 'read-only' && <Chip icon="🔒" tone="urgent">{t('detail.chip.permReadOnly')}</Chip>}
-            {task.permission === 'danger-full-access' && <Chip icon="⚡" tone="urgent">{t('detail.chip.permFull')}</Chip>}
-            {(task.permission === 'workspace-write' || task.permission === undefined) && <Chip icon="📁">{t('detail.chip.permWrite')}</Chip>}
+            {(task.isolation === undefined || task.isolation === 'worktree') && task.branch === undefined && <Chip icon="branch">{t('detail.chip.isolated')}</Chip>}
+            {task.permission === 'read-only' && <Chip icon="lock" tone="urgent">{t('detail.chip.permReadOnly')}</Chip>}
+            {task.permission === 'danger-full-access' && <Chip icon="shieldCheck" tone="urgent">{t('detail.chip.permFull')}</Chip>}
+            {(task.permission === 'workspace-write' || task.permission === undefined) && <Chip icon="folder">{t('detail.chip.permWrite')}</Chip>}
             {holder !== undefined && (
               <button
                 type="button"
@@ -849,15 +850,15 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                 title={t('detail.chip.holderTitle', { id: holder })}
                 onClick={() => jumpToSession(holder)}
               >
-                <span className="dsh-atb-chip2-icon">{stale ? '⏱' : '🤖'}</span>
-                {stale ? t('detail.chip.holderStale') : t('detail.chip.holderBy')}{shortId(holder)}{t('detail.chip.holderSuffix')}
+                <span className="dsh-atb-chip2-icon"><Icon name={stale ? 'stale' : 'bot'} size={12} /></span>
+                {stale ? t('detail.chip.holderStale') : t('detail.chip.holderBy')}{shortId(holder)}
               </button>
             )}
-            {task.trashedAt !== undefined && <Chip icon="🗑" tone="urgent">{t('detail.chip.trashed')}</Chip>}
+            {task.trashedAt !== undefined && <Chip icon="trash" tone="urgent">{t('detail.chip.trashed')}</Chip>}
             <Chip>v{task.version}</Chip>
           </div>
           <div className="dsh-atb-detail-sub">
-            {t('detail.sub.line', { time: fmtTime(task.updatedAt), who: task.updatedBy.kind === 'agent' ? `🤖 ${shortId(task.updatedBy.sessionId)}` : task.updatedBy.kind === 'system' ? t('detail.updatedBy.system') : t('detail.updatedBy.user') })}
+            {t('detail.sub.line', { time: fmtTime(task.updatedAt), who: task.updatedBy.kind === 'agent' ? shortId(task.updatedBy.sessionId) : task.updatedBy.kind === 'system' ? t('detail.updatedBy.system') : t('detail.updatedBy.user') })}
             <button
               type="button"
               className="dsh-atb-detail-id"
@@ -879,10 +880,10 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               title={t('detail.session.jumpTitle', { id: targetSessionId })}
               onClick={() => jumpToSession(targetSessionId)}
             >
-              {t('detail.session.jump')}
+              <Icon name="bot" /> {t('detail.session.jump')}
             </button>
           )}
-          <button type="button" className="dsh-atb-detail-edit" onClick={() => controller.openEditor(task.id)}>{t('detail.action.edit')}</button>
+          <button type="button" className="dsh-atb-detail-edit" onClick={() => controller.openEditor(task.id)}><Icon name="edit" /> {t('detail.action.edit')}</button>
           <button
             type="button"
             className="dsh-atb-detail-edit"
@@ -902,7 +903,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               if (ok) showAlert(t('detail.action.saveTplDone'))
             })}
           >
-            {t('detail.action.saveTpl')}
+            <Icon name="file" /> {t('detail.action.saveTpl')}
           </button>
           {canRun && task.branch !== undefined && (
             <button
@@ -912,7 +913,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               disabled={actionBusy}
               onClick={() => runAction(() => controller.run(task.id, true))}
             >
-              {t('detail.action.reuse')}
+              <Icon name="play" /> {t('detail.action.reuse')}
             </button>
           )}
           {canRun && (
@@ -923,7 +924,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               disabled={actionBusy}
               onClick={() => runAction(() => controller.run(task.id))}
             >
-              {t('detail.action.run')}
+              <Icon name="play" /> {t('detail.action.run')}
             </button>
           )}
           {runningExecution !== undefined && (confirmCancel
@@ -942,10 +943,10 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                 title={t('detail.action.stopTitle', { id: runningExecution.sessionId ?? '' })}
                 onClick={() => setConfirmCancel(true)}
               >
-                {t('detail.action.stopExec')}
+                <Icon name="stop" /> {t('detail.action.stopExec')}
               </button>
             ))}
-          <button type="button" className="dsh-atb-detail-close" aria-label={t('shared.close')} onClick={() => controller.select(undefined)}>✕</button>
+          <button type="button" className="dsh-atb-detail-close" aria-label={t('shared.close')} onClick={() => controller.select(undefined)}><Icon name="close" /></button>
         </div>
       </div>
 
@@ -1110,7 +1111,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
             )
           })}
           <button type="button" className="dsh-atb-movebtn" data-to="blocked" onClick={() => void controller.toggleBlocked(task)}>
-            {task.blocked ? t('detail.blocked.unmark') : t('detail.blocked.mark')}
+            <Icon name={task.blocked ? 'check' : 'warning'} size={12} /> {task.blocked ? t('detail.blocked.unmark') : t('detail.blocked.mark')}
           </button>
           {holder !== undefined && (
             <button
@@ -1129,7 +1130,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
       <div className="dsh-atb-section" data-section="task-dependencies">
         <details>
           <summary>
-            🔗 {t('dependency.title')}{dependency.total > 0
+            <Icon name="link" /> {t('dependency.title')}{dependency.total > 0
               ? ` · ${dependency.completed}/${dependency.total}`
               : ''}
           </summary>
@@ -1154,7 +1155,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                 && comment.systemParams?.id === id)
               return (
                 <div key={id} className="dsh-atb-bubble" data-from="user" data-missing={missing ? 'true' : undefined}>
-                  <div className="dsh-atb-bubble-avatar">{missing ? '⚠' : completed ? '✓' : '○'}</div>
+                  <div className="dsh-atb-bubble-avatar"><Icon name={missing ? 'warning' : completed ? 'check' : 'clock'} /></div>
                   <div className="dsh-atb-bubble-main">
                     <div className="dsh-atb-prereq-row">
                       {selectable
@@ -1176,7 +1177,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                       </span>
                       {audit !== undefined && (
                         <span className="dsh-atb-prereq-audit" title={t('dependency.auditNote', { id })}>
-                          ⚑ {t('dependency.audit')}
+                          <Icon name="warning" size={12} /> {t('dependency.audit')}
                         </span>
                       )}
                     </div>
@@ -1204,13 +1205,13 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
       <div className="dsh-atb-section" data-section="task-subtasks">
         <details>
           <summary>
-            ▸ {t('hierarchy.subtasks')}{subtaskTotal > 0 ? ` · ${subtaskDone}/${subtaskTotal}` : ''}
+            <Icon name="subtask" /> {t('hierarchy.subtasks')}{subtaskTotal > 0 ? ` · ${subtaskDone}/${subtaskTotal}` : ''}
           </summary>
           <div className="dsh-atb-commentlist">
             {subtaskChildren.length === 0 && <div className="dsh-atb-empty2">{t('hierarchy.empty')}</div>}
             {subtaskChildren.map(child => (
               <div key={child.id} className="dsh-atb-bubble" data-from="system">
-                <div className="dsh-atb-bubble-avatar">▸</div>
+                <div className="dsh-atb-bubble-avatar"><Icon name="subtask" /></div>
                 <div className="dsh-atb-bubble-main">
                   <div className="dsh-atb-prereq-row">
                     <button type="button" className="dsh-atb-btn" title={child.id} onClick={() => openHierarchyTask(child.id)}>
@@ -1224,11 +1225,11 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               </div>
             ))}
             {isReviewOrDone && subtaskOpen > 0 && (
-              <div className="dsh-atb-subtask-warn">⚠ {t('hierarchy.openWarning', { n: subtaskOpen })}</div>
+              <div className="dsh-atb-subtask-warn"><Icon name="warning" size={12} /> {t('hierarchy.openWarning', { n: subtaskOpen })}</div>
             )}
             {task.trashedAt === undefined && (
               <button type="button" className="dsh-atb-btn" onClick={() => controller.newSubtask(task.id)}>
-                ＋ {t('hierarchy.addSubtask')}
+                <Icon name="plus" /> {t('hierarchy.addSubtask')}
               </button>
             )}
           </div>
@@ -1243,7 +1244,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               <div className="dsh-atb-commentlist">
                 {task.comments.map(c => (
                   <div key={c.id} className="dsh-atb-bubble" data-from={c.threadId !== undefined ? 'agent' : 'user'}>
-                    <div className="dsh-atb-bubble-avatar">{c.threadId !== undefined ? '🤖' : '👤'}</div>
+                    <div className="dsh-atb-bubble-avatar"><Icon name={c.threadId !== undefined ? 'bot' : 'user'} /></div>
                     <div className="dsh-atb-bubble-main">
                       <div className="dsh-atb-bubble-meta">
                         {c.threadId !== undefined && c.threadId.startsWith('session-') ? (
@@ -1272,7 +1273,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                                   title={t('detail.comment.deliveredTitle')}
                                   onClick={() => jumpToSession(session)}
                                 >
-                                  {t('detail.comment.delivered')} ↗
+                                  {t('detail.comment.delivered')} <Icon name="external" size={12} />
                                 </button>
                               )
                             : <span className="dsh-atb-comment-delivered">{t('detail.comment.delivered')}</span>
@@ -1319,8 +1320,8 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               e.target.value = ''
             }}
           />
-          <button type="button" className="dsh-atb-image-add" disabled={commentUploading} title={t('image.add')} onClick={() => commentFileRef.current?.click()}>
-            {commentUploading ? '…' : '🖼'}
+          <button type="button" className="dsh-atb-image-add" disabled={commentUploading} title={t('image.add')} aria-label={t('image.add')} onClick={() => commentFileRef.current?.click()}>
+            {commentUploading ? '…' : <Icon name="image" />}
           </button>
           <button
             type="button"
@@ -1340,7 +1341,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                 : t('detail.composer.deliverTitle')}
               onClick={deliverComments}
             >
-              ▸ {t('detail.composer.deliver')}{pendingCommentCount > 0 ? ` (${pendingCommentCount})` : ''}
+              <Icon name="comment" /> {t('detail.composer.deliver')}{pendingCommentCount > 0 ? ` (${pendingCommentCount})` : ''}
             </button>
           )}
         </div>
@@ -1355,7 +1356,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               title={t('detail.exec.toggleTitle')}
               onClick={() => setExecOpen(v => !v)}
             >
-              <span className="dsh-atb-toggle-caret">{execOpen ? '▾' : '▸'}</span>
+              <span className="dsh-atb-toggle-caret" data-open={execOpen ? 'true' : undefined}><Icon name="chevronRight" size={12} /></span>
               {t('detail.exec.title')}<span className="dsh-atb-count2">{task.executions.length}</span>
               {task.executionsPruned !== undefined && task.executionsPruned > 0 && (
                 <span className="dsh-atb-count2" title={t('detail.exec.prunedTitle', { n: task.executionsPruned })}>{t('detail.exec.pruned', { n: task.executionsPruned })}</span>
@@ -1376,7 +1377,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                     title={t('detail.exec.openTitle', { id: e.sessionId })}
                     onClick={() => jumpToSession(e.sessionId!)}
                   >
-                    🤖 {shortId(e.sessionId)} ↗
+                    <Icon name="bot" size={12} /> {shortId(e.sessionId)} <Icon name="external" size={12} />
                   </button>
                 )}
                 {e.error !== undefined && <span className="dsh-atb-exec-error" title={e.error}>{e.error.slice(0, 80)}{e.error.length > 80 ? '…' : ''}</span>}
@@ -1388,7 +1389,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
 
       <div className="dsh-atb-dangerzone">
         {task.trashedAt === undefined
-          ? <button type="button" className="dsh-atb-btn" data-danger="true" onClick={() => void controller.remove(task.id, task.version, false)}>{t('detail.danger.delete')}</button>
+          ? <button type="button" className="dsh-atb-btn" data-danger="true" onClick={() => void controller.remove(task.id, task.version, false)}><Icon name="trash" /> {t('detail.danger.delete')}</button>
           : (confirmPurge
               ? (
                   <span className="dsh-atb-confirm">

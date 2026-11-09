@@ -18,6 +18,7 @@ import { dependencyState } from '../../shared/dependencies.ts'
 import { subtaskProgress } from '../../shared/hierarchy.ts'
 import { checkNeedsHuman, fmtTime, isStaleClaim } from './format.ts'
 import { OUTCOME_KEYS, URGENCY_KEYS, statusText } from './labels.ts'
+import { Icon } from './Icon.tsx'
 import { useT } from '../i18n/runtime.ts'
 import { externalTypeLabel } from '../external-api.ts'
 
@@ -180,15 +181,15 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
       }}
     >
       <div className="dsh-atb-card-title">
-        {needsHuman.needs && <span className="dsh-atb-badge" data-kind="needs-human" style={{ marginRight: 6, verticalAlign: 'middle' }}>🙋 {needsHuman.reason ?? t('card.badge.needsHuman')}</span>}
+        {needsHuman.needs && <span className="dsh-atb-badge" data-kind="needs-human" style={{ marginRight: 6, verticalAlign: 'middle' }}><Icon name="hand" /> {needsHuman.reason ?? t('card.badge.needsHuman')}</span>}
         {task.title}
       </div>
-      {task.external && <small>{task.external.providerName ?? task.external.provider} · {externalTypeLabel(task.external.item.type, t)} #{task.external.item.id}{task.external.conflicts.length > 0 ? ' ⚠' : ''}</small>}
+      {task.external && <small>{task.external.providerName ?? task.external.provider} · {externalTypeLabel(task.external.item.type, t)} #{task.external.item.id}{task.external.conflicts.length > 0 ? <><Icon name="warning" /> </> : ''}</small>}
       
       {(task.status === 'in_review' || task.status === 'done') && (
         <div className="dsh-atb-card-deliverable">
           <div className="dsh-atb-card-deliv-row">
-            <span className="dsh-atb-card-deliv-tag">📄 {t(latestReport?.changedFiles.length ? 'card.deliv.reportFiles' : 'card.deliv.gitFiles')}:</span>
+            <span className="dsh-atb-card-deliv-tag"><Icon name="file" /> {t(latestReport?.changedFiles.length ? 'card.deliv.reportFiles' : 'card.deliv.gitFiles')}:</span>
             {latestReport?.changedFiles && latestReport.changedFiles.length > 0 ? (
               <span className="dsh-atb-card-deliv-val" title={latestReport.changedFiles.join('\n')}>
                 {latestReport.changedFiles.length} {t('card.deliv.filesUnit')} ({latestReport.changedFiles[0]?.split(/[\\/]/).pop()}{latestReport.changedFiles.length > 1 ? ` +${latestReport.changedFiles.length - 1}` : ''})
@@ -202,7 +203,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
             )}
           </div>
           <div className="dsh-atb-card-deliv-row">
-            <span className="dsh-atb-card-deliv-tag">☑ {t('card.deliv.acceptance')}:</span>
+            <span className="dsh-atb-card-deliv-tag"><Icon name="checklist" /> {t('card.deliv.acceptance')}:</span>
             {task.checklist && task.checklist.length > 0 ? (
               <span className="dsh-atb-card-deliv-val" title={task.checklist.map(c => `${c.checked ? '✓' : '✗'} ${c.text}`).join('\n')}>
                 {t('card.deliv.checklistProgress', { done: task.checklist.filter(c => c.checked).length, total: task.checklist.length })}
@@ -216,13 +217,13 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
               </span>
             ) : (
               <span className="dsh-atb-card-deliv-val dsh-atb-deliv-muted">
-                ⚠ {t('card.deliv.noVerificationWarn')}
+                <Icon name="warning" /> {t('card.deliv.noVerificationWarn')}
               </span>
             )}
           </div>
           {latestReport?.summary && (
             <div className="dsh-atb-card-deliv-summary" title={latestReport.summary}>
-              💡 {latestReport.summary}
+              {latestReport.summary}
             </div>
           )}
         </div>
@@ -230,7 +231,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
 
       <div className="dsh-atb-card-meta">
         <span className="dsh-atb-badge">{t(URGENCY_KEYS[task.urgency])}</span>
-        {task.blocked && <span className="dsh-atb-badge" data-kind="blocked">{t('shared.blocked')}</span>}
+        {task.blocked && <span className="dsh-atb-badge" data-kind="blocked"><Icon name="warning" /> {t('shared.blocked')}</span>}
         {dependency.total > 0 && (
           <span
             className="dsh-atb-badge"
@@ -238,7 +239,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
             data-ready={dependency.ready ? 'true' : undefined}
             title={t('dependency.badgeTitle', { list: dependencyTitle })}
           >
-            🔗 {dependency.completed}/{dependency.total}
+            <Icon name="link" /> {dependency.completed}/{dependency.total}
           </span>
         )}
         {subtasks.total > 0 && (
@@ -248,14 +249,14 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
             data-ready={subtasks.open === 0 ? 'true' : undefined}
             title={subtaskTitle}
           >
-            ▸ {subtasks.done}/{subtasks.total}
+            <Icon name="subtask" /> {subtasks.done}/{subtasks.total}
           </span>
         )}
-        {stale && <span className="dsh-atb-badge" data-kind="stale">{t('card.badge.stale')}</span>}
+        {stale && <span className="dsh-atb-badge" data-kind="stale"><Icon name="stale" /> {t('card.badge.stale')}</span>}
         {task.execution.mode === 'scheduled'
           && (task.execution.nextRunAt ?? task.execution.queuedRunAt ?? task.execution.runAt) !== undefined && (
           <span className="dsh-atb-badge" data-kind="scheduled">
-            ⏰ {fmtTime(task.execution.nextRunAt ?? task.execution.queuedRunAt ?? task.execution.runAt)}
+            <Icon name="clock" /> {fmtTime(task.execution.nextRunAt ?? task.execution.queuedRunAt ?? task.execution.runAt)}
           </span>
         )}
         {task.model !== undefined && (
@@ -268,12 +269,12 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
         )}
         {task.permission === 'read-only' && (
           <span className="dsh-atb-badge" data-kind="blocked" title={t('card.badge.permReadOnlyTitle')}>
-            {t('card.badge.permReadOnly')}
+            <Icon name="lock" /> {t('card.badge.permReadOnly')}
           </span>
         )}
         {task.permission === 'danger-full-access' && (
           <span className="dsh-atb-badge" data-kind="urgent" title={t('card.badge.permFullTitle')}>
-            {t('card.badge.permFull')}
+            <Icon name="shieldCheck" /> {t('card.badge.permFull')}
           </span>
         )}
         {task.checklist !== undefined && task.checklist.length > 0 && (
@@ -282,7 +283,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
             data-kind={task.status === 'in_review' && task.checklist.some(i => !i.checked) ? 'blocked' : 'checklist'}
             title={task.status === 'in_review' && task.checklist.some(i => !i.checked) ? t('card.badge.checklistReview') : t('card.badge.checklist')}
           >
-            ☑ {task.checklist.filter(i => i.checked).length}/{task.checklist.length}
+            <Icon name="checklist" /> {task.checklist.filter(i => i.checked).length}/{task.checklist.length}
           </span>
         )}
         {task.status === 'done' && <span className="dsh-atb-badge" data-kind="done">{t('status.pill.done')}</span>}
@@ -319,11 +320,11 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
               })
             }}
           >
-            💬 {t('card.session.badge', { id: shortId(targetSessionId) })}
+            <Icon name="comment" /> {t('card.session.badge', { id: shortId(targetSessionId) })}
           </span>
         )}
-        {task.comments.length > 0 && <span>💬 {task.comments.length}</span>}
-        {task.trashedAt !== undefined && <span className="dsh-atb-badge" data-kind="trashed">{t('card.badge.pendingPurge')}</span>}
+        {task.comments.length > 0 && <span><Icon name="comment" /> {task.comments.length}</span>}
+        {task.trashedAt !== undefined && <span className="dsh-atb-badge" data-kind="trashed"><Icon name="trash" /> {t('card.badge.pendingPurge')}</span>}
         <span style={{ marginLeft: 'auto' }}>{fmtTime(task.updatedAt)}</span>
       </div>
       {reviewing && (rejectOpen
@@ -354,7 +355,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
                 title={t('card.action.doneTitle')}
                 onClick={() => void controller.move(task.id, task.version, 'done')}
               >
-                {t('card.action.done')}
+                <Icon name="check" /> {t('card.action.done')}
               </button>
               <button
                 type="button"
@@ -363,7 +364,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
                 title={t('card.action.rejectTitle')}
                 onClick={() => setRejectOpen(true)}
               >
-                {t('card.action.reject')}
+                <Icon name="close" /> {t('card.action.reject')}
               </button>
             </div>
           ))}

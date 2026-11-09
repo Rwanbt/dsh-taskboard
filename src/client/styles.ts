@@ -1421,6 +1421,110 @@ color: var(--dsw-alias-state-business-primary, var(--atb-accent));
 .dsh-atb-sel-check { flex: none; width: 13px; opacity: 0; color: var(--atb-accent); }
 .dsh-atb-sel-opt[data-selected="true"] .dsh-atb-sel-check { opacity: 1; }
 
+/* =====================================================================
+   Flat pass — borderless, DSH-style. Surfaces are separated by tone and
+   elevation, never by outlines. Controls are filled (hover tint) and only
+   reveal an edge on focus. Floating menus keep their hairline (that IS the
+   DSH menu recipe). Declared last on purpose: same-specificity overrides.
+   ===================================================================== */
+.dsh-atb-icon { display: inline-block; flex: none; vertical-align: -0.15em; }
+.dsh-atb-btn, .dsh-atb-chip, .dsh-atb-movebtn, .dsh-atb-detail-edit, .dsh-atb-detail-run, .dsh-atb-badge { display: inline-flex; align-items: center; gap: 5px; }
+.dsh-atb-btn .dsh-atb-icon, .dsh-atb-chip .dsh-atb-icon { opacity: .8; }
+.dsh-atb-fieldcard .dsh-atb-input, .dsh-atb-fieldcard .dsh-atb-btn, .dsh-atb-fieldcard .dsh-atb-movebtn { background: var(--atb-bg); }
+.dsh-atb-detail summary { list-style: none; cursor: pointer; }
+.dsh-atb-detail summary::-webkit-details-marker { display: none; }
+.dsh-atb-toggle-caret { transition: transform .14s ease; }
+.dsh-atb-toggle-caret[data-open="true"] { transform: rotate(90deg); }
+
+/* Cards: white on the neutral column, separated by a soft shadow. */
+.dsh-atb-card {
+  border-color: transparent; border-radius: var(--atb-radius-md);
+  box-shadow: 0 0 0 .5px #0000000f, 0 1px 2px #0000000a;
+  transition: box-shadow .14s ease, transform .14s ease;
+}
+.dsh-atb-card:hover { border-color: transparent; box-shadow: 0 0 0 .5px #00000014, 0 4px 12px #0000000f; }
+.dsh-atb-column { border-radius: var(--atb-radius-lg); }
+.dsh-atb-colhead { padding: 4px 6px 2px; }
+
+/* Buttons, chips, pills: filled, no outline. */
+.dsh-atb-btn, .dsh-atb-chip, .dsh-atb-detail-edit, .dsh-atb-detail-session, .dsh-atb-movebtn,
+.dsh-atb-quickbtn, .dsh-atb-image-add, .dsh-atb-card-session, .dsh-atb-file-copybtn,
+.dsh-atb-ver, .dsh-atb-detail-id, button.dsh-atb-chip2.dsh-atb-chip-btn,
+.dsh-atb-external button, .dsh-atb-cron-preset, .dsh-atb-mode-opt, .dsh-atb-perm-opt {
+  border-color: transparent; background: var(--atb-hover);
+}
+.dsh-atb-btn:hover, .dsh-atb-chip:hover, .dsh-atb-detail-edit:hover, .dsh-atb-detail-session:hover,
+.dsh-atb-movebtn:hover, .dsh-atb-quickbtn:hover, .dsh-atb-image-add:hover:not(:disabled),
+.dsh-atb-card-session:hover, .dsh-atb-file-copybtn:hover, .dsh-atb-ver:hover, .dsh-atb-detail-id:hover,
+button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-atb-mode-opt:hover {
+  border-color: transparent; background: var(--atb-active); color: var(--atb-text);
+}
+.dsh-atb-btn { border-radius: var(--atb-radius-sm); }
+.dsh-atb-btn[data-primary="true"], .dsh-atb-btn[data-primary="true"]:hover { background: var(--dsw-alias-button-primary-fill, var(--atb-brand)); color: var(--dsw-alias-label-primary-foreground, #fff); }
+.dsh-atb-btn[data-danger="true"] { border-color: transparent; background: color-mix(in srgb, var(--atb-error) 9%, transparent); }
+.dsh-atb-chip[data-on="true"] { background: var(--atb-text); color: var(--atb-bg); }
+.dsh-atb-chip[data-on="true"] .dsh-atb-dot { box-shadow: 0 0 0 1.5px var(--atb-bg); }
+.dsh-atb-mode-opt[data-on="true"], .dsh-atb-perm-opt[data-on="true"], .dsh-atb-set .dsh-atb-perm-opt[data-on="true"] {
+  border-color: transparent; background: var(--atb-active); box-shadow: inset 0 0 0 1.5px var(--atb-text);
+}
+.dsh-atb-cron-preset[data-on="true"] { background: var(--atb-brand); color: var(--dsw-alias-label-primary-foreground, #fff); }
+/* Semantic actions keep their meaning through a tint, not an outline. */
+.dsh-atb-movebtn[data-to="done"], .dsh-atb-quickbtn[data-act="done"] { border-color: transparent; background: color-mix(in srgb, var(--atb-success) 12%, transparent); color: var(--atb-success); }
+.dsh-atb-movebtn[data-to="blocked"] { border-color: transparent; background: color-mix(in srgb, var(--atb-error) 9%, transparent); color: var(--atb-error); }
+.dsh-atb-quickbtn[data-act="reject"] { border-color: transparent; background: color-mix(in srgb, var(--atb-warn) 12%, transparent); }
+.dsh-atb-movebtn[data-to="needs-human-active"] { border-color: transparent; }
+.dsh-atb-detail-id[data-state="copied"], .dsh-atb-detail-id[data-state="failed"] { border-color: transparent; }
+
+/* Badges: tone only. */
+.dsh-atb-badge, .dsh-atb-badge[data-kind="session"], .dsh-atb-badge[data-kind="subtasks"] { border-color: transparent; }
+.dsh-atb-badge { background: var(--atb-hover); color: var(--atb-text-2); border-radius: var(--atb-radius-xs); }
+.dsh-atb-badge[data-kind="subtasks"] { background: var(--atb-hover); }
+
+/* Fields: filled wells, edge appears only on focus. */
+.dsh-atb-input, .dsh-atb-select, .dsh-atb-sel, .dsh-atb-composer-input, .dsh-atb-external input, .dsh-atb-external select,
+.dsh-atb-modal-body input, .dsh-atb-modal-body textarea {
+  border-color: transparent; background: var(--atb-hover);
+}
+.dsh-atb-sel:hover:not(:disabled) { background: var(--atb-active); }
+.dsh-atb-input:focus-visible, .dsh-atb-select:focus-visible, .dsh-atb-sel:focus-visible, .dsh-atb-composer-input:focus,
+.dsh-atb-modal-body input:focus, .dsh-atb-modal-body textarea:focus {
+  border-color: transparent; background: var(--atb-input); box-shadow: 0 0 0 1px var(--atb-border-2), var(--atb-focus);
+}
+.dsh-atb-modal-body .dsh-atb-input-bad { box-shadow: inset 0 0 0 1px var(--atb-error); }
+
+/* Content blocks inside the detail: tone, no frame. */
+.dsh-atb-fieldcard, .dsh-atb-bubble-main, .dsh-atb-exec-row, .dsh-atb-cl-item, .dsh-atb-imp-row,
+.dsh-atb-detail-img, .dsh-atb-promptbox {
+  border-color: transparent; border-style: solid;
+}
+.dsh-atb-fieldcard { background: var(--atb-surface-sunken); border-radius: var(--atb-radius-md); padding: 12px 14px; }
+.dsh-atb-bubble-main, .dsh-atb-exec-row { background: var(--atb-surface-sunken); }
+.dsh-atb-bubble[data-from="agent"] .dsh-atb-bubble-main { border-color: transparent; background: color-mix(in srgb, var(--dsw-alias-state-done-primary, #7c3aed) 6%, var(--atb-bg)); }
+.dsh-atb-bubble[data-missing="true"] .dsh-atb-bubble-main { border-color: transparent; box-shadow: inset 2px 0 0 var(--atb-error); }
+.dsh-atb-promptbox { background: var(--atb-bg); }
+.dsh-atb-cl-item { background: var(--atb-surface-sunken); }
+.dsh-atb-cl-item[data-alert="true"] { border-color: transparent; box-shadow: inset 2px 0 0 var(--atb-error); }
+.dsh-atb-modal-foot { border-top-color: transparent; padding-top: 8px; }
+
+/* Panels & modals: elevation + spacing replace rules. */
+.dsh-atb-detailpanel { border-color: transparent; border-radius: var(--atb-radius-lg); box-shadow: var(--atb-elevation-prominent); padding: 14px 18px; }
+.dsh-atb-modal { border-color: transparent; }
+.dsh-atb-modal-head { border-bottom-color: transparent; padding: 18px 20px 8px; }
+.dsh-atb-modal-headicon { background: var(--atb-hover); color: var(--atb-text); border-radius: var(--atb-radius-sm); }
+.dsh-atb-form-left { border-right-color: transparent; }
+.dsh-atb-settings-nav { border-right-color: transparent; background: var(--atb-surface-sunken); }
+.dsh-atb-ws-group + .dsh-atb-ws-group { border-top: none; }
+.dsh-atb-dangerzone { border-top: none; }
+.dsh-atb-done-foldbar { border: none; background: transparent; }
+.dsh-atb-iso-repo[data-multi="true"] { border-top: none; }
+
+/* Sticky project header follows the restored neutral column tone. */
+.dsh-atb-ws-group-head { background: linear-gradient(var(--atb-hover), var(--atb-hover)), var(--atb-surface-sunken); border-radius: var(--atb-radius-sm); }
+.dsh-atb-ws-group-count { background: var(--atb-bg); }
+
+/* Drop target: tint, no dashed frame. */
+.dsh-atb-column[data-dragover] { outline: none; background: var(--atb-active); }
+
 `
 
 /** Style element id (stable since 0.1.x: hook for tests and debugging). */

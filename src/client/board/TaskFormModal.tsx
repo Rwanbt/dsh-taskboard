@@ -15,6 +15,7 @@ import type { ChecklistItem, IsolationMode, PermissionMode, PeriodicCompletion, 
 import { MAX_CHECKLIST_ITEMS, asPermission, branchNameModeOf, branchNamePrefixOf, buildBranchName, defaultIsolationOf, defaultPermissionOf, nextCronTime, parseCron } from '../../shared/protocol.ts'
 import { fmtTime, initialWorkspaceId } from './format.ts'
 import { useT, type Translate } from '../i18n/runtime.ts'
+import { Icon } from './Icon.tsx'
 import { SlashPromptInput } from './SlashPromptInput.tsx'
 import { useAlert } from './AlertModal.tsx'
 import { Select } from './Select.tsx'
@@ -82,10 +83,10 @@ const cronPresets = (t: Translate): ReadonlyArray<{ label: string; cron: string 
 ]
 
 /** Permission presets aligned with DSH (translated per render). */
-const permissionOptions = (t: Translate): ReadonlyArray<{ value: PermissionMode; label: string; icon: string }> => [
-  { value: 'workspace-write', label: t('form.perm.write'), icon: '📁' },
-  { value: 'read-only', label: t('form.perm.readOnly'), icon: '🔒' },
-  { value: 'danger-full-access', label: t('form.perm.fullAccess'), icon: '⚡' },
+const permissionOptions = (t: Translate): ReadonlyArray<{ value: PermissionMode; label: string }> => [
+  { value: 'workspace-write', label: t('form.perm.write') },
+  { value: 'read-only', label: t('form.perm.readOnly') },
+  { value: 'danger-full-access', label: t('form.perm.fullAccess') },
 ]
 
 /** Field shell: label + control, optionally spanning the full grid row. */
@@ -149,11 +150,11 @@ function ChecklistEditor({ rows, onChange, editing }: { rows: CheckRow[]; onChan
             spellCheck={false}
             onChange={e => setRow(index, { text: e.target.value })}
           />
-          <button type="button" className="dsh-atb-cke-del" title={t('form.check.removeTitle')} onClick={() => onChange(rows.filter((_, i) => i !== index))}>✕</button>
+          <button type="button" className="dsh-atb-cke-del" title={t('form.check.removeTitle')} aria-label={t('form.check.removeTitle')} onClick={() => onChange(rows.filter((_, i) => i !== index))}><Icon name="close" size={12} /></button>
         </div>
       ))}
       {rows.length < MAX_CHECKLIST_ITEMS && (
-        <button type="button" className="dsh-atb-cke-add" onClick={() => onChange([...rows, { text: '', checked: false }])}>{t('form.check.add')}</button>
+        <button type="button" className="dsh-atb-cke-add" onClick={() => onChange([...rows, { text: '', checked: false }])}><Icon name="plus" size={12} /> {t('form.check.add')}</button>
       )}
       {rows.length > 0 && (
         <span className="dsh-atb-cke-hint">{editing ? t('form.check.hintEdit', { checked, total: rows.length }) : t('form.check.hintCreate', { n: rows.length })}</span>
@@ -545,7 +546,7 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
     <div className="dsh-atb-modal-backdrop">
       <div className="dsh-atb-modal dsh-atb-taskform-modal" data-mode={editing ? 'edit' : 'create'} role="dialog" aria-modal="true" aria-label={editing ? t('form.title.edit') : t('form.title.create')}>
         <div className="dsh-atb-modal-head">
-          <span className="dsh-atb-modal-headicon">{editing ? '✎' : '✚'}</span>
+          <span className="dsh-atb-modal-headicon"><Icon name={editing ? 'edit' : 'plus'} /></span>
           <div className="dsh-atb-modal-headtext">
             <h3>{editing ? t('form.title.edit') : t('form.title.create')}</h3>
             <p>{editing
@@ -554,7 +555,7 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
                 ? t('hierarchy.formSubtitle', { title: subtaskParent?.title ?? subtaskParentId })
                 : t('form.subtitle.create')}</p>
           </div>
-          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeForm()}>✕</button>
+          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeForm()}><Icon name="close" /></button>
         </div>
 
         <div className="dsh-atb-modal-body dsh-atb-taskform-body">
@@ -668,7 +669,6 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
                   onChange={v => setPermission(asPermission(v))}
                   options={permissionOptions(t).map(opt => ({
                     value: opt.value,
-                    icon: opt.icon,
                     label: opt.label + (opt.value === 'workspace-write' ? t('form.perm.defaultTag') : ''),
                   }))}
                 />
@@ -895,7 +895,7 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
               title={runBlocked ? t('form.action.runBlockedTitle') : busy || imageUploading ? t('form.action.runBusyTitle') : t('form.action.runTitle')}
               onClick={submitAndRun}
             >
-              {t('form.action.run')}
+              <Icon name="play" /> {t('form.action.run')}
             </button>
             <button type="button" className="dsh-atb-btn" data-primary="true" disabled={!valid || busy || imageUploading} onClick={submit}>
               {editing ? t('form.action.save') : t('form.action.create')}

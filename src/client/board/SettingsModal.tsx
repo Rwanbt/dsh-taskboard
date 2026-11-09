@@ -14,6 +14,7 @@ import type { BoardController } from '../controller.ts'
 import type { CatalogModelItem, CatalogPresetItem } from '../../shared/api.ts'
 import { BRANCH_NAME_MODES, DEFAULT_BRANCH_NAME_PREFIX, DEFAULT_COMPLETED_DISPLAY_LIMIT, DEFAULT_DISPATCH_INTERVAL_MS, DEFAULT_ISOLATION, DEFAULT_MAX_CONCURRENT, DEFAULT_QUEUE_MAX_AGE_MINUTES, DEFAULT_SCHEDULE_MISSED_AFTER_MINUTES, MIN_COMPLETED_DISPLAY_LIMIT, MAX_COMPLETED_DISPLAY_LIMIT, allowClaimFromLinkedRootsOf, branchNameModeOf, branchNamePrefixOf, buildBranchName, completedDisplayLimitOf, defaultPermissionOf, defaultSyncExternalSessionsOf, dispatchIntervalMsOf, maxConcurrentOf, queueMaxAgeMinutesOf, scheduleMissedAfterMinutesOf, type BranchNameMode, type IsolationMode, type PermissionMode } from '../../shared/protocol.ts'
 import { localeStore, setLocalePreference, useT, type LocalePreference, type Translate } from '../i18n/runtime.ts'
+import { Icon } from './Icon.tsx'
 
 /** The isolation options with one-line hints (mirrors the task form; translated per render). */
 const isolationOptions = (t: Translate): ReadonlyArray<{ value: IsolationMode; name: string; hint: string }> => [
@@ -142,12 +143,12 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
     <div className="dsh-atb-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) controller.closeSettings() }}>
       <div className="dsh-atb-modal dsh-atb-set" role="dialog" aria-modal="true" aria-label={t('set.aria')}>
         <div className="dsh-atb-modal-head">
-          <span className="dsh-atb-modal-headicon">🛠</span>
+          <span className="dsh-atb-modal-headicon"><Icon name="settings" /></span>
           <div className="dsh-atb-modal-headtext">
             <h3>{t('set.title')}</h3>
             <p>{t('set.subtitle')}</p>
           </div>
-          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeSettings()}>✕</button>
+          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeSettings()}><Icon name="close" /></button>
         </div>
 
         <div className="dsh-atb-settings-layout">
@@ -392,7 +393,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
                 data-on={draftPerm === 'workspace-write'}
                 onClick={() => setDraftPerm('workspace-write')}
               >
-                <span className="dsh-atb-perm-name">{t('set.perm.writeName')}</span>
+                <span className="dsh-atb-perm-name"><Icon name="folder" /> {t('set.perm.writeName')}</span>
                 <span className="dsh-atb-perm-hint">{t('set.perm.writeHint')}</span>
               </button>
               <button
@@ -401,7 +402,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
                 data-on={draftPerm === 'read-only'}
                 onClick={() => setDraftPerm('read-only')}
               >
-                <span className="dsh-atb-perm-name">{t('set.perm.readOnlyName')}</span>
+                <span className="dsh-atb-perm-name"><Icon name="lock" /> {t('set.perm.readOnlyName')}</span>
                 <span className="dsh-atb-perm-hint">{t('set.perm.readOnlyHint')}</span>
               </button>
               <button
@@ -410,7 +411,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
                 data-on={draftPerm === 'danger-full-access'}
                 onClick={() => setDraftPerm('danger-full-access')}
               >
-                <span className="dsh-atb-perm-name">{t('set.perm.fullName')}</span>
+                <span className="dsh-atb-perm-name"><Icon name="shieldCheck" /> {t('set.perm.fullName')}</span>
                 <span className="dsh-atb-perm-hint">{t('set.perm.fullHint')}</span>
               </button>
             </div>
@@ -475,7 +476,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
             />
             {state.storageNotice !== undefined && (
               <div className="dsh-atb-storage-notice" role="status">
-                <span className="dsh-atb-storage-notice-ok">✓ {t('set.storage.migrated', { path: state.storageNotice.path })}</span>
+                <span className="dsh-atb-storage-notice-ok"><Icon name="check" /> {t('set.storage.migrated', { path: state.storageNotice.path })}</span>
                 {state.storageNotice.warnings.length > 0 && (
                   <span className="dsh-atb-storage-notice-warn">{t('set.storage.warnings', { warnings: state.storageNotice.warnings.join('; ') })}</span>
                 )}

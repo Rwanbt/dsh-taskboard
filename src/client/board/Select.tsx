@@ -22,6 +22,7 @@
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Icon } from './Icon.tsx'
 
 /** One selectable entry. */
 export interface SelectOption {
@@ -244,7 +245,7 @@ export function Select({
               onPointerEnter={() => { if (!option.disabled) setActiveIndex(index) }}
               onClick={() => commit(index)}
             >
-              <span className="dsh-atb-sel-check" aria-hidden="true">✓</span>
+              <span className="dsh-atb-sel-check" aria-hidden="true"><Icon name="check" size={12} /></span>
               {option.icon !== undefined && <span className="dsh-atb-sel-icon">{option.icon}</span>}
               <span className="dsh-atb-sel-label">{option.label}</span>
             </div>
