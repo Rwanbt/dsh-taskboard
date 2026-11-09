@@ -19,6 +19,17 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 
 **零配置**：安装即用——无需 Token、无需 API Key、无需额外服务或数据库。
 
+## 分支说明（`feat/dependencies-lite`）
+
+本分支在上游基础上新增以下能力。完整设计见 [docs/dependencies-lite.md](./docs/dependencies-lite.md)，审计与验收标准见 [docs/fork-audit.md](./docs/fork-audit.md)，安装说明见 [docs/INSTALL-FORK.md](./docs/INSTALL-FORK.md)。
+
+- **任务依赖**：任务可声明同项目前置任务（`dependsOn`）；在所有前置任务经人验收为 `done` 之前不可认领、执行或调度。拒绝环、自引用与跨项目依赖。前置任务被删除时自动解除依赖并写入审计评论，任务不会被永久阻塞。
+- **子任务**：`parentId` 构成任务树（最深 8 层，无环）。卡片显示 `完成/总数` 进度，详情显示面包屑与子任务列表。
+- **前置任务选择器**：可按标题或 ID 搜索、支持键盘操作的组合框，引用缺失时给出提示。
+- **DSH 设计规范**：颜色、圆角、阴影全部取自 `--dsw-*` 设计令牌（亮/暗主题）。原生 `<select>` 替换为主题化、可访问的 `Select`（弹层挂载到 `<body>`，完整键盘支持）。看板采用无边框布局（以色调与阴影区分层级），图标统一为单色 SVG，不再使用 emoji。
+- **健壮性**：台账锁在 Windows 上遇到瞬时 `EPERM`/`EACCES`/`ENOENT` 时按争用处理并重试。
+
+测试：`npm run build && npm test`（70 个文件，975 个用例）。覆盖率：`npm run test:coverage`（v8，行覆盖约 88.6%，见 [tests/qa/COVERAGE.md](./tests/qa/COVERAGE.md)）。
 ## 界面
 
 <p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="任务看板" width="880"></p>
@@ -229,6 +240,7 @@ git clone https://github.com/cloader/dsh-taskboard.git
 cd dsh-taskboard
 npm install && npm run build    # host ESM + client CJS 双构建
 npm test                        # vitest 全量（含真实 git 镜像集成测试）
+npm run test:coverage           # v8 覆盖率（text-summary + json-summary）
 node tests/manual-git-e2e.mjs   # 真 git 端到端手测（worktree 全链路 + 续跑 + diff 查看器）
 ```
 

@@ -19,6 +19,18 @@ A **task board plugin for DeepSeek Harness**: humans create cards, agents claim 
 
 **Zero configuration**: install and it works — no tokens, no API keys, no extra services or databases.
 
+## Fork notes (`feat/dependencies-lite`)
+
+This fork adds the following on top of upstream. Full design: [docs/dependencies-lite.md](./docs/dependencies-lite.md), audit and acceptance criteria: [docs/fork-audit.md](./docs/fork-audit.md), install guide: [docs/INSTALL-FORK.md](./docs/INSTALL-FORK.md).
+
+- **Task dependencies**: a task can list same-project prerequisites (`dependsOn`); it cannot be claimed, run or scheduled until every prerequisite is human-approved `done`. Cycles, self-references and cross-project links are rejected. When a prerequisite is trashed, the link is removed and an audit comment is written instead of leaving the task blocked forever.
+- **Subtasks**: `parentId` builds a tree (max depth 8, acyclic). Cards show `done/total` progress, the detail pane shows a breadcrumb and the child list.
+- **Prerequisite picker**: searchable, keyboard-accessible combobox (title or ID), with a warning for missing references.
+- **DSH design system**: every color, radius and shadow comes from the `--dsw-*` tokens (light and dark). Native `<select>` elements are replaced by a themed, accessible `Select` (popup rendered on `<body>`, full keyboard support). The board uses a borderless layout (tone and elevation instead of outlines) and a monochrome SVG icon set instead of emoji.
+- **Robustness**: the ledger lock now treats transient Windows `EPERM`/`EACCES`/`ENOENT` like contention and retries.
+
+Tests: `npm run build && npm test` (70 files, 975 tests). Coverage: `npm run test:coverage` (v8, ~88.6 % lines; see [tests/qa/COVERAGE.md](./tests/qa/COVERAGE.md)).
+npm run test:coverage           # v8 coverage (text-summary + json-summary)
 ## Screenshots
 
 <p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="Task board" width="880"></p>

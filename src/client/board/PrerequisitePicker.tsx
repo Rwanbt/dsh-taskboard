@@ -132,6 +132,7 @@ export function PrerequisitePicker({ task, controller, linkedIds, index }: {
     } else if (event.key === 'Escape') {
       if (open) {
         event.preventDefault()
+        event.stopPropagation()
         setOpen(false)
       } else if (query.length > 0) {
         event.preventDefault()

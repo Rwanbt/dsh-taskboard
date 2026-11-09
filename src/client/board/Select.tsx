@@ -74,6 +74,7 @@ export function Select({
   const close = useCallback((focus = false) => {
     setOpen(false)
     setPlacement(undefined)
+    typeahead.current = { buffer: '', at: 0 }
     if (focus) triggerRef.current?.focus()
   }, [])
 
@@ -144,7 +145,8 @@ export function Select({
       close()
     }
     const onKey = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') { event.preventDefault(); close(true) }
+      // Swallow Escape so an enclosing modal does not close with the list.
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true) }
     }
     const onReflow = (): void => place()
     window.addEventListener('pointerdown', onPointerDown, true)
@@ -172,8 +174,8 @@ export function Select({
     switch (event.key) {
       case 'ArrowDown': event.preventDefault(); move(1); break
       case 'ArrowUp': event.preventDefault(); move(-1); break
-      case 'Home': event.preventDefault(); setActiveIndex(0); break
-      case 'End': event.preventDefault(); setActiveIndex(options.length - 1); break
+      case 'Home': { event.preventDefault(); const i = options.findIndex(o => !o.disabled); if (i >= 0) setActiveIndex(i); break }
+      case 'End': { event.preventDefault(); let i = options.length - 1; while (i >= 0 && options[i]?.disabled) i--; if (i >= 0) setActiveIndex(i); break }
       case 'Enter':
       case ' ': event.preventDefault(); commit(activeIndex); break
       case 'Escape': event.preventDefault(); close(true); break
