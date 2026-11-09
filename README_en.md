@@ -19,7 +19,14 @@ A **task board plugin for DeepSeek Harness**: humans create cards, agents claim 
 
 **Zero configuration**: install and it works — no tokens, no API keys, no extra services or databases.
 
-## Fork notes (`feat/dependencies-lite`)
+## Rwanbt fork — v0.10.2
+
+Stable release: [v0.10.2](https://github.com/Rwanbt/dsh-taskboard/releases/tag/v0.10.2). The changes are merged into this fork's `main` and `dev`; upstream `cloader/dsh-taskboard` is unchanged. The npm badge and npm installation below refer to upstream, not this fork; use the [fork installation guide](./docs/INSTALL-FORK.md).
+
+- **Explicit user approval (0.10.1)**: agents may add prerequisites immediately, but removing them or deleting a prerequisite with live dependents only records a request with a required reason. The graph stays enforced until the user approves in the GUI; the agent can continue other work. Requests appear in “Waiting for Me”, including on completed tasks. Cross-project agent update/delete/move operations are refused.
+- **Worktree settlement (0.10.2)**: agents should commit their work when possible. If sandbox boundaries prevent it, the host commits remaining work on the task branch before collecting evidence, with the identity `dsh-taskboard`. Hook failures are reported without discarding changes; nested mirror repositories are handled separately.
+- **Provider-independent**: board tools are available to DSH sessions independently of their model provider, subject to the session preset and project permissions. Real-host tests exercised Claude/Anthropic, GPT/Codex, Gemini/Google, Mistral and GLM/OpenCode. Gemini reached its provider quota after successfully recording an approval request.
+- **Real-host validation**: prerequisite gating, approval/rejection, cross-project refusal, periodic cron deferral/replay, worktree isolation, merge and cleanup are documented in the [E2E report](./docs/E2E-REAL-HOST-0.10.1.md). These are bounded scenarios, not an exhaustive production guarantee.
 
 This fork adds the following on top of upstream. Full design: [docs/dependencies-lite.md](./docs/dependencies-lite.md), audit and acceptance criteria: [docs/fork-audit.md](./docs/fork-audit.md), install guide: [docs/INSTALL-FORK.md](./docs/INSTALL-FORK.md).
 
@@ -29,7 +36,8 @@ This fork adds the following on top of upstream. Full design: [docs/dependencies
 - **DSH design system**: every color, radius and shadow comes from the `--dsw-*` tokens (light and dark). Native `<select>` elements are replaced by a themed, accessible `Select` (popup rendered on `<body>`, full keyboard support). The board uses a borderless layout (tone and elevation instead of outlines) and a monochrome SVG icon set instead of emoji.
 - **Robustness**: the ledger lock now treats transient Windows `EPERM`/`EACCES`/`ENOENT` like contention and retries.
 
-Tests: `npm run build && npm test` (70 files, 975 tests). Coverage: `npm run test:coverage` (v8, ~88.6 % lines; see [tests/qa/COVERAGE.md](./tests/qa/COVERAGE.md)).
+Tests: `npm run build && npm test` (74 files, 1026 tests at v0.10.2). CI passed on Node 22 and 26 before release. Coverage: `npm run test:coverage`; the [coverage report](./tests/qa/COVERAGE.md) records an earlier 975-test baseline (~88.6 % lines), not a fresh v0.10.2 measurement.
+
 ## Screenshots
 
 <p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="Task board" width="880"></p>
