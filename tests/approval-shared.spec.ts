@@ -179,9 +179,14 @@ describe('needs-human integration (source approval)', () => {
     expect(humanWaiting(task)).toMatchObject({ needs: true, source: 'approval' })
   })
 
-  it('terminal/trashed cards and request-less cards keep the old semantics', () => {
+  it('a done prerequisite with a pending deletion request still needs the human (real-host E2E finding)', () => {
+    expect(humanWaiting(record({ id: 't-done', status: 'done', pendingChanges: [request()] })))
+      .toEqual({ needs: true, source: 'approval', reasonKey: 'human.reason.approval' })
+    expect(humanWaiting(record({ id: 't-done-quiet', status: 'done' }))).toEqual({ needs: false })
+  })
+
+  it('trashed cards and request-less cards keep the old semantics', () => {
     expect(humanWaiting(record({ id: 't-trash', trashedAt: NOW, pendingChanges: [request()] }))).toEqual({ needs: false })
-    expect(humanWaiting(record({ id: 't-done', status: 'done', pendingChanges: [request()] }))).toEqual({ needs: false })
     expect(humanWaiting(record({ id: 't-quiet', pendingChanges: [] }))).toEqual({ needs: false })
     expect(humanWaiting(record({ id: 't-clear', waitingForHuman: false }))).toEqual({ needs: false })
   })

@@ -26,13 +26,16 @@ export type HumanWaiting = { needs: boolean; source?: 'explicit' | 'inferred' | 
  * OBJECTIVE pending human action, so it wins over an explicit
  * `waitingForHuman: false` — the user still has to approve or reject it, and
  * the "Waiting for Me" filter must surface it. Only terminal/trashed cards are
- * excluded.
+ * excluded from inference; pending approvals are not.
  */
 export function humanWaiting(task: TaskRecord): HumanWaiting {
-  if (task.trashedAt !== undefined || ['done', 'archived', 'canceled'].includes(task.status)) return { needs: false }
+  if (task.trashedAt !== undefined) return { needs: false }
+  // A pending approval needs the human even on a done/canceled card: a done
+  // prerequisite is exactly what an agent may ask to delete (real-host E2E).
   if ((task.pendingChanges?.length ?? 0) > 0) {
     return { needs: true, source: 'approval', reasonKey: 'human.reason.approval' }
   }
+  if (['done', 'archived', 'canceled'].includes(task.status)) return { needs: false }
   if (typeof task.waitingForHuman === 'boolean') {
     return task.waitingForHuman ? { needs: true, source: 'explicit', reason: task.waitingReason, reasonKey: 'human.reason.manual' } : { needs: false }
   }
