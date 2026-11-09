@@ -1,7 +1,7 @@
 {
   "name": "dsh-taskboard",
   "description": "Agent-first task board for the DSH web GUI: host-authoritative task ledger with taskboard_* agent tools, project (= workspace) claim boundaries, per-task model execution with optional existing-session reuse, optional per-task git-worktree isolation (dedicated task branches, commit evidence, one-click merge), host-side cron scheduling, and a live SSE kanban view. Mounts via the official dsh plugin system — no DSH source changes.",
-  "version": "0.9.11",
+  "version": "0.10.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -61,6 +61,7 @@
     "watch": "tsdown -c tsdown.host.config.ts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run build && npm test"
   },
   "devDependencies": {
@@ -74,6 +75,7 @@
     "@types/node": "^22.20.1",
     "@types/react": "~18.3.1",
     "@types/react-dom": "^18.3.7",
+    "@vitest/coverage-v8": "^3.2.7",
     "jsdom": "^25.0.1",
     "puppeteer-core": "^25.8.0",
     "react": "^18.3.1",

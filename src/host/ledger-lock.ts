@@ -84,8 +84,11 @@ export async function withLedgerWriteLock<T>(file: string, run: () => Promise<T>
   for (;;) {
     let acquired = false
     try { mkdirSync(lock); acquired = true } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-      if (recoverLock(lock)) continue
+      const code = (error as NodeJS.ErrnoException).code
+      // Windows can surface EPERM/EACCES/ENOENT while a competing owner is
+      // removing the directory: treat these like contention and back off.
+      if (code !== 'EEXIST' && code !== 'EPERM' && code !== 'EACCES' && code !== 'ENOENT') throw error
+      if (code === 'EEXIST' && recoverLock(lock)) continue
     }
     if (acquired) {
       let ready = false

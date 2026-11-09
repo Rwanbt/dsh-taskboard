@@ -1,6 +1,9 @@
 import type { SessionArchiveResult } from '../shared/api.ts'
 import { archiveTaskSessions } from './archive-sessions.ts'
 import { applyHumanWaitingPatch, humanWaiting } from '../shared/human-wait.ts'
+import { buildDependencyIndex, DependencyError, dependencyState, downstreamDependents, prerequisiteDetails, validateDependencies } from '../shared/dependencies.ts'
+import { assertNoChildren, HierarchyError, subtaskProgress, validateParent } from '../shared/hierarchy.ts'
+import type { SubtaskProgress } from '../shared/hierarchy.ts'
 /**
  * The ten `taskboard_*` agent tools. All writes require a calling agent
  * session (ownership audit), carry optimistic-version checks, and enforce
@@ -58,6 +61,7 @@ import {
   type TaskRecord,
 } from '../shared/protocol.ts'
 import type { TaskStore } from './store.ts'
+import { detachPrerequisitesOfTrashed } from './store.ts'
 
 /** Render side: one compact task line (id/status/version are load-bearing). */
 function taskLine(t: {
@@ -68,6 +72,15 @@ function taskLine(t: {
   version: number
   workspaceId: string
   blocked: boolean
+  dependsOn?: string[]
+  /** Derived prerequisite readiness (present only when the task has dependsOn). */
+  dependencyProgress?: {
+    ready: boolean
+    total: number
+    completed: number
+    pendingIds: string[]
+    missingIds: string[]
+  }
   waitingForHuman?: boolean
   waitingReason?: string
   executionMode: string
@@ -81,6 +94,11 @@ function taskLine(t: {
     `「${t.title}」`,
   ]
   if (t.blocked) parts.push('·受阻')
+  if (t.dependsOn?.length) parts.push('·依赖' + t.dependsOn.length)
+  // F6: agents must be able to tell whether a card can start from list alone.
+  if (t.dependencyProgress !== undefined) {
+    parts.push(t.dependencyProgress.ready ? '·可执行' : `·等待前置${t.dependencyProgress.pendingIds.length}项`)
+  }
   if (t.waitingForHuman === true) parts.push(`·待人工${t.waitingReason ? `：${t.waitingReason}` : ''}`)
   if (t.executionMode === 'scheduled') parts.push('·定时')
   if (t.commentCount !== undefined && t.commentCount > 0) parts.push(`·评论${t.commentCount}`)
@@ -90,8 +108,27 @@ function taskLine(t: {
   return parts.join(' ')
 }
 
+/**
+ * Derived, GET-only dependency projection attached by `taskboard_get` (F6):
+ * per-prerequisite state + which downstream tasks an acceptance would unblock.
+ * Never persisted (D9) — the render only consumes it.
+ */
+export interface TaskDetailDependencyView {
+  dependencyProgress?: {
+    total: number
+    completed: number
+    pendingIds: string[]
+    missingIds: string[]
+    ready: boolean
+  }
+  prerequisites?: Array<{ id: string; state: 'done' | 'pending' | 'missing'; title?: string; status?: string; trashed?: boolean }>
+  completionUnblocks?: Array<{ id: string; title: string; status: string }>
+  /** Derived direct-children progress (D6/D9); present only for a parent. */
+  subtaskProgress?: SubtaskProgress
+}
+
 /** Render side: the full task detail block (everything an executor needs). */
-function taskDetail(t: TaskRecord & { effectivePrompt?: string }): string {
+function taskDetail(t: TaskRecord & { effectivePrompt?: string } & TaskDetailDependencyView): string {
   const lines: string[] = [
     `任务 ${t.id} 「${t.title}」`,
     `状态: ${t.status} (v${t.version}) · 紧急度: ${t.urgency} · 项目: ${t.workspaceId}${t.blocked ? ' · 受阻' : ''}`,
@@ -103,6 +140,41 @@ function taskDetail(t: TaskRecord & { effectivePrompt?: string }): string {
   if (waiting.needs) lines.push(`人工等待: ${waiting.source === 'inferred' ? '疑似，需确认' : '已标记'}${waiting.reason ? ` · ${waiting.reason}` : ''}`)
   else if (t.waitingForHuman === false) lines.push('人工等待: 已明确解除（不自动识别）')
   if (holder !== undefined) lines.push(`认领: agent ${String(holder).slice(0, 24)}（持有期间其他会话不可移动或删除）`)
+  // D6: hierarchy is a separate concept from dependencies — never a gate, but
+  // both the parent link and the derived direct-children progress must be
+  // visible (a parent is never auto-completed; the open count is the signal).
+  if (t.parentId !== undefined) lines.push(`父任务: ${t.parentId}`)
+  if (t.subtaskProgress !== undefined) {
+    const progress = t.subtaskProgress
+    if (progress.total > 0 || progress.missing > 0) {
+      lines.push(`子任务进度: 完成 ${progress.done}/${progress.total}`
+        + (progress.open > 0 ? `，未完成 ${progress.open} 项` : '')
+        + (progress.blocked > 0 ? `（其中受阻 ${progress.blocked} 项）` : '')
+        + (progress.missing > 0 ? `，已删除 ${progress.missing} 项` : ''))
+    }
+  }
+  if (t.dependsOn?.length) lines.push('前置依赖（全部需人工确认 done 后才能开始）: ' + t.dependsOn.join(', '))
+  // F6: per-prerequisite state so an agent can see WHY it is blocked, plus
+  // the downstream tasks an acceptance would unblock (D9: derived only).
+  if (t.dependencyProgress !== undefined) {
+    lines.push(t.dependencyProgress.ready
+      ? '前置就绪: 全部完成（可执行）'
+      : `前置未满足: 等待 ${t.dependencyProgress.pendingIds.length} 项（其中缺失/已删除 ${t.dependencyProgress.missingIds.length} 项）`)
+  }
+  if (t.prerequisites !== undefined && t.prerequisites.length > 0) {
+    for (const prerequisite of t.prerequisites) {
+      const label = prerequisite.state === 'done' ? 'done 已完成'
+        : prerequisite.state === 'pending' ? 'pending 未完成' : 'missing 缺失'
+      const status = prerequisite.status !== undefined ? ` [${prerequisite.status}]` : ''
+      const title = prerequisite.title !== undefined ? `「${prerequisite.title}」` : '（任务已删除或不存在）'
+      lines.push(`  - ${prerequisite.id} ${title} ${label}${status}`)
+    }
+  }
+  if (t.completionUnblocks !== undefined && t.completionUnblocks.length > 0) {
+    const shown = t.completionUnblocks.slice(0, 10).map(task => `${task.id}「${task.title}」(${task.status})`)
+    const more = t.completionUnblocks.length - shown.length
+    lines.push(`完成后可解锁 ${t.completionUnblocks.length} 个下游任务: ${shown.join(', ')}${more > 0 ? `（另有 ${more} 个）` : ''}`)
+  }
   if (t.execution.nextRunAt !== undefined) lines.push(`下次触发: ${new Date(t.execution.nextRunAt).toISOString()}`)
   if (t.model !== undefined) lines.push(`固定模型: ${t.model.provider}/${t.model.model}${t.model.reasoningEffort !== undefined ? ` (思考强度: ${t.model.reasoningEffort})` : ''}`)
   if (t.presetId !== undefined) lines.push(`执行模式: ${t.presetId}（未指定时为部署默认 preset）`)
@@ -401,6 +473,10 @@ function liveTaskAt(ledger: TaskLedger, id: string): { index: number; task: Task
 /** Re-throw with a stable code; non-ToolErrors become invalid_input. */
 function fail(error: unknown): never {
   if (error instanceof ToolError) throw error
+  // Shared graph refusals keep their stable code at the head of the message.
+  if (error instanceof DependencyError) throw new ToolError(ERR.invalidInput, `${error.code}: ${error.message}`)
+  // Hierarchy refusals keep their stable code too (has_children / depth / …).
+  if (error instanceof HierarchyError) throw new ToolError(ERR.invalidInput, `${error.code}: ${error.message}`)
   const message = error instanceof Error ? error.message : String(error)
   throw new ToolError(ERR.invalidInput, message)
 }
@@ -485,12 +561,21 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
         }
         if (a.status !== undefined) asStatus(a.status)
         if (a.urgency !== undefined) asUrgency(a.urgency)
-        const tasks = store.snapshot().tasks.filter(t =>
+        const ledger = store.snapshot()
+        // F4/F6: ONE id index for the whole listing; the readiness projection
+        // is derived (D9) and only attached to tasks that have prerequisites.
+        const index = buildDependencyIndex(ledger.tasks)
+        const tasks = ledger.tasks.filter(t =>
           (workspaceId === undefined || t.workspaceId === workspaceId)
           && (a.status === undefined || t.status === a.status)
           && (a.urgency === undefined || t.urgency === a.urgency)
           && (a.includeTrashed === true || t.trashedAt === undefined))
-        return json({ revision: store.snapshot().revision, tasks: tasks.map(summarize) })
+        return json({
+          revision: ledger.revision,
+          tasks: tasks.map(t => t.dependsOn?.length
+            ? { ...summarize(t), dependencyProgress: dependencyState(t, ledger.tasks, index) }
+            : summarize(t)),
+        })
       } catch (error) { fail(error) }
     },
   })) as () => void)
@@ -507,16 +592,43 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     output: {
       schema: JSON_OUT,
       render: (_args, value) => {
-        const v = value as { task?: TaskRecord & { effectivePrompt?: string } }
+        const v = value as { task?: TaskRecord & { effectivePrompt?: string } & TaskDetailDependencyView }
         return [{ type: 'text', text: v.task === undefined ? '任务不存在。' : taskDetail(v.task) }]
       },
     },
     async execute(args: { id: string }) {
       try {
         const { id } = args
-        const task = store.get(id)
+        const ledger = store.snapshot()
+        // ONE id index for the whole detail projection (F4).
+        const index = buildDependencyIndex(ledger.tasks)
+        const task = index.get(id)
         if (task === undefined || task.trashedAt !== undefined) throw new ToolError(ERR.notFound, `no task ${id}`)
-        return json({ task: { ...task, effectivePrompt: effectivePrompt(task) } })
+        // F6: explain WHY the card is blocked — the shared per-prerequisite
+        // projection (same ledger the execution gate reads) and the downstream
+        // tasks a human acceptance would unblock. Derived only (D9), never
+        // persisted and never an execution gate.
+        const completionUnblocks = downstreamDependents(task.id, ledger.tasks).flatMap(dependentId => {
+          const dependent = index.get(dependentId)
+          return dependent === undefined ? [] : [{ id: dependent.id, title: dependent.title, status: dependent.status }]
+        })
+        // D6/D9: direct-children progress for the detail renderer. Derived
+        // only, never stored, never a gate. O(n) once per read.
+        const hierarchy = subtaskProgress(task.id, ledger.tasks, index)
+        return json({
+          task: {
+            ...task,
+            effectivePrompt: effectivePrompt(task),
+            ...(task.dependsOn?.length
+              ? {
+                dependencyProgress: dependencyState(task, ledger.tasks, index),
+                prerequisites: prerequisiteDetails(task, ledger.tasks, index),
+              }
+              : {}),
+            ...(completionUnblocks.length > 0 ? { completionUnblocks } : {}),
+            ...(hierarchy.total > 0 || hierarchy.missing > 0 ? { subtaskProgress: hierarchy } : {}),
+          },
+        })
       } catch (error) { fail(error) }
     },
   })) as () => void)
@@ -577,6 +689,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
         description: `Acceptance checklist (DoD) item texts (≤${MAX_CHECKLIST_ITEMS} × 200 chars); agents check them off at handoff, the user reviews.`,
         items: { type: 'string' },
       },
+      dependsOn: { type: 'array', items: { type: 'string' }, description: 'Task IDs that must be human-approved done before this task can start. Same workspace, acyclic.' },
+      parentId: { type: 'string', description: 'Optional parent task id (subtask). Same workspace, acyclic, max depth 8. Omitted → top-level task.' },
     },
     output: {
       schema: JSON_OUT,
@@ -600,6 +714,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       permission?: string
       presetId?: string
       checklist?: string[]
+      dependsOn?: string[]
+      parentId?: string
     }, exec: unknown) {
       try {
         const { actor } = caller(exec as ToolRunContext)
@@ -657,6 +773,18 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           executions: [],
         }
         await store.mutate('task-created', ledger => {
+          // ONE id index for the whole write (F4). A duplicate copies
+          // dependsOn/parentId onto a new record, so this is where copied links
+          // are re-validated against the live graph.
+          const index = buildDependencyIndex(ledger.tasks)
+          if (args.parentId !== undefined) {
+            const parentId = validateParent(task, args.parentId, ledger.tasks)
+            if (parentId !== undefined) task.parentId = parentId
+          }
+          if (args.dependsOn !== undefined) {
+            const ids = validateDependencies(task, args.dependsOn, ledger.tasks, index)
+            if (ids.length > 0) task.dependsOn = ids
+          }
           ledger.tasks.push(task)
           return [task]
         })
@@ -669,7 +797,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
   disposers.push(register(defineTool({
     name: 'taskboard_update',
     description:
-      'Update a task\'s title/description/prompt/urgency/blocked/waitingForHuman/waitingReason/permission. Requires ifVersion (read first). '
+      'Update a task\'s title/description/prompt/urgency/blocked/waitingForHuman/waitingReason/permission/dependsOn/parentId. Requires ifVersion (read first). '
+      + 'parentId takes a same-workspace task id to make this a subtask, or null to detach it from its parent (omitted = unchanged; hierarchy is not an execution gate). '
       + 'The model and execution config are read-only through this tool (they belong to the task owner/user).',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id.' },
@@ -679,6 +808,13 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       prompt: { type: 'string', description: 'New execution prompt.' },
       urgency: { type: 'string', description: 'urgent | normal | relaxed.' },
       blocked: { type: 'boolean', description: 'Blocked marker (work cannot continue right now).' },
+      dependsOn: { type: 'array', items: { type: 'string' }, description: 'Replace prerequisites by same-workspace task IDs; [] clears, cycles rejected.' },
+      // The author-facing spec cannot express `string | null`; the JSON node
+      // keeps BOTH a new parent id and an explicit null detach available (the
+      // host validates the value with validateParent). The parameter's meaning
+      // is documented on the tool description because a json node has no
+      // per-property description in the compiled schema.
+      parentId: { type: 'json' },
       waitingForHuman: { type: 'boolean', description: 'True to wait for human action; false to explicitly clear the wait and suppress inference. Independent of blocked.' },
       waitingReason: { type: 'string', description: 'Why human input/action is needed (max 500 characters). Never include credentials or secret values. Empty clears the reason.' },
       permission: { type: 'string', description: 'Execution permission: read-only | workspace-write | danger-full-access.' },
@@ -699,6 +835,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       prompt?: string
       urgency?: string
       blocked?: boolean
+      dependsOn?: string[]
+      parentId?: string | null
       waitingForHuman?: boolean
       waitingReason?: string
       permission?: string
@@ -719,6 +857,24 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           if (args.prompt !== undefined) next.prompt = normalizePrompt(args.prompt)
           if (args.urgency !== undefined) next.urgency = asUrgency(args.urgency)
           if (args.blocked !== undefined) next.blocked = args.blocked
+          // D6: reparent/detach. The shared validator enforces same-workspace,
+          // untrashed parent, no self/ancestor cycle and the depth cap (also
+          // over the task's existing subtree).
+          if (args.parentId !== undefined) {
+            const parentId = validateParent(next, args.parentId, ledger.tasks)
+            if (parentId === undefined) delete next.parentId
+            else next.parentId = parentId
+          }
+          // Link validation must see the POST-WRITE record (one index, F4).
+          const projected = ledger.tasks.map(t => t.id === args.id ? next! : t)
+          if (args.dependsOn !== undefined) {
+            if (task.status === 'in_progress' || task.executions.some(e => e.outcome === 'running')) {
+              throw new ToolError(ERR.invalidInput, 'dependencies cannot change while the task is running')
+            }
+            const ids = validateDependencies(next, args.dependsOn, projected, buildDependencyIndex(projected))
+            if (ids.length) next.dependsOn = ids
+            else delete next.dependsOn
+          }
           applyHumanWaitingPatch(next, args)
           if (args.permission !== undefined) next.permission = asPermission(args.permission)
           next.version = task.version + 1
@@ -778,6 +934,10 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           }
           if (!canTransition(task.status, to)) {
             throw new ToolError(ERR.invalidTransition, `illegal transition ${task.status} → ${to}`)
+          }
+          if (to === 'in_progress') {
+            const dependency = dependencyState(task, ledger.tasks)
+            if (!dependency.ready) throw new ToolError(ERR.invalidTransition, 'unsatisfied dependencies: ' + dependency.pendingIds.join(', '))
           }
           // Exclusive hold: while a task is in_progress under a session
           // (explicit claimedBy — an agent claim or a live execution), no other
@@ -926,7 +1086,6 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
         // R1: guards inside the mutation. S5: a running execution keeps
         // writing to the task (report, settlement) — refuse the soft-delete
         // until it is cancelled or settled. T8: clear claim residue.
-        let next: TaskRecord | undefined
         await store.mutate('task-deleted', ledger => {
           const { index, task } = liveTaskAt(ledger, args.id)
           versionGuard(task, args.ifVersion)
@@ -934,14 +1093,23 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           if (task.executions.some(e => e.outcome === 'running')) {
             throw new ToolError(ERR.invalidInput, '任务有正在运行的执行（先在 GUI 取消或等它结束再删除）')
           }
-          next = structuredClone(task)
-          next.trashedAt = deps.now()
+          // D7: hierarchy deletion is refused, not cascaded — an agent must
+          // move/delete the live children first (no silent re-parenting).
+          assertNoChildren(args.id, ledger.tasks)
+          const now = deps.now()
+          const next = structuredClone(task)
+          next.trashedAt = now
           next.version = task.version + 1
           delete next.claimedBy
           delete next.claimedAt
           next.blocked = false
           ledger.tasks[index] = next
-          return [next]
+          // F1/D2: strip the id from every dependent and append the
+          // sys.prerequisiteRemoved audit trace in the SAME transaction, so a
+          // dangling prerequisite can never block a dependent forever. The
+          // repaired records join the change set (SSE/GUI badges stay fresh).
+          const repaired = detachPrerequisitesOfTrashed(ledger, [{ id: args.id, title: task.title }], now)
+          return [next, ...repaired]
         })
         return { trashed: true }
       } catch (error) { fail(error) }

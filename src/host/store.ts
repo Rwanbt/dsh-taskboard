@@ -15,7 +15,10 @@ import {
   asBoardSettings,
   emptyLedger,
   isPlausibleTaskRecord,
+  newCommentId,
+  normalizeBody,
   pruneExecutions,
+  repairTaskLinks,
   type TaskLedger,
   type TaskRecord,
 } from '../shared/protocol.ts'
@@ -174,6 +177,16 @@ export class TaskStore {
           if (external === undefined) delete task.external
           else task.external = external
         }
+        // F8 availability contract: an invalid OPTIONAL link must never make
+        // the whole board unloadable (`taskboard_ledger_unavailable` forced
+        // manual JSON surgery). The load gate validates link SHAPE; the
+        // content-level hazards that only a hand-edited ledger can carry
+        // (self reference, duplicate, invalid id, over-cap list) are dropped
+        // here with the same console.warn degradation style as the fields
+        // above. Dangling-but-well-formed ids stay untouched: D2 keeps them
+        // blocking so legacy ledgers behave exactly as before.
+        const droppedLinks = repairTaskLinks(task)
+        if (droppedLinks.length > 0) console.warn('[dsh-taskboard] dropped invalid task links on load:', task.id, droppedLinks)
         if (task.status === 'in_progress' && task.claimedBy === undefined
           && task.updatedBy?.kind === 'agent' && typeof task.updatedBy.sessionId === 'string') {
           task.claimedBy = task.updatedBy.sessionId
@@ -302,6 +315,80 @@ export class TaskStore {
     if (this.storageQueue !== undefined) return this.storageQueue.run(run)
     return (this.queue = this.queue.then(run, run)) as Promise<T>
   }
+}
+
+// ---------------------------------------------------------------------------
+// Ledger repair helpers (F1/D2)
+//
+// These are pure functions over a DRAFT ledger: callers MUST run them inside
+// the same `store.mutate()` transaction as the delete/purge they repair, so a
+// reader can never observe a trashed prerequisite while its dependents still
+// reference it (and a failed persist rolls the whole repair back).
+// ---------------------------------------------------------------------------
+
+/** One prerequisite being trashed/purged, captured before the write. */
+export interface TrashedPrerequisite {
+  id: string
+  title: string
+}
+
+/**
+ * F1/D2: strip every removed prerequisite from every untrashed dependent, bump
+ * each dependent's version and append one `sys.prerequisiteRemoved` audit
+ * comment per removed id — in place, on the DRAFT ledger, inside the caller's
+ * mutation.
+ *
+ * This is the ONE repair invariant used by every path that can make a task
+ * trashed: route soft-delete, route purge, agent `taskboard_delete` and import
+ * merge (post-merge sweep). Keeping it in one place is why an incoming
+ * already-trashed record cannot strand an existing dependent.
+ *
+ * Why repair at the source instead of letting `dependencyState` keep blocking:
+ * a dangling id classifies as `missing` and would block the dependent forever
+ * with no trace. The system comment is the audit trail; the version bump
+ * invalidates any stale optimistic write an agent may still hold.
+ *
+ * @param ledger - draft ledger; entries being purged may already be filtered out.
+ * @param trashed - the records that are now (or were just) trashed.
+ * @param now - epoch ms of the delete.
+ * @returns every repaired dependent (for the store change event).
+ */
+export function detachPrerequisitesOfTrashed(
+  ledger: TaskLedger,
+  trashed: readonly TrashedPrerequisite[],
+  now: number,
+): TaskRecord[] {
+  if (trashed.length === 0) return []
+  const removed = new Map(trashed.map(task => [task.id, task.title]))
+  const repaired: TaskRecord[] = []
+  for (const [index, task] of ledger.tasks.entries()) {
+    if (task.trashedAt !== undefined) continue
+    const ids = task.dependsOn ?? []
+    const gone = ids.filter(id => removed.has(id))
+    if (gone.length === 0) continue
+    const next = structuredClone(task)
+    const remaining = ids.filter(id => !removed.has(id))
+    if (remaining.length > 0) next.dependsOn = remaining
+    else delete next.dependsOn
+    next.version = task.version + 1
+    next.updatedAt = now
+    next.updatedBy = { kind: 'system' }
+    for (const id of gone) {
+      const title = removed.get(id) ?? id
+      next.comments.push({
+        id: newCommentId(),
+        body: normalizeBody(`[系统] 前置任务 ${id}「${title}」已删除，已自动移除此项前置依赖。`),
+        systemKey: 'sys.prerequisiteRemoved',
+        systemParams: { id, title },
+        threadId: 'host',
+        version: 1,
+        createdAt: now,
+      })
+    }
+    ledger.tasks[index] = next
+    repaired.push(next)
+  }
+  return repaired
 }
 
 /** Recursively freeze a plain-data value (defense in depth for handed-out snapshots). */

@@ -9,10 +9,12 @@
  */
 import { useEffect, useState } from 'react'
 import { ExternalSyncPanel } from './ExternalSyncPanel.tsx'
+import { Select } from './Select.tsx'
 import type { BoardController } from '../controller.ts'
 import type { CatalogModelItem, CatalogPresetItem } from '../../shared/api.ts'
 import { BRANCH_NAME_MODES, DEFAULT_BRANCH_NAME_PREFIX, DEFAULT_COMPLETED_DISPLAY_LIMIT, DEFAULT_DISPATCH_INTERVAL_MS, DEFAULT_ISOLATION, DEFAULT_MAX_CONCURRENT, DEFAULT_QUEUE_MAX_AGE_MINUTES, DEFAULT_SCHEDULE_MISSED_AFTER_MINUTES, MIN_COMPLETED_DISPLAY_LIMIT, MAX_COMPLETED_DISPLAY_LIMIT, allowClaimFromLinkedRootsOf, branchNameModeOf, branchNamePrefixOf, buildBranchName, completedDisplayLimitOf, defaultPermissionOf, defaultSyncExternalSessionsOf, dispatchIntervalMsOf, maxConcurrentOf, queueMaxAgeMinutesOf, scheduleMissedAfterMinutesOf, type BranchNameMode, type IsolationMode, type PermissionMode } from '../../shared/protocol.ts'
 import { localeStore, setLocalePreference, useT, type LocalePreference, type Translate } from '../i18n/runtime.ts'
+import { Icon } from './Icon.tsx'
 
 /** The isolation options with one-line hints (mirrors the task form; translated per render). */
 const isolationOptions = (t: Translate): ReadonlyArray<{ value: IsolationMode; name: string; hint: string }> => [
@@ -141,12 +143,12 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
     <div className="dsh-atb-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) controller.closeSettings() }}>
       <div className="dsh-atb-modal dsh-atb-set" role="dialog" aria-modal="true" aria-label={t('set.aria')}>
         <div className="dsh-atb-modal-head">
-          <span className="dsh-atb-modal-headicon">🛠</span>
+          <span className="dsh-atb-modal-headicon"><Icon name="settings" /></span>
           <div className="dsh-atb-modal-headtext">
             <h3>{t('set.title')}</h3>
             <p>{t('set.subtitle')}</p>
           </div>
-          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeSettings()}>✕</button>
+          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeSettings()}><Icon name="close" /></button>
         </div>
 
         <div className="dsh-atb-settings-layout">
@@ -167,26 +169,37 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
           <section className="dsh-atb-diag-sec">
             <label className="dsh-atb-field dsh-atb-field-inline">
               <span className="dsh-atb-field-label">{t('set.language.label')}</span>
-              <select className="dsh-atb-input" value={localePreference} aria-describedby="dsh-atb-language-hint"
-                onChange={e => setLocalePreference(e.target.value as LocalePreference)}>
-                <option value="follow">{t('set.language.follow')}</option>
-                <option value="zh">简体中文</option>
-                <option value="en">English</option>
-                <option value="ru">Русский</option>
-              </select>
+              <Select
+                full
+                ariaLabel={t('set.language.label')}
+                value={localePreference}
+                onChange={v => setLocalePreference(v as LocalePreference)}
+                options={[
+                  { value: 'follow', label: t('set.language.follow') },
+                  { value: 'zh', label: '简体中文' },
+                  { value: 'en', label: 'English' },
+                  { value: 'ru', label: 'Русский' },
+                ]}
+              />
             </label>
             <p id="dsh-atb-language-hint" className="dsh-atb-isolation-note">{t('set.language.hint')}</p>
           </section>
           <section className="dsh-atb-diag-sec">
             <label className="dsh-atb-field dsh-atb-field-inline">
               <span className="dsh-atb-field-label">{t('set.workspace.field')}</span>
-              <select className="dsh-atb-input" value={draftDefaultWorkspace} onChange={e => setDraftDefaultWorkspace(e.target.value)}>
-                <option value="">{t('set.workspace.follow')}</option>
-                {draftDefaultWorkspace !== '' && !(state.workspaces ?? []).some(w => w.id === draftDefaultWorkspace) && (
-                  <option value={draftDefaultWorkspace}>{draftDefaultWorkspace}</option>
-                )}
-                {(state.workspaces ?? []).map(ws => <option key={ws.id} value={ws.id}>{ws.title || ws.path}</option>)}
-              </select>
+              <Select
+                full
+                ariaLabel={t('set.workspace.field')}
+                value={draftDefaultWorkspace}
+                onChange={v => setDraftDefaultWorkspace(v)}
+                options={[
+                  { value: '', label: t('set.workspace.follow') },
+                  ...(draftDefaultWorkspace !== '' && !(state.workspaces ?? []).some(w => w.id === draftDefaultWorkspace)
+                    ? [{ value: draftDefaultWorkspace, label: draftDefaultWorkspace }]
+                    : []),
+                  ...(state.workspaces ?? []).map(ws => ({ value: ws.id, label: ws.title || ws.path })),
+                ]}
+              />
             </label>
             <p className="dsh-atb-isolation-note">{t('set.workspace.hint')}</p>
           </section>
@@ -218,10 +231,13 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
             <p className="dsh-atb-isolation-note">{t('set.iso.branchHint')}</p>
             <label className="dsh-atb-field dsh-atb-field-inline">
               <span className="dsh-atb-field-label">{t('set.iso.branchMode.label')}</span>
-              <select className="dsh-atb-input" value={draftBranchMode}
-                onChange={e => setDraftBranchMode(e.target.value as BranchNameMode)}>
-                {branchModeOptions(t).map(o => <option key={o.value} value={o.value}>{o.name}</option>)}
-              </select>
+              <Select
+                full
+                ariaLabel={t('set.iso.branchMode.label')}
+                value={draftBranchMode}
+                onChange={v => setDraftBranchMode(v as BranchNameMode)}
+                options={branchModeOptions(t).map(o => ({ value: o.value, label: o.name }))}
+              />
             </label>
             {isPrefixMode(draftBranchMode) && (
               <label className="dsh-atb-field dsh-atb-field-inline">
@@ -305,43 +321,65 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
             <div className="dsh-atb-form-subgrid">
               <label className="dsh-atb-field">
                 <span className="dsh-atb-field-label">{t('set.agent.model')}</span>
-                <select className="dsh-atb-input" value={draftModel} onChange={e => { setDraftModel(e.target.value); setDraftEffort('') }}>
-                  <option value="">{t('form.field.modelDefault')}</option>
-                  {parsedModel !== undefined && selectedModel === undefined && (
-                    <option value={draftModel}>{parsedModel.model} ({parsedModel.provider})</option>
-                  )}
-                  {catalog.map(m => (
-                    <option key={`${m.provider}/${m.model}`} value={JSON.stringify({ provider: m.provider, model: m.model })}>
-                      {t('form.model.option', { name: m.name ?? m.model, provider: m.provider })}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.model')}
+                  value={draftModel}
+                  onChange={v => { setDraftModel(v); setDraftEffort('') }}
+                  options={[
+                    { value: '', label: t('form.field.modelDefault') },
+                    ...(parsedModel !== undefined && selectedModel === undefined
+                      ? [{ value: draftModel, label: parsedModel.model + ' (' + parsedModel.provider + ')' }]
+                      : []),
+                    ...catalog.map(m => ({
+                      value: JSON.stringify({ provider: m.provider, model: m.model }),
+                      label: t('form.model.option', { name: m.name ?? m.model, provider: m.provider }),
+                    })),
+                  ]}
+                />
               </label>
               <label className="dsh-atb-field">
                 <span className="dsh-atb-field-label">{t('set.agent.effort')}</span>
-                <select className="dsh-atb-input" value={draftEffort} disabled={parsedModel === undefined} onChange={e => setDraftEffort(e.target.value)}>
-                  <option value="">{t('form.effort.follow')}{reasoning?.defaultEffort !== undefined ? t('shared.current', { name: reasoning.efforts.find(e => e.id === reasoning.defaultEffort)?.name ?? reasoning.defaultEffort }) : ''}</option>
-                  {draftEffort !== '' && reasoning !== undefined && !reasoning.efforts.some(e => e.id === draftEffort) && (
-                    <option value={draftEffort}>{draftEffort}</option>
-                  )}
-                  {reasoning !== undefined ? reasoning.efforts.map(e => (
-                    <option key={e.id} value={e.id}>{e.name}{e.description ? ` (${e.description})` : ''}</option>
-                  )) : <>
-                    {!['', 'low', 'medium', 'high', 'none'].includes(draftEffort) && <option value={draftEffort}>{draftEffort}</option>}
-                    <option value="low">{t('form.effort.low')}</option>
-                    <option value="medium">{t('form.effort.medium')}</option>
-                    <option value="high">{t('form.effort.high')}</option>
-                    <option value="none">{t('form.effort.none')}</option>
-                  </>}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.effort')}
+                  disabled={parsedModel === undefined}
+                  value={draftEffort}
+                  onChange={v => setDraftEffort(v)}
+                  options={[
+                    { value: '', label: t('form.effort.follow') + (reasoning?.defaultEffort !== undefined
+                      ? t('shared.current', { name: reasoning.efforts.find(e => e.id === reasoning.defaultEffort)?.name ?? reasoning.defaultEffort })
+                      : '') },
+                    ...(draftEffort !== '' && reasoning !== undefined && !reasoning.efforts.some(e => e.id === draftEffort)
+                      ? [{ value: draftEffort, label: draftEffort }]
+                      : []),
+                    ...(reasoning !== undefined
+                      ? reasoning.efforts.map(e => ({ value: e.id, label: e.name + (e.description ? ' (' + e.description + ')' : '') }))
+                      : [
+                        ...(!['', 'low', 'medium', 'high', 'none'].includes(draftEffort) ? [{ value: draftEffort, label: draftEffort }] : []),
+                        { value: 'low', label: t('form.effort.low') },
+                        { value: 'medium', label: t('form.effort.medium') },
+                        { value: 'high', label: t('form.effort.high') },
+                        { value: 'none', label: t('form.effort.none') },
+                      ]),
+                  ]}
+                />
               </label>
               <label className="dsh-atb-field">
                 <span className="dsh-atb-field-label">{t('set.agent.preset')}</span>
-                <select className="dsh-atb-input" value={draftPreset} onChange={e => setDraftPreset(e.target.value)}>
-                  <option value="">{t('form.preset.follow')}{presetDefault !== undefined ? t('shared.current', { name: presets.find(p => p.id === presetDefault)?.name ?? presetDefault }) : ''}</option>
-                  {draftPreset !== '' && !presets.some(p => p.id === draftPreset) && <option value={draftPreset}>{draftPreset}</option>}
-                  {presets.map(p => <option key={p.id} value={p.id}>{p.name ?? p.id}{p.id === presetDefault ? t('form.preset.defaultTag') : ''}</option>)}
-                </select>
+                <Select
+                  full
+                  ariaLabel={t('form.field.preset')}
+                  value={draftPreset}
+                  onChange={v => setDraftPreset(v)}
+                  options={[
+                    { value: '', label: t('form.preset.follow') + (presetDefault !== undefined
+                      ? t('shared.current', { name: presets.find(p => p.id === presetDefault)?.name ?? presetDefault })
+                      : '') },
+                    ...(draftPreset !== '' && !presets.some(p => p.id === draftPreset) ? [{ value: draftPreset, label: draftPreset }] : []),
+                    ...presets.map(p => ({ value: p.id, label: (p.name ?? p.id) + (p.id === presetDefault ? t('form.preset.defaultTag') : '') })),
+                  ]}
+                />
               </label>
             </div>
           </section>
@@ -355,7 +393,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
                 data-on={draftPerm === 'workspace-write'}
                 onClick={() => setDraftPerm('workspace-write')}
               >
-                <span className="dsh-atb-perm-name">{t('set.perm.writeName')}</span>
+                <span className="dsh-atb-perm-name"><Icon name="folder" /> {t('set.perm.writeName')}</span>
                 <span className="dsh-atb-perm-hint">{t('set.perm.writeHint')}</span>
               </button>
               <button
@@ -364,7 +402,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
                 data-on={draftPerm === 'read-only'}
                 onClick={() => setDraftPerm('read-only')}
               >
-                <span className="dsh-atb-perm-name">{t('set.perm.readOnlyName')}</span>
+                <span className="dsh-atb-perm-name"><Icon name="lock" /> {t('set.perm.readOnlyName')}</span>
                 <span className="dsh-atb-perm-hint">{t('set.perm.readOnlyHint')}</span>
               </button>
               <button
@@ -373,7 +411,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
                 data-on={draftPerm === 'danger-full-access'}
                 onClick={() => setDraftPerm('danger-full-access')}
               >
-                <span className="dsh-atb-perm-name">{t('set.perm.fullName')}</span>
+                <span className="dsh-atb-perm-name"><Icon name="shieldCheck" /> {t('set.perm.fullName')}</span>
                 <span className="dsh-atb-perm-hint">{t('set.perm.fullHint')}</span>
               </button>
             </div>
@@ -438,7 +476,7 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
             />
             {state.storageNotice !== undefined && (
               <div className="dsh-atb-storage-notice" role="status">
-                <span className="dsh-atb-storage-notice-ok">✓ {t('set.storage.migrated', { path: state.storageNotice.path })}</span>
+                <span className="dsh-atb-storage-notice-ok"><Icon name="check" /> {t('set.storage.migrated', { path: state.storageNotice.path })}</span>
                 {state.storageNotice.warnings.length > 0 && (
                   <span className="dsh-atb-storage-notice-warn">{t('set.storage.warnings', { warnings: state.storageNotice.warnings.join('; ') })}</span>
                 )}

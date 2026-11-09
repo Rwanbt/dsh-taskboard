@@ -11,6 +11,7 @@ import type { BoardController } from '../controller.ts'
 import type { ImportPreviewResponse } from '../../shared/api.ts'
 import { useAlert } from './AlertModal.tsx'
 import { useT } from '../i18n/runtime.ts'
+import { Icon } from './Icon.tsx'
 
 /** One classified row (create / overwrite). */
 function PlanRow({ row }: { row: { id: string; title: string; status: string } }) {
@@ -95,12 +96,12 @@ export function ImportModal({ controller }: { controller: BoardController }) {
     <div className="dsh-atb-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) close() }}>
       <div className="dsh-atb-modal dsh-atb-imp" role="dialog" aria-modal="true" aria-label={t('imp.aria')}>
         <div className="dsh-atb-modal-head">
-          <span className="dsh-atb-modal-headicon">⬆</span>
+          <span className="dsh-atb-modal-headicon"><Icon name="import" /></span>
           <div className="dsh-atb-modal-headtext">
             <h3>{t('imp.title')}</h3>
             <p>{t('imp.subtitle')}</p>
           </div>
-          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={close}>✕</button>
+          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={close}><Icon name="close" /></button>
         </div>
         <div className="dsh-atb-modal-body">
           <div className="dsh-atb-imp-picker">

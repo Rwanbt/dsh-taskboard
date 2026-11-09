@@ -1,5 +1,7 @@
 import { archiveTaskSessions } from './archive-sessions.ts'
 import { applyHumanWaitingPatch } from '../shared/human-wait.ts'
+import { buildDependencyIndex, DependencyError, dependencyState, validateDependencies, validateWorkspaceLinks } from '../shared/dependencies.ts'
+import { assertNoChildren, detachIsDeleted, HierarchyError, subtaskProgress, validateHierarchyLinks, validateParent } from '../shared/hierarchy.ts'
 /**
  * /dsh-taskboard routes on the shared DSH webserver: a JSON API for the
  * GUI's human operations (create/update/move/comment/delete — actor `user`,
@@ -55,6 +57,7 @@ import { MAX_ASSET_BYTES, type AssetStore } from './assets.ts'
 import type { StorageCoordinator } from './storage.ts'
 import { ROUTE_PREFIX, SSE_PATH, type ApiFail, type ApiResult } from '../shared/api.ts'
 import type { TaskStore } from './store.ts'
+import { detachPrerequisitesOfTrashed } from './store.ts'
 import { ERR, ToolError } from './tools.ts'
 import type { WorkspaceFace } from './tools.ts'
 
@@ -255,6 +258,12 @@ function normalizePresetId(raw: string | null): string | undefined {
 
 /** Map a thrown domain error to the envelope. */
 function toFail(error: unknown): { res: ApiFail; status: number } {
+  // Shared graph refusals surface their stable code at the head of the message
+  // (cross_workspace / cycle / duplicate / missing / too_many / self) so a
+  // client or QA can branch on the reason without parsing prose.
+  if (error instanceof DependencyError) return fail('invalid_input', `${error.code}: ${error.message}`)
+  // Hierarchy refusals do the same (has_children / depth / cycle / …).
+  if (error instanceof HierarchyError) return fail('invalid_input', `${error.code}: ${error.message}`)
   const message = error instanceof Error ? error.message : String(error)
   // Structured path first (review P2): ToolError carries its code — no need
   // to parse the 'Error: <code>: …' prefix it also renders into the message.
@@ -470,7 +479,27 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
           const ledger = store.snapshot()
           const excludeDone = url.searchParams.get('excludeDone') === 'true' || url.searchParams.get('excludeDone') === '1'
           const doneCount = ledger.tasks.filter(t => t.status === 'done' && t.trashedAt === undefined).length
-          const tasks = excludeDone ? ledger.tasks.filter(t => t.status !== 'done') : ledger.tasks
+          // ONE id index per request (F4), shared by both derived projections:
+          // dependencyProgress (dependencies) and subtaskProgress (hierarchy).
+          // Both are GET-only, never persisted (D9) and never execution gates.
+          const ledgerIndex = buildDependencyIndex(ledger.tasks)
+          // Only tasks that actually parent something get a progress object.
+          const parentIds = new Set<string>()
+          for (const task of ledger.tasks) {
+            if (task.parentId !== undefined) parentIds.add(task.parentId)
+          }
+          const visible = excludeDone ? ledger.tasks.filter(t => t.status !== 'done') : ledger.tasks
+          const tasks = visible.map(t => {
+            const dependencyProjection = t.dependsOn?.length
+              ? { dependencyProgress: dependencyState(t, ledger.tasks, ledgerIndex) }
+              : {}
+            const hierarchyProjection = parentIds.has(t.id)
+              ? { subtaskProgress: subtaskProgress(t.id, ledger.tasks, ledgerIndex) }
+              : {}
+            return Object.keys(dependencyProjection).length > 0 || Object.keys(hierarchyProjection).length > 0
+              ? { ...t, ...dependencyProjection, ...hierarchyProjection }
+              : t
+          })
           json(res, {
             ok: true,
             value: {
@@ -481,6 +510,32 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               queue: queueSummary(ledger),
             },
           })
+          return
+        }
+        // Read-only picker surface (docs/fork-audit.md §5): every untrashed task
+        // of ONE workspace with its identity plus optional hierarchy/dependency
+        // links. Deliberately excludes derived progress — the client only needs
+        // to render candidates — and ignores excludeDone so completed tasks stay
+        // selectable as prerequisites.
+        if (pathname === `${ROUTE_PREFIX}/task-index`) {
+          await store.load()
+          const workspaceId = url.searchParams.get('workspaceId') ?? ''
+          if (workspaceId.length === 0 || workspaces.get(workspaceId) === undefined) {
+            const f = fail('not_found', 'unknown workspace')
+            json(res, f.res, f.status)
+            return
+          }
+          const tasks = store.snapshot().tasks
+            .filter(t => t.workspaceId === workspaceId && t.trashedAt === undefined)
+            .map(t => ({
+              id: t.id,
+              title: t.title,
+              status: t.status,
+              workspaceId: t.workspaceId,
+              ...(t.parentId !== undefined ? { parentId: t.parentId } : {}),
+              ...(t.dependsOn?.length ? { dependsOn: [...t.dependsOn] } : {}),
+            }))
+          json(res, { ok: true, value: { tasks } })
           return
         }
         if (pathname === `${ROUTE_PREFIX}/workspaces`) {
@@ -806,6 +861,18 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
             executions: [],
           }
           await store.mutate('task-created', ledger => {
+            // One id index for the whole write (F4). Duplicates copy
+            // dependsOn/parentId onto a brand-new record, so this is the only
+            // place their copied links are re-validated against the live graph.
+            const index = buildDependencyIndex(ledger.tasks)
+            if (body.parentId !== undefined) {
+              const parentId = validateParent(task, body.parentId, ledger.tasks)
+              if (parentId !== undefined) task.parentId = parentId
+            }
+            if (body.dependsOn !== undefined) {
+              const ids = validateDependencies(task, body.dependsOn, ledger.tasks, index)
+              if (ids.length > 0) task.dependsOn = ids
+            }
             ledger.tasks.push(task)
             return [task]
           })
@@ -910,6 +977,32 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
                 if (items.length > 0) next.checklist = items
                 else delete next.checklist
               }
+              // D6: explicit hierarchy link; null detaches (undefined = keep).
+              // Same-workspace untrashed parent, no self/ancestor cycle and the
+              // depth cap are validated against the ledger being written.
+              if (body.parentId !== undefined) {
+                const parentId = validateParent(next, body.parentId, ledger.tasks)
+                if (parentId === undefined) delete next.parentId
+                else next.parentId = parentId
+              }
+              // Every link validation must see the POST-WRITE ledger: a
+              // workspace rebind can strand a parent/child or a dependent in
+              // another project, and a new dependency must resolve against the
+              // state this very mutation commits (not the pre-write one).
+              const projected = ledger.tasks.map(t => t.id === id ? next! : t)
+              const projectedIndex = buildDependencyIndex(projected)
+              if (body.dependsOn !== undefined) {
+                if (task.status === 'in_progress' || task.executions.some(e => e.outcome === 'running')) {
+                  throw new Error('Error: invalid_input: dependencies cannot change while a task is running')
+                }
+                const ids = validateDependencies(next, body.dependsOn, projected, projectedIndex)
+                if (ids.length) next.dependsOn = ids
+                else delete next.dependsOn
+              }
+              // D7: refuse a workspace rebind that would cross the existing
+              // parent or any child; also re-checks depth/cycle on the record.
+              validateHierarchyLinks(next, projected)
+              validateWorkspaceLinks(next, projected, projectedIndex)
               next.version = task.version + 1
               next.updatedAt = options.now()
               next.updatedBy = { kind: 'user' }
@@ -931,6 +1024,10 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               const { index, task } = liveTaskAt(ledger, id)
               if (ifVersion !== task.version) throw new Error(`Error: version_conflict: stale version ${ifVersion} (current ${task.version})`)
               if (!canTransition(task.status, to)) throw new Error(`Error: invalid_transition: illegal transition ${task.status} → ${to}`)
+              if (to === 'in_progress') {
+                const dependency = dependencyState(task, ledger.tasks)
+                if (!dependency.ready) throw new Error('Error: invalid_transition: unsatisfied dependencies: ' + dependency.pendingIds.join(', '))
+              }
               beforeTask = task
               next = structuredClone(task)
               next.status = to
@@ -1035,6 +1132,10 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
             const purge = body.purge === true
             if (purge) {
               if (task.trashedAt === undefined) throw new Error('Error: invalid_input: purge requires a trashed task (soft-delete first)')
+              // D7: hierarchy deletion is refused, not cascaded. Check BEFORE
+              // the irreversible worktree/branch cleanup below (the mutation
+              // re-checks authoritatively on the fresh draft).
+              assertNoChildren(id, store.snapshot().tasks)
               // Worktree safety before purge (plan §3.3, 0.3.1): refuse while
               // uncommitted work remains; otherwise clean the worktree and
               // the task branch along with the ledger entry.
@@ -1078,9 +1179,29 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
                   }
                 }
               }
+              // F1/D2: the purge and the dependent repair are ONE transaction.
+              // A dangling id would block those dependents forever (missing),
+              // so it is stripped here with a version bump + audit comment.
+              const now = options.now()
               await store.mutate('task-deleted', ledger => {
+                const target = ledger.tasks.find(t => t.id === id)
+                if (target === undefined) throw new Error('Error: not_found: no such task')
+                assertNoChildren(id, ledger.tasks)
                 ledger.tasks = ledger.tasks.filter(t => t.id !== id)
-                return []
+                // D7: trashed children may still carry the link; clearing it in
+                // the same mutation keeps the ledger coherent (no dangling
+                // parentId) while those records stay inert. They are part of
+                // the change set so subscribers see the rewritten records.
+                const detached: TaskRecord[] = []
+                for (const detachedId of detachIsDeleted(id, ledger.tasks)) {
+                  const child = ledger.tasks.find(t => t.id === detachedId)
+                  if (child === undefined) continue
+                  child.version += 1
+                  child.updatedAt = now
+                  child.updatedBy = { kind: 'system' }
+                  detached.push(child)
+                }
+                return [...detached, ...detachPrerequisitesOfTrashed(ledger, [{ id, title: target.title }], now)]
               })
               json(res, { ok: true, value: { purged: true } })
               return
@@ -1095,14 +1216,22 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               if (task.executions.some(e => e.outcome === 'running')) {
                 throw new Error('Error: invalid_input: 任务有正在运行的执行，请先取消或等它结束再删除')
               }
+              // D7: refuse while live children remain (no cascade, no silent
+              // re-parenting); the user must move/delete the children first.
+              assertNoChildren(id, ledger.tasks)
+              const now = options.now()
               const next = structuredClone(task)
-              next.trashedAt = options.now()
+              next.trashedAt = now
               next.version = task.version + 1
               delete next.claimedBy
               delete next.claimedAt
               next.blocked = false
               ledger.tasks[index] = next
-              return [next]
+              // F1/D2: strip the trashed id from every dependent, bump its
+              // version and append the sys.prerequisiteRemoved trace — in the
+              // SAME transaction so no reader sees a dangling reference.
+              const repaired = detachPrerequisitesOfTrashed(ledger, [{ id, title: task.title }], now)
+              return [next, ...repaired]
             })
             json(res, { ok: true, value: { trashed: true } })
             return
@@ -1418,8 +1547,31 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               if (ledger.tasks.some(t => t.executions.some(e => e.outcome === 'running'))) {
                 throw new Error('Error: invalid_input: 有任务正在执行，不能整册替换（请先取消或等待结束）')
               }
+              // F5: validate the WHOLE incoming graph once, BEFORE the swap —
+              // a rejected import must leave the live ledger untouched. Every
+              // task is incoming here, so its own link validation covers both
+              // directions; nothing pre-existing survives to re-validate.
+              const nextTasks = structuredClone(imported)
+              const nextIndex = buildDependencyIndex(nextTasks)
+              for (const item of nextTasks) {
+                // INERT (soft-trashed) records are exempt from link-CONTENT
+                // validation: the delete-repair invariant deliberately leaves a
+                // TRASHED dependent's own stale links untouched, so a
+                // legitimately exported board that ever trashed a
+                // dependent/subtask must still round-trip. Only D7 survives on
+                // inert records: a trashed parent may not keep LIVE children.
+                if (item.trashedAt !== undefined) {
+                  assertNoChildren(item.id, nextTasks)
+                  continue
+                }
+                if (item.dependsOn?.length) validateDependencies(item, item.dependsOn, nextTasks, nextIndex)
+                // D6/D7: hierarchy links are validated too — a parentId must
+                // resolve inside the imported graph (same workspace, untrashed,
+                // acyclic, depth-capped).
+                if (item.parentId !== undefined) validateParent(item, item.parentId, nextTasks)
+              }
               replacedTotal = ledger.tasks.length
-              ledger.tasks = structuredClone(imported)
+              ledger.tasks = nextTasks
               if (plan.externalSync !== undefined) ledger.externalSync = structuredClone(plan.externalSync)
               else delete ledger.externalSync
               // Replace is a whole-ledger swap (0.5.0): board settings ride
@@ -1428,26 +1580,73 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
               else delete ledger.settings
               return ledger.tasks
             }
-            const byId = new Map(ledger.tasks.map(t => [t.id, t]))
-            if (plan.externalSync !== undefined) {
-              ledger.externalSync ??= {}
-              for (const [id, incoming] of Object.entries(plan.externalSync)) {
-                const current = ledger.externalSync[id]
-                ledger.externalSync[id] = current ? { ...incoming, ...current,
-                  links: { ...incoming.links, ...current.links }, ignored: [...new Set([...incoming.ignored, ...current.ignored])] } : structuredClone(incoming)
-              }
-            }
-            for (const task of imported) {
+            // ---- merge (upsert by id) ----
+            // F5: build the projected ledger ONCE, then validate ONLY the
+            // tasks this merge writes. Re-validating every untouched task made
+            // each merge O(n²) and failed forever on a legacy ledger holding an
+            // old cross-workspace edge the import never touched.
+            //
+            // D2/D7 invariant: a merge can also TRASH an existing task (an
+            // imported record carries trashedAt). That must never leave an
+            // untouched dependent pointing at it, nor a live child under a
+            // trashed parent, so the ids that were untrashed before are
+            // captured here and repaired by the post-merge sweep below — in
+            // this same mutation, after ordering within the batch is resolved.
+            const untrashedBefore = new Set(ledger.tasks.filter(t => t.trashedAt === undefined).map(t => t.id))
+            const existingById = new Map(ledger.tasks.map(t => [t.id, t]))
+            const incoming = new Map(imported.map(t => [t.id, structuredClone(t)]))
+            for (const task of incoming.values()) {
               // S6: merging over a task whose execution is live would orphan
               // that run the same way — refuse the overwrite.
-              const existing = byId.get(task.id)
+              const existing = existingById.get(task.id)
               if (existing !== undefined && existing.executions.some(e => e.outcome === 'running')) {
                 throw new Error(`Error: invalid_input: 任务 ${task.id} 正在执行，不能被导入覆盖`)
               }
-              byId.set(task.id, structuredClone(task))
             }
-            ledger.tasks = [...byId.values()]
-            return structuredClone(imported)
+            const projected: TaskRecord[] = ledger.tasks.map(t => incoming.get(t.id) ?? t)
+            for (const [id, task] of incoming) {
+              if (!existingById.has(id)) projected.push(task)
+            }
+            // validateWorkspaceLinks covers a written task's own dependsOn and
+            // ANY existing task that points at it — the exact edges a merge can
+            // invalidate by moving a task's workspace. Untouched→untouched
+            // links are not re-validated on purpose (F5). ONE index for the
+            // whole written set (F4).
+            const projectedIndex = buildDependencyIndex(projected)
+            for (const task of incoming.values()) {
+              // INERT (soft-trashed) incoming records: same exemption as the
+              // replace branch — the stale links of a trashed dependent are
+              // expected data and must not block a legitimate round-trip. A
+              // trashed parent may still not keep LIVE children (D7).
+              if (task.trashedAt !== undefined) {
+                assertNoChildren(task.id, projected)
+                continue
+              }
+              validateWorkspaceLinks(task, projected, projectedIndex)
+              // D6/D7: an incoming parentId must resolve against the MERGED
+              // ledger (same workspace, untrashed, acyclic, depth-capped).
+              // Refuses BEFORE any commit.
+              validateHierarchyLinks(task, projected)
+            }
+            if (plan.externalSync !== undefined) {
+              ledger.externalSync ??= {}
+              for (const [id, incomingSync] of Object.entries(plan.externalSync)) {
+                const current = ledger.externalSync[id]
+                ledger.externalSync[id] = current ? { ...incomingSync, ...current,
+                  links: { ...incomingSync.links, ...current.links }, ignored: [...new Set([...incomingSync.ignored, ...current.ignored])] } : structuredClone(incomingSync)
+              }
+            }
+            ledger.tasks = projected
+            // D2: POST-MERGE SWEEP over the final ledger. Any pre-existing task
+            // this batch trashed is now removed from untouched dependents'
+            // dependsOn (version bump + sys.prerequisiteRemoved), exactly like
+            // a manual delete — so a merge can never strand a dependent that
+            // the batch did not also rewrite.
+            const newlyTrashed = projected
+              .filter(task => untrashedBefore.has(task.id) && task.trashedAt !== undefined)
+              .map(task => ({ id: task.id, title: task.title }))
+            const repaired = detachPrerequisitesOfTrashed(ledger, newlyTrashed, options.now())
+            return [...incoming.values(), ...repaired]
           })
           json(res, {
             ok: true,

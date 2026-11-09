@@ -19,3 +19,5 @@ _vlog.mjs
 
 # local review/tooling scratch
 .aionrs/
+
+coverage/

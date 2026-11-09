@@ -17,6 +17,7 @@
  * @module dsh-taskboard/client/board/labels
  */
 import type { TaskStatus, Urgency } from '../../shared/protocol.ts'
+import type { Translate } from '../i18n/runtime.ts'
 
 /** Column header keys on the five-column main board (+ secondary tab). */
 export const COLUMN_KEYS: Readonly<Record<TaskStatus, string>> = {
@@ -50,4 +51,16 @@ export const URGENCY_KEYS: Readonly<Record<Urgency, string>> = {
 /** Execution outcome keys. */
 export const OUTCOME_KEYS: Readonly<Record<string, string>> = {
   running: 'outcome.running', succeeded: 'outcome.succeeded', failed: 'outcome.failed', cancelled: 'outcome.cancelled',
+}
+
+/**
+ * Human text for an arbitrary status string coming off the wire (task index,
+ * summaries): known statuses localize through {@link STATUS_KEYS}, unknown
+ * values pass through untouched so nothing ever renders as a blank chip.
+ * @param t - the active translate function.
+ * @param status - the raw status string.
+ */
+export function statusText(t: Translate, status: string): string {
+  const key = (STATUS_KEYS as Readonly<Record<string, string | undefined>>)[status]
+  return key === undefined ? status : t(key)
 }

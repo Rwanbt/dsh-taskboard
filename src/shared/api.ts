@@ -5,9 +5,12 @@
  *
  * @module dsh-taskboard/shared/api
  */
-import type { BoardSettings, TaskLedger, TaskModel, TaskRecord, TaskSummary } from './protocol.ts'
+import type { BoardSettings, TaskLedger, TaskModel, TaskRecord, TaskStatus, TaskSummary } from './protocol.ts'
 
 export type { TaskModel, TaskRecord }
+/** Derived projections consumed by the client badge/detail panels (D9). */
+export type { DependencyState } from './dependencies.ts'
+export type { SubtaskProgress } from './hierarchy.ts'
 
 /** Route prefix on the shared DSH webserver (same origin as the GUI). */
 export const ROUTE_PREFIX = '/dsh-taskboard'
@@ -91,6 +94,10 @@ export type CreateTaskBody = {
   permission?: string
   /** Acceptance checklist item texts (host mints ids, all unchecked). */
   checklist?: string[]
+  /** Optional prerequisite IDs, validated atomically by the host. */
+  dependsOn?: string[]
+  /** Optional hierarchy parent id (same workspace), validated atomically by the host (D6). */
+  parentId?: string
 }
 
 /** Update-task request body (ifVersion mandatory). */
@@ -122,6 +129,10 @@ export type UpdateTaskBody = {
   permission?: string | null
   /** Replace the whole checklist (GUI owner surface); null clears it. */
   checklist?: unknown
+  /** Replace all prerequisites; [] clears. */
+  dependsOn?: string[]
+  /** Re-parent the task; null detaches it (D6; validated atomically by the host). */
+  parentId?: string | null
 }
 
 /** Move-task request body (ifVersion mandatory; the user MAY move to done). */
@@ -350,6 +361,23 @@ export type TaskResponse = TaskRecord
 
 /** Summary response used by list-ish endpoints. */
 export type SummaryResponse = { tasks: TaskSummary[] }
+
+/**
+ * Compact row of one task for the prerequisite picker / parent navigation
+ * (D2/F9). Deliberately cheaper than a full record: no comments, executions or
+ * derived progress — the client only needs identity, status and links.
+ */
+export type TaskIndexEntry = {
+  id: string
+  title: string
+  status: TaskStatus
+  workspaceId: string
+  parentId?: string
+  dependsOn?: string[]
+}
+
+/** Response of `GET /dsh-taskboard/task-index?workspaceId=<id>`. */
+export type TaskIndexResponse = { tasks: TaskIndexEntry[] }
 
 // ---------------------------------------------------------------------------
 // SSE

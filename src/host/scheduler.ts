@@ -4,10 +4,31 @@
  * capacity becomes available. A queued window remains eligible across a host
  * restart; only a window that was never queued can be classified as missed.
  *
+ * DEPENDENCY DEFERRAL (D3/F3, binding policy): a scheduled task whose
+ * prerequisites are not all `done` is DEFERRED, never spent. Concretely:
+ * - a due window of a blocked task is moved into the durable queue instead of
+ *   being consumed by the offline missed-window policy (which would otherwise
+ *   burn a one-shot or skip a cron window for a reason unrelated to
+ *   dependencies);
+ * - a queued entry that stays dependency-blocked is exempt from the
+ *   `queueMaxAgeMs` shelf life (its expiry clock is cleared) and is never
+ *   dispatched — it survives restarts until it becomes ready or the user
+ *   explicitly clears/changes the schedule;
+ * - readiness is re-checked inside `reserveDispatch()`, `expireQueued()` and the
+ *   two missed-window spend paths (`consumeRunAt` / `advanceAndMark`), so a
+ *   prerequisite that reopens between the tick snapshot and the write can
+ *   never let a blocked entry start or be spent;
+ * - when the entry becomes ready it dispatches ONCE; a cron window's next run
+ *   is recomputed from the DISPATCH time, so a long deferral cannot burst into
+ *   a catch-up run after unblocking.
+ * One ledger id index is built per tick and reused for every readiness check
+ * (F4: the old per-task `Map` build was O(n²) per tick).
+ *
  * @module dsh-taskboard/host/scheduler
  */
-import { DEFAULT_DISPATCH_INTERVAL_MS, DEFAULT_MAX_CONCURRENT, isSpentOneShot, newCommentId, nextCronTime, normalizeBody, parseCron, type TaskLedger } from '../shared/protocol.ts'
+import { DEFAULT_DISPATCH_INTERVAL_MS, DEFAULT_MAX_CONCURRENT, isSpentOneShot, newCommentId, nextCronTime, normalizeBody, parseCron, type TaskLedger, type TaskRecord } from '../shared/protocol.ts'
 import type { ExecutionService } from './execution.ts'
+import { buildDependencyIndex, isDependencyReady } from '../shared/dependencies.ts'
 import type { TaskStore } from './store.ts'
 
 /** Tick cadence. */
@@ -132,8 +153,13 @@ export class SchedulerService {
     // would tick over an empty ledger until something else loads it).
     await this.deps.store.load()
     const now = this.deps.now()
-    const ledger: TaskLedger = this.deps.store.snapshot()
-    for (const task of ledger.tasks) {
+    const snapshot: TaskLedger = this.deps.store.snapshot()
+    // F4: ONE dependency index per tick. Phase 1 (queueing) only writes queue
+    // and timing fields — never dependsOn — so a snapshot index stays valid
+    // for every readiness check in this phase.
+    const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(snapshot.tasks)
+
+    for (const task of snapshot.tasks) {
       if (task.execution.mode !== 'scheduled' || task.trashedAt !== undefined) continue
       // Only todo fires. A finished periodic run settles in review (its cron
       // moves to a freshly minted successor todo card), and terminal/parked
@@ -152,20 +178,35 @@ export class SchedulerService {
         continue
       }
 
+      // D3: readiness decides between SPENDING the pending window and
+      // DEFERRING it. A blocked task is never subject to the offline
+      // missed-window policy: its window becomes a durable queue entry, which
+      // the restart-safe FIFO pass keeps until the prerequisites are met.
+      const prerequisitesReady = isDependencyReady(task, dependencyIndex)
+
       if (task.execution.cron !== undefined) {
         // Periodic (定期执行): refire at every cron match.
         if (task.execution.nextRunAt === undefined) continue
         if (task.execution.nextRunAt > now) continue
+        if (!prerequisitesReady) {
+          await this.queueCron(task.id, now, task.execution.nextRunAt)
+          continue
+        }
         const missed = now - task.execution.nextRunAt > this.skipAfterMs()
-
         if (missed) await this.advanceAndMark(task.id, now, undefined, task.execution.nextRunAt)
         else await this.queueCron(task.id, now, task.execution.nextRunAt)
       } else if (task.execution.runAt !== undefined) {
         // One-shot (定时执行): fire once at the instant, then consume it.
         const due = task.execution.runAt
         if (due > now) continue
+        if (!prerequisitesReady) {
+          // Deferred, not spent: queue the one-shot even when the host was
+          // offline past skipAfterMs (the queue entry cannot be expired while
+          // the prerequisites are unmet — see releaseExpiryClock below).
+          await this.queueRunAt(task.id, now, due)
+          continue
+        }
         const missed = now - due > this.skipAfterMs()
-
         if (missed) await this.consumeRunAt(task.id, now, due)
         else await this.queueRunAt(task.id, now, due)
       }
@@ -173,11 +214,27 @@ export class SchedulerService {
 
     // Re-read after the queue mutations. Stable due-time order prevents cards
     // later in the ledger from starving behind a fixed snapshot order.
-    const queued = this.deps.store.snapshot().tasks
-      .filter(task => task.execution.mode === 'scheduled' && task.status === 'todo'
-        && task.trashedAt === undefined && task.execution.queuedRunAt !== undefined)
-      .sort((a, b) => (a.execution.queuedRunAt! - b.execution.queuedRunAt!)
-        || ((a.execution.queuedAt ?? 0) - (b.execution.queuedAt ?? 0)) || a.id.localeCompare(b.id))
+    const queuedTasks = this.deps.store.snapshot().tasks
+    // F4: ONE index for the whole dispatch phase. Readiness is re-checked
+    // atomically in reserveDispatch/expireQueued before an entry is taken.
+    const dispatchIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(queuedTasks)
+    const ready: TaskRecord[] = []
+    const deferred: string[] = []
+    for (const task of queuedTasks) {
+      if (task.execution.mode !== 'scheduled' || task.status !== 'todo'
+        || task.trashedAt !== undefined || task.execution.queuedRunAt === undefined) continue
+      if (isDependencyReady(task, dispatchIndex)) ready.push(task)
+      else deferred.push(task.id)
+    }
+    // D3: a dependency-deferred queue entry must never be spent by the
+    // queueMaxAgeMs shelf life. Drop its expiry clock once, in ONE mutation
+    // for the whole tick (no write at all when the shelf life is disabled).
+    // The durable entry itself stays queued across restarts; only an explicit
+    // user clear/cancel consumes it.
+    if (deferred.length > 0 && this.queueMaxAgeMs() > 0) await this.releaseExpiryClock(deferred)
+
+    const queued = ready.sort((a, b) => (a.execution.queuedRunAt! - b.execution.queuedRunAt!)
+      || ((a.execution.queuedAt ?? 0) - (b.execution.queuedAt ?? 0)) || a.id.localeCompare(b.id))
     for (const task of queued) {
       const queuedWindow = task.execution.queuedRunAt!
       if (this.isExpired(task.execution.queuedAt, now)) {
@@ -215,6 +272,28 @@ export class SchedulerService {
         this.dispatching.delete(key)
       }
     }
+  }
+
+  /**
+   * Exempt dependency-deferred queue entries from the shelf-life policy (D3).
+   * Clearing `queuedAt` (the expiry clock) leaves the durable queue entry
+   * untouched, so the work is deferred rather than spent. Runs in ONE mutation
+   * and recomputes readiness on the fresh draft: a task whose prerequisites
+   * became done in the meantime keeps its original clock and normal policy.
+   */
+  private async releaseExpiryClock(taskIds: readonly string[]): Promise<void> {
+    const ids = new Set(taskIds)
+    await this.deps.store.mutate('task-updated', ledger => {
+      const index: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
+      const changed: TaskRecord[] = []
+      for (const task of ledger.tasks) {
+        if (!ids.has(task.id) || task.execution.queuedAt === undefined) continue
+        if (isDependencyReady(task, index)) continue
+        delete task.execution.queuedAt
+        changed.push(task)
+      }
+      return changed.length === 0 ? undefined : changed
+    })
   }
 
   private isExpired(queuedAt: number | undefined, now: number): boolean {
@@ -273,6 +352,15 @@ export class SchedulerService {
       const task = ledger.tasks.find(t => t.id === taskId)
       if (task === undefined || task.execution.queuedRunAt !== queuedWindow) return undefined
       if (reason !== 'cleared' && !this.isExpired(task.execution.queuedAt, now)) return undefined
+      // D3: never SPEND dependency-blocked work. A prerequisite may have
+      // reopened since the tick snapshot, so readiness is re-checked on the
+      // fresh draft; a blocked entry is left queued for a later tick. An
+      // explicit manual clear ('cleared') stays unconditional — it is user
+      // intent, not a policy drop.
+      if (reason !== 'cleared') {
+        const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
+        if (!isDependencyReady(task, dependencyIndex)) return undefined
+      }
       delete task.execution.queuedRunAt
       delete task.execution.queuedAt
       // A dropped queue entry spends a one-shot (its runAt was already
@@ -332,13 +420,34 @@ export class SchedulerService {
     })
   }
 
-  /** Reserve one FIFO entry before calling an execution face. */
+  /**
+   * Reserve one FIFO entry before calling an execution face.
+   *
+   * D4: readiness is re-checked INSIDE the reservation mutation — the tick
+   * snapshot can be stale (a human may reopen a prerequisite while this
+   * callback waited for a rate/capacity slot), and a blocked entry must never
+   * leave the durable queue.
+   * D3: when a cron entry is taken, a next run that is already in the past is
+   * recomputed from the DISPATCH time; a long dependency deferral therefore
+   * dispatches once and schedules the following window forward instead of
+   * replaying the missed windows as a burst.
+   */
   private async reserveDispatch(taskId: string, queuedWindow: number): Promise<boolean> {
     let reserved = false
     await this.deps.store.mutate('task-updated', ledger => {
       const task = ledger.tasks.find(t => t.id === taskId)
       if (task === undefined || task.execution.queuedRunAt !== queuedWindow) return undefined
       if (task.status !== 'todo' || task.trashedAt !== undefined) return undefined
+      const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
+      if (!isDependencyReady(task, dependencyIndex)) return undefined
+      if (task.execution.cron !== undefined) {
+        const dispatchAt = this.deps.now()
+        if (task.execution.nextRunAt === undefined || task.execution.nextRunAt <= dispatchAt) {
+          const match = parseCron(task.execution.cron)
+          const next = match === null ? undefined : nextCronTime(match, dispatchAt) ?? undefined
+          if (next !== undefined) task.execution.nextRunAt = next
+        }
+      }
       delete task.execution.queuedRunAt
       task.execution.dispatchingRunAt = queuedWindow
       reserved = true
@@ -369,6 +478,14 @@ export class SchedulerService {
       const task = ledger.tasks.find(t => t.id === taskId)
       if (task === undefined || task.execution.runAt === undefined) return undefined
       if (task.status !== 'todo' || task.trashedAt !== undefined) return undefined
+      // D3: the offline missed-window policy must never SPEND a
+      // dependency-blocked one-shot. Re-check on the fresh draft; when still
+      // blocked the window is left in place and the next tick queues it as a
+      // deferred durable entry instead.
+      if (missedDue !== undefined) {
+        const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
+        if (!isDependencyReady(task, dependencyIndex)) return undefined
+      }
       delete task.execution.runAt
       task.execution.nextRunAt = undefined
       task.execution.lastTriggeredAt = now
@@ -403,6 +520,14 @@ export class SchedulerService {
       const task = ledger.tasks.find(t => t.id === taskId)
       if (task === undefined || task.execution.cron === undefined) return undefined
       if (task.status !== 'todo' || task.trashedAt !== undefined) return undefined
+      // D3: the offline missed-window policy must never SPEND a
+      // dependency-blocked periodic window. Re-check on the fresh draft; when
+      // still blocked the window is left due and the next tick queues it as a
+      // deferred durable entry instead.
+      if (missedDue !== undefined) {
+        const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
+        if (!isDependencyReady(task, dependencyIndex)) return undefined
+      }
       const match = parseCron(task.execution.cron)
       const next = match === null ? undefined : nextCronTime(match, now) ?? undefined
       if (next === undefined) {

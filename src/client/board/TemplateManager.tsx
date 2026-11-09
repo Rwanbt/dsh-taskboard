@@ -14,6 +14,7 @@ import type { Urgency } from '../../shared/protocol.ts'
 import { useAlert } from './AlertModal.tsx'
 import { URGENCY_KEYS } from './labels.ts'
 import { useT } from '../i18n/runtime.ts'
+import { Icon } from './Icon.tsx'
 import { localizeBuiltinCategory, localizeBuiltinName, localizeBuiltinTask } from '../i18n/templates.ts'
 import { categoryLabel, groupTemplatesByCategory, templateCategoryOf, templateCategoryOptions } from '../template-categories.ts'
 
@@ -146,12 +147,12 @@ export function TemplateManager({ controller }: { controller: BoardController })
     <div className="dsh-atb-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) close() }}>
       <div className="dsh-atb-modal dsh-atb-tplm" role="dialog" aria-modal="true" aria-label={t('tpl.aria')}>
         <div className="dsh-atb-modal-head">
-          <span className="dsh-atb-modal-headicon">⌗</span>
+          <span className="dsh-atb-modal-headicon"><Icon name="file" /></span>
           <div className="dsh-atb-modal-headtext">
             <h3>{t('tpl.title')}</h3>
             <p>{t('tpl.subtitle')}</p>
           </div>
-          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={close}>✕</button>
+          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={close}><Icon name="close" /></button>
         </div>
         <div className="dsh-atb-modal-body">
           {state.templates.length === 0
@@ -160,7 +161,7 @@ export function TemplateManager({ controller }: { controller: BoardController })
                 <div className="dsh-atb-tplm-list">
                     {groupTemplatesByCategory(state.templates).map(group => (
                       <div key={group.category ?? '\u0000'} className="dsh-atb-tplm-catgroup">
-                        <div className="dsh-atb-tplm-cathead">▍{categoryLabel(group.category, t)} ({group.templates.length})</div>
+                        <div className="dsh-atb-tplm-cathead">{categoryLabel(group.category, t)} ({group.templates.length})</div>
                         {group.templates.map(tpl => (
                           <div key={tpl.id} className="dsh-atb-tplm-row">
                             <input
@@ -225,8 +226,8 @@ export function TemplateManager({ controller }: { controller: BoardController })
                                     </>
                                   )
                                 : (
-                                    <button type="button" className="dsh-atb-btn" data-danger="true" title={t('tpl.delete.title')} onClick={() => setConfirmId(tpl.id)}>
-                                      🗑
+                                    <button type="button" className="dsh-atb-btn" data-danger="true" title={t('tpl.delete.title')} aria-label={t('tpl.delete.title')} onClick={() => setConfirmId(tpl.id)}>
+                                      <Icon name="trash" />
                                     </button>
                                   )}
                             </span>

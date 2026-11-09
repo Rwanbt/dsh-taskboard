@@ -18,10 +18,12 @@ import { humanWaiting } from '../../shared/human-wait.ts'
 import { DRAG_TYPE, TaskCard } from './TaskCard.tsx'
 import { TaskDetail } from './TaskDetail.tsx'
 import { TaskFormModal } from './TaskFormModal.tsx'
+import { Icon } from './Icon.tsx'
 import { SettingsModal } from './SettingsModal.tsx'
 import { ImportModal } from './ImportModal.tsx'
 import { TemplateManager } from './TemplateManager.tsx'
 import { useAlert } from './AlertModal.tsx'
+import { Select } from './Select.tsx'
 
 /** Urgency sort rank (urgent first). */
 const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, normal: 1, relaxed: 2 }
@@ -226,7 +228,9 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
               if (next) controller.prepareTemplateMenu()
             }}
           >
+            <Icon name="plus" />
             {t('board.action.newTask')}
+            <Icon name="chevronDown" />
           </button>
           {newMenuOpen && (
             <>
@@ -267,26 +271,28 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
           spellCheck={false}
           onChange={e => controller.setSearch(e.target.value)}
         />
-        <select
-          className="dsh-atb-select"
+        <Select
+          ariaLabel={t('board.filter.allProjects')}
           value={state.filters.workspaceId ?? ''}
-          onChange={e => controller.setWorkspaceFilter(e.target.value === '' ? undefined : e.target.value)}
-        >
-          <option value="">{t('board.filter.allProjects')}</option>
-          {state.workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.title || ws.path}</option>)}
-        </select>
-        <select
-          className="dsh-atb-select"
-          value={state.sortBy}
+          onChange={v => controller.setWorkspaceFilter(v === '' ? undefined : v)}
+          options={[
+            { value: '', label: t('board.filter.allProjects') },
+            ...state.workspaces.map(ws => ({ value: ws.id, label: ws.title || ws.path })),
+          ]}
+        />
+        <Select
+          ariaLabel={t('board.sort.title')}
           title={t('board.sort.title')}
-          onChange={e => controller.setSortBy(e.target.value as typeof state.sortBy)}
-        >
-          <option value="default">{t('board.sort.default')}</option>
-          <option value="updated">{t('board.sort.updated')}</option>
-          <option value="urgency">{t('board.sort.urgency')}</option>
-          <option value="created">{t('board.sort.created')}</option>
-          <option value="title">{t('board.sort.byTitle')}</option>
-        </select>
+          value={state.sortBy}
+          onChange={v => controller.setSortBy(v as typeof state.sortBy)}
+          options={[
+            { value: 'default', label: t('board.sort.default') },
+            { value: 'updated', label: t('board.sort.updated') },
+            { value: 'urgency', label: t('board.sort.urgency') },
+            { value: 'created', label: t('board.sort.created') },
+            { value: 'title', label: t('board.sort.byTitle') },
+          ]}
+        />
         {(['urgent', 'normal', 'relaxed'] as const).map(u => (
           <button
             key={u}
@@ -313,14 +319,14 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             setOnlyNeedsHuman(!onlyNeedsHuman)
           }}
         >
-          🙋 {t("board.filter.needsHuman")} {needsHumanCount > 0 ? `(${needsHumanCount})` : ""}
+          <Icon name="hand" /> {t("board.filter.needsHuman")} {needsHumanCount > 0 ? `(${needsHumanCount})` : ""}
         </button>
         <button type="button" className="dsh-atb-btn" onClick={() => controller.toggleSecondary()}>
           {state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
         </button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}>{t('board.action.settings')}</button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.diagTitle')} onClick={() => controller.openDiagnostics()}>{t('board.action.diag')}</button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.importTitle')} onClick={() => controller.openImport()}>{t('board.action.import')}</button>
+        <button type="button" className="dsh-atb-btn" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}><Icon name="settings" /> {t('board.action.settings')}</button>
+        <button type="button" className="dsh-atb-btn" title={t('board.action.diagTitle')} onClick={() => controller.openDiagnostics()}><Icon name="diagnostics" /> {t('board.action.diag')}</button>
+        <button type="button" className="dsh-atb-btn" title={t('board.action.importTitle')} onClick={() => controller.openImport()}><Icon name="import" /> {t('board.action.import')}</button>
         <div className="dsh-atb-newmenu">
           <button
             type="button"
@@ -328,7 +334,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             title={t('board.action.exportTitle')}
             onClick={() => setExportOpen(!exportOpen)}
           >
-            {t('board.action.export')}
+            <Icon name="export" /> {t('board.action.export')} <Icon name="chevronDown" />
           </button>
           {exportOpen && (
             <>
@@ -434,7 +440,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                       <button
                         type="button"
                         className="dsh-atb-colfoldbtn"
-                        title={expandTitle}
+                        title={expandTitle} aria-label={expandTitle}
                         onClick={(e) => {
                           e.stopPropagation()
                           onExpand()
@@ -497,7 +503,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                       <button
                         type="button"
                         className="dsh-atb-colfoldbtn"
-                        title={t('board.column.collapseBacklog')}
+                        title={t('board.column.collapseBacklog')} aria-label={t('board.column.collapseBacklog')}
                         onClick={() => controller.setBacklogCollapsed(true)}
                       >
                         <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
@@ -509,7 +515,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                       <button
                         type="button"
                         className="dsh-atb-colfoldbtn"
-                        title={t('board.column.collapseTodo')}
+                        title={t('board.column.collapseTodo')} aria-label={t('board.column.collapseTodo')}
                         onClick={() => controller.setTodoCollapsed(true)}
                       >
                         <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
@@ -521,7 +527,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                       <button
                         type="button"
                         className="dsh-atb-colfoldbtn"
-                        title={t('board.column.collapseDone')}
+                        title={t('board.column.collapseDone')} aria-label={t('board.column.collapseDone')}
                         onClick={() => controller.setDoneCollapsed(true)}
                       >
                         <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
@@ -538,7 +544,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                           aria-label={t(controller.isWorkspaceGroupCollapsed(status, group.workspaceId) ? 'board.workspace.expand' : 'board.workspace.collapse', { name: group.workspaceName })}
                           title={group.workspaceName}
                           onClick={() => controller.toggleWorkspaceGroup(status, group.workspaceId)}>
-                          <svg className="dsh-atb-ws-group-chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m5 3 5 5-5 5" /></svg>
+                          <span className="dsh-atb-ws-group-chevron"><Icon name="chevronRight" size={12} /></span>
                           <span className="dsh-atb-ws-group-icon">
                             <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="M1.5 3.5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 .8.4L8 4.5h5.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z" />
@@ -648,11 +654,11 @@ function QueuePanel({ controller, onAlert }: { controller: BoardController; onAl
     <div className="dsh-atb-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) controller.closeQueuePanel() }}>
       <div className="dsh-atb-modal dsh-atb-queuepanel" role="dialog" aria-modal="true" aria-label={t('queue.panel.title')}>
         <div className="dsh-atb-modal-head">
-          <span className="dsh-atb-modal-headicon">📋</span>
+          <span className="dsh-atb-modal-headicon"><Icon name="clock" /></span>
           <div className="dsh-atb-modal-headtext">
             <h3>{t('queue.panel.title')}</h3>
           </div>
-          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeQueuePanel()}>✕</button>
+          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeQueuePanel()}><Icon name="close" /></button>
         </div>
         <div className="dsh-atb-modal-body">
           <div className="dsh-atb-diag-grid">
@@ -687,12 +693,12 @@ function DiagnosticsPanel({ controller }: { controller: BoardController }) {
     <div className="dsh-atb-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) controller.closeDiagnostics() }}>
       <div className="dsh-atb-modal dsh-atb-diag" role="dialog" aria-modal="true" aria-label={t('diag.title')}>
         <div className="dsh-atb-modal-head">
-          <span className="dsh-atb-modal-headicon">⚙</span>
+          <span className="dsh-atb-modal-headicon"><Icon name="diagnostics" /></span>
           <div className="dsh-atb-modal-headtext">
             <h3>{t('diag.title')}</h3>
             <p>{t('diag.subtitle')}</p>
           </div>
-          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeDiagnostics()}>✕</button>
+          <button type="button" className="dsh-atb-modal-close" aria-label={t('shared.close')} onClick={() => controller.closeDiagnostics()}><Icon name="close" /></button>
         </div>
         <div className="dsh-atb-modal-body">
           {diag === undefined
@@ -890,7 +896,7 @@ function SecondaryTab({ controller, tasks }: { controller: BoardController; task
                           aria-label={t(controller.isWorkspaceGroupCollapsed(group.dot, wsGroup.workspaceId) ? 'board.workspace.expand' : 'board.workspace.collapse', { name: wsGroup.workspaceName })}
                           title={wsGroup.workspaceName}
                           onClick={() => controller.toggleWorkspaceGroup(group.dot, wsGroup.workspaceId)}>
-                          <svg className="dsh-atb-ws-group-chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m5 3 5 5-5 5" /></svg>
+                          <span className="dsh-atb-ws-group-chevron"><Icon name="chevronRight" size={12} /></span>
                   <span className="dsh-atb-ws-group-icon">
                     <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M1.5 3.5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 .8.4L8 4.5h5.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z" />
