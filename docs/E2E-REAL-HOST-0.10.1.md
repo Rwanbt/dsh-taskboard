@@ -21,4 +21,18 @@ Finding fixed during the run: a **done** prerequisite carrying a pending deletio
 was not counted in "Waiting for Me". Pending approvals now need the human regardless of
 status (trashed cards excepted); test added.
 
-Not exercised: worktree isolation in this run (`isolation: none`), scheduled/cron dispatch.
+## Cron dispatch (same day, 12:51–12:56)
+
+Two periodic tasks, cron `* * * * *`, `periodicCompletion: rearm`, Claude Haiku 5.5:
+F (no prerequisite) and G (`dependsOn` a manual task P, not done).
+
+| Time | Event | Observed |
+| --- | --- | --- |
+| 12:52:35, 12:53:30 | F ticks | F ran each minute (log lines appended), re-armed to todo |
+| 12:52–12:54 | G ticks while P not done | G **not executed**: no execution, no log; run held as `queuedRunAt` |
+| 12:54:07 | user moves P to done | — |
+| 12:54:34 | next tick | G ran (queued run replayed), then every minute (12:55:31) |
+
+Both periodic tasks were then cancelled and deleted.
+
+Not exercised: worktree isolation (`isolation: none` throughout).
