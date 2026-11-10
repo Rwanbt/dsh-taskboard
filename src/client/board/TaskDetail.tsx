@@ -991,7 +991,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
         />
       )}
 
-      {task.external && <ExternalSourcePanel task={task} />}
+      <ExternalSourcePanel task={task} />
 
       {(isReviewOrDone || hasReport) && (
         <>

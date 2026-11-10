@@ -53,6 +53,7 @@ export function ExternalSyncPanel() {
   const [action, setAction] = useState('')
   const [savedDraft, setSavedDraft] = useState<string>()
   const descriptor = status?.providers?.find(p => p.id === providerId)
+  const lastResult = status?.lastResult
   const authentication = descriptor?.authModes.find(m => m.id === authMode)
   const effectiveAccount = providerId === 'zentao' && reuseLogin ? (credentials.username ?? '').trim() : account
   const canKeepCredentials = status?.config?.provider === providerId && status.config.authMode === authMode
@@ -134,7 +135,7 @@ export function ExternalSyncPanel() {
         }}
         options={(status?.providers ?? []).map(p => ({ value: p.id, label: p.name }))}
       /></label>
-      <label>{t('ext.url')}<input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} /></label>
+      <label>{t(providerId === 'zentao' ? 'ext.url' : 'ext.apiUrl')}<input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} /></label>
       {providerId !== 'zentao' && <>
         <label>{t('ext.account')}<input value={account} onChange={e => setAccount(e.target.value)} /></label>
         {!descriptor?.capabilities.accountDiscovery && <p>{t('ext.manualAccount')}</p>}
@@ -230,5 +231,7 @@ export function ExternalSyncPanel() {
     {status?.lastError && <p role="alert">{status.lastError}</p>}
     {status?.lastAttemptAt !== undefined && <p>{t('ext.lastAttempt')}: {new Date(status.lastAttemptAt).toLocaleString()}</p>}
     {status?.lastResult && <p>{t('ext.result', status.lastResult)} · {new Date(status.lastResult.at).toLocaleString()}</p>}
+    {lastResult !== undefined && (lastResult.pushed ?? 0) > 0 && <p>{t('ext.resultPushed', { count: lastResult.pushed ?? 0 })}</p>}
+    {lastResult !== undefined && (lastResult.pushFailed ?? 0) > 0 && <p>{t('ext.resultPushFailed', { count: lastResult.pushFailed ?? 0 })}</p>}
   </section>
 }

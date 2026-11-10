@@ -1,4 +1,5 @@
 import type { SessionArchiveResult } from '../shared/api.ts'
+import type { ExternalPushOutcome, SyncResult } from '../shared/external.ts'
 import { archiveTaskSessions } from './archive-sessions.ts'
 import { applyHumanWaitingPatch, humanWaiting } from '../shared/human-wait.ts'
 import { buildDependencyIndex, DependencyError, dependencyState, downstreamDependents, prerequisiteDetails, validateDependencies } from '../shared/dependencies.ts'
@@ -300,6 +301,12 @@ export function workspaceFace(registry: WorkspaceRegistry): WorkspaceFace {
   }
 }
 
+/** Narrow external-sync face the agent tool needs (the service satisfies it structurally). */
+export interface ExternalSyncFace {
+  sync(): Promise<SyncResult>
+  pushTask(taskId: string, scope?: string): Promise<ExternalPushOutcome>
+}
+
 /** Everything the tool set needs. */
 export interface ToolDeps {
   store: TaskStore
@@ -320,6 +327,11 @@ export interface ToolDeps {
    * multi-root support, so only the primary root can ever claim.
    */
   linkedRoots?: (cwd: string) => Promise<readonly string[] | undefined> | readonly string[] | undefined
+  /**
+   * External tracker sync service getter. Undefined until the host wiring
+   * completes, so the tool stays registered and reports a stable error.
+   */
+  externalSync?: () => ExternalSyncFace | undefined
 }
 
 /** Validate a pinned model: structural check always, provider route when known. */
@@ -1449,6 +1461,52 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           throw new ToolError(ERR.forbidden, 'no running execution and no settled execution of yours to report on — reports attach to your running execution, or back-submit onto your latest succeeded one while you hold the task')
         }
         return json({ taskId, executionId, report })
+      } catch (error) { fail(error) }
+    },
+  })) as () => void)
+
+  // --------------------------------------------------------- external sync
+  disposers.push(register(defineTool({
+    name: 'taskboard_external_sync',
+    description:
+      'Run the configured external tracker sync (GitHub issues, ZenTao or TAPD): pull remote work items into the '
+      + 'board, then push local card changes back when the provider supports write-back (GitHub). '
+      + 'Pass taskId to push ONE card instead: a linked card updates its remote issue, an unlinked card gets a new '
+      + 'remote issue linked to it. Requires a saved connection in Settings → External sync. '
+      + 'Returns pull and push counters, or the pushed fields for a single card.',
+    parameters: {
+      taskId: { type: 'string', description: 'Push only this card (optional). Omit to run the full connection sync.' },
+      scope: { type: 'string', description: 'Remote scope for this push (GitHub: owner/repo). Only needed when several scopes map to the card\'s project.' },
+    },
+    output: {
+      schema: JSON_OUT,
+      render: (_args, value) => {
+        const v = value as { mode?: string; taskId?: string; created?: number; updated?: number; unchanged?: number
+          conflicts?: number; ignored?: number; pushed?: number; pushFailed?: number
+          pushedFields?: string[]; item?: { type?: string; id?: string; url?: string } }
+        if (v.mode === 'push') {
+          const fields = v.pushedFields ?? []
+          if (fields.length === 0) return [{ type: 'text', text: `外部同步：任务 ${v.taskId ?? '?'} 无需推送的修改。` }]
+          const target = v.item?.url === undefined ? '' : `（${v.item.url}）`
+          return [{ type: 'text', text: `外部同步：任务 ${v.taskId ?? '?'} 已推送 ${fields.join(', ')}${target}。` }]
+        }
+        return [{ type: 'text', text: `外部同步完成：拉取新建 ${v.created ?? 0} · 更新 ${v.updated ?? 0} · 冲突 ${v.conflicts ?? 0}`
+          + ` · 忽略 ${v.ignored ?? 0} · 推送 ${v.pushed ?? 0} · 推送失败 ${v.pushFailed ?? 0}。` }]
+      },
+    },
+    async execute(args: { taskId?: string; scope?: string }) {
+      try {
+        const service = deps.externalSync?.()
+        if (service === undefined) throw new ToolError(ERR.invalidInput, 'external sync is not available in this host')
+        if (args.taskId === undefined) {
+          if (args.scope !== undefined) throw new ToolError(ERR.invalidInput, 'scope requires taskId')
+          return json({ mode: 'sync', ...await service.sync() })
+        }
+        const outcome = await service.pushTask(args.taskId, args.scope)
+        return json({
+          mode: 'push', taskId: args.taskId, created: outcome.created, pushedFields: outcome.pushed,
+          item: { type: outcome.item.type, id: outcome.item.id, url: outcome.item.url, status: outcome.item.status },
+        })
       } catch (error) { fail(error) }
     },
   })) as () => void)

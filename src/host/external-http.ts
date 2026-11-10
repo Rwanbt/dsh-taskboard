@@ -1,10 +1,28 @@
 /** Shared bounded read-only HTTP transport. Never includes server bodies/credentials in errors. */
 export async function externalGet(request: typeof fetch, url: string, headers: Record<string, string>, signal: AbortSignal, beforeRequest?: () => Promise<void>): Promise<unknown> {
+  return (await externalSend(request, url, { method: 'GET', headers }, signal, beforeRequest)).body
+}
+
+/** Bounded write-capable transport for opt-in write-back providers. */
+export async function externalSend(
+  request: typeof fetch,
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: unknown },
+  signal: AbortSignal,
+  beforeRequest?: () => Promise<void>,
+): Promise<{ body: unknown; headers: Headers }> {
+  const payload = init.body === undefined ? undefined : JSON.stringify(init.body)
   for (let attempt = 0; ; attempt++) {
     signal.throwIfAborted()
     await beforeRequest?.()
-    const response = await request(url, { headers: { ...headers, Accept: 'application/json' }, signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]), redirect: 'error' })
-    if ((response.status === 429 || response.status >= 500) && attempt < 2) {
+    const response = await request(url, {
+      method: init.method,
+      headers: { ...init.headers, Accept: 'application/json', ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      ...(payload === undefined ? {} : { body: payload }),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]), redirect: 'error',
+    })
+    const rateLimited = response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0'
+    if ((response.status === 429 || response.status >= 500 || rateLimited) && attempt < 2) {
       const retry = response.headers.get('retry-after')
       const seconds = retry && /^\d+$/.test(retry) ? Math.min(Number(retry), 30) : 2 ** attempt
       await response.body?.cancel()
@@ -16,8 +34,8 @@ export async function externalGet(request: typeof fetch, url: string, headers: R
       })
       continue
     }
-    if (!response.ok) throw new Error(`External request failed (HTTP ${response.status})`)
-    try { return await response.json() }
+    if (!response.ok) { await response.body?.cancel(); throw new Error(`External request failed (HTTP ${response.status})`) }
+    try { return { body: await response.json(), headers: response.headers } }
     catch { throw new Error('External service returned invalid JSON') }
   }
 }

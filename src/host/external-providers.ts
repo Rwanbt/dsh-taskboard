@@ -2,6 +2,7 @@ import type { ExternalConfig } from '../shared/external.ts'
 import { ExternalProviderRegistry } from './external-provider.ts'
 import { ZentaoProvider } from './zentao.ts'
 import { TapdProvider } from './tapd.ts'
+import { GithubProvider } from './github.ts'
 
 const validateNumericProjects = (config: ExternalConfig) => {
   if (config.mappings.some(m => !/^\d+$/.test(m.projectId))) throw new Error('provider requires numeric project IDs')
@@ -42,5 +43,20 @@ export function createBuiltinProviders(): ExternalProviderRegistry {
       if (config.authMode === 'basic' && config.credentials.apiUser?.includes(':')) throw new Error('API username cannot contain a colon')
     },
     create: config => new TapdProvider(config),
+  }).register({
+    descriptor: { id: 'github', name: 'GitHub', scopeLabel: 'ext.repoScope', defaultBaseUrl: 'https://api.github.com',
+      settingsFields: [
+        { key: 'urgentLabels', label: 'ext.urgentLabels', defaultValue: 'urgent,priority: urgent,priority/urgent,p0,p1,紧急' },
+        { key: 'relaxedLabels', label: 'ext.relaxedLabels', defaultValue: 'low,minor,priority: low,低' },
+      ],
+      authModes: [
+        { id: 'token', label: 'ext.githubToken', fields: [{ key: 'token', label: 'ext.githubToken' }] },
+      ],
+      capabilities: { itemTypes: ['issue'], projectDiscovery: true, accountDiscovery: true, pagination: 'page', incremental: true, write: true } },
+    validate: config => {
+      if (config.authMode !== 'token') throw new Error('unsupported GitHub authentication mode')
+      if (config.mappings.some(m => !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(m.projectId))) throw new Error('GitHub scopes must be owner/repo')
+    },
+    create: config => new GithubProvider(config),
   })
 }

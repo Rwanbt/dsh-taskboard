@@ -1,11 +1,11 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { ExternalItem, ExternalSource, ExternalSyncRecord } from '../shared/external.ts'
+import type { ExternalItem, ExternalPushField, ExternalPushOutcome, ExternalPushPatch, ExternalSource, ExternalSyncRecord } from '../shared/external.ts'
 import { externalKey, mergeExternalFields, normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
 import { defaultIsolationOf, defaultPermissionOf, newTaskId, normalizeTitle, type TaskRecord, type TaskLedger } from '../shared/protocol.ts'
 import type { TaskStore } from './store.ts'
 import type { ExternalConfig, ExternalSyncStatus, SyncResult } from '../shared/external.ts'
-import type { ExternalTaskProvider, ExternalProviderRegistry } from './external-provider.ts'
+import type { ExternalTaskProvider, ExternalProviderRegistry, ExternalWriteProvider } from './external-provider.ts'
 import { createBuiltinProviders } from './external-providers.ts'
 import { normalizeConnection } from './external-config.ts'
 export type { ExternalConfig, SyncResult } from '../shared/external.ts'
@@ -278,6 +278,14 @@ export class ExternalSyncService {
         committed = true
         this.volatileError = undefined
       })
+      // Opt-in outbound phase. It runs only after the inbound merge committed,
+      // so `task.external.item` is the freshest remote base for every diff.
+      if (this.registry.get(config.provider).descriptor.capabilities.write === true) {
+        result.pushed = 0
+        result.pushFailed = 0
+        await this.pushLinked(config, signal, result)
+        await this.recordResult(config, result)
+      }
       return result
     } catch (error) {
       // Never expose server bodies or request URLs (which may contain credentials).
@@ -292,5 +300,134 @@ export class ExternalSyncService {
       } catch { this.volatileError = `${message} Sync status could not be saved.` }
       throw new Error(this.volatileError, { cause: error })
     } finally { this.running = false; this.controller = undefined }
+  }
+  /** Fail closed: write-back requires both the descriptor flag and the methods. */
+  private writeProvider(config: ExternalConfig): ExternalWriteProvider {
+    if (this.registry.get(config.provider).descriptor.capabilities.write !== true) throw new Error('this provider does not support write-back')
+    const provider = this.provider(config) as Partial<ExternalWriteProvider>
+    if (typeof provider.createItem !== 'function' || typeof provider.updateItem !== 'function') throw new Error('provider write-back is unavailable')
+    return provider as ExternalWriteProvider
+  }
+  /**
+   * Compare a card with its last-known remote item. Conflicts are never
+   * overwritten, running executions are never raced, and reopening a remote
+   * item stays an explicit remote action.
+   */
+  private planPush(task: TaskRecord): { patch: ExternalPushPatch; fields: ExternalPushField[] } | undefined {
+    const source = task.external
+    if (source === undefined) return undefined
+    if (task.executions.some(execution => execution.outcome === 'running')) return undefined
+    const conflicts = new Set(source.conflicts)
+    const patch: ExternalPushPatch = {}
+    const fields: ExternalPushField[] = []
+    if (task.title !== source.item.title && !conflicts.has('title')) { patch.title = task.title; fields.push('title') }
+    if (task.description !== source.item.description && !conflicts.has('description')) { patch.description = task.description; fields.push('description') }
+    if ((task.status === 'done' || task.status === 'canceled') && !source.item.closed) {
+      patch.close = task.status === 'canceled' ? 'not_planned' : 'completed'
+      fields.push('state')
+    }
+    return fields.length === 0 ? undefined : { patch, fields }
+  }
+  private async pushLinked(config: ExternalConfig, signal: AbortSignal, result: SyncResult): Promise<void> {
+    const write = this.writeProvider(config)
+    const pending = this.options.store.snapshot().tasks.filter(task =>
+      task.external?.connectionId === config.id && task.trashedAt === undefined && task.status !== 'archived')
+    const completed: Array<{ id: string; version: number; source: ExternalSource }> = []
+    for (const task of pending) {
+      signal.throwIfAborted()
+      const plan = this.planPush(task)
+      if (plan === undefined) continue
+      try {
+        const item = await write.updateItem(task.external!.item.projectId, task.external!.item.type, task.external!.item.id, plan.patch, signal)
+        const source = normalizeExternalSource({ connectionId: config.id, provider: config.provider,
+          providerName: this.registry.get(config.provider).descriptor.name, item, syncedAt: this.now(), conflicts: task.external!.conflicts })
+        if (source === undefined) throw new Error('provider returned an invalid work item')
+        completed.push({ id: task.id, version: task.version, source })
+        result.pushed = (result.pushed ?? 0) + 1
+      } catch {
+        if (signal.aborted) throw new Error('request aborted')
+        result.pushFailed = (result.pushFailed ?? 0) + 1
+      }
+    }
+    if (completed.length === 0) return
+    await this.serial(async () => {
+      await this.options.store.mutate('task-updated', ledger => {
+        const changed: TaskRecord[] = []
+        for (const entry of completed) {
+          const task = ledger.tasks.find(candidate => candidate.id === entry.id)
+          // A card edited while its push was in flight keeps the newer local edits.
+          if (task === undefined || task.trashedAt !== undefined || task.version !== entry.version) continue
+          task.external = entry.source
+          task.version++; task.updatedAt = this.now(); task.updatedBy = { kind: 'user' }
+          changed.push(task)
+        }
+        return changed
+      })
+    })
+  }
+  private async recordResult(config: ExternalConfig, result: SyncResult): Promise<void> {
+    await this.serial(async () => this.options.store.mutate('external-sync-updated', ledger => {
+      const record = this.record(ledger, config.id)
+      record.lastResult = result; record.lastAttemptAt = this.lastAttempt; delete record.lastError
+      return []
+    }))
+  }
+  private mappingFor(config: ExternalConfig, workspaceId: string, scope?: string): { projectId: string; workspaceId: string } {
+    const candidates = config.mappings.filter(mapping => mapping.workspaceId === workspaceId && (scope === undefined || mapping.projectId === scope))
+    if (scope !== undefined && candidates.length === 0) throw new Error('the chosen scope is not mapped to this project')
+    if (candidates.length === 0) throw new Error('this project has no mapped external scope; configure a mapping first')
+    if (candidates.length > 1) throw new Error('multiple external scopes are mapped to this project; pass a scope')
+    return candidates[0]!
+  }
+  /** Push one card (or create and link a remote item for an unlinked card). */
+  async pushTask(taskId: string, scope?: string): Promise<ExternalPushOutcome> {
+    await this.ready
+    if (this.disposed) throw new Error('sync service stopped')
+    if (this.running) throw new Error('sync is already running')
+    if (!this.state.config) throw new Error('configure a connection first')
+    const config = structuredClone(this.state.config)
+    const write = this.writeProvider(config)
+    const signal = AbortSignal.timeout(120_000)
+    this.running = true
+    try {
+      const snapshot = this.options.store.snapshot()
+      const task = snapshot.tasks.find(candidate => candidate.id === taskId)
+      if (task === undefined || task.trashedAt !== undefined) throw new Error('task not found')
+      if (task.external !== undefined) {
+        if (task.external.connectionId !== config.id) throw new Error('task is linked to another external connection')
+        const plan = this.planPush(task)
+        if (plan === undefined) return { created: false, pushed: [], item: task.external.item }
+        const item = await write.updateItem(task.external.item.projectId, task.external.item.type, task.external.item.id, plan.patch, signal)
+        const source = normalizeExternalSource({ connectionId: config.id, provider: config.provider,
+          providerName: this.registry.get(config.provider).descriptor.name, item, syncedAt: this.now(), conflicts: task.external.conflicts })
+        if (source === undefined) throw new Error('provider returned an invalid work item')
+        await this.serial(async () => this.options.store.mutate('task-updated', ledger => {
+          const current = ledger.tasks.find(candidate => candidate.id === task.id)
+          if (current === undefined || current.trashedAt !== undefined) throw new Error('task not found')
+          current.external = source; current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
+          return [current]
+        }))
+        return { created: false, pushed: plan.fields, item }
+      }
+      const mapping = this.mappingFor(config, task.workspaceId, scope)
+      let item = await write.createItem(mapping.projectId, { title: task.title, description: task.description, urgency: task.urgency }, signal)
+      const close = task.status === 'done' || task.status === 'canceled'
+      if (close) item = await write.updateItem(item.projectId, item.type, item.id, { close: task.status === 'canceled' ? 'not_planned' : 'completed' }, signal)
+      const source = normalizeExternalSource({ connectionId: config.id, provider: config.provider,
+        providerName: this.registry.get(config.provider).descriptor.name, item, syncedAt: this.now(), conflicts: [] })
+      if (source === undefined) throw new Error('provider returned an invalid work item')
+      await this.serial(async () => this.options.store.mutate('task-updated', ledger => {
+        const current = ledger.tasks.find(candidate => candidate.id === task.id)
+        if (current === undefined || current.trashedAt !== undefined) throw new Error('task not found')
+        if (current.external !== undefined) throw new Error('task was linked by another sync; refresh and retry')
+        const key = externalKey(config.id, source.item)
+        const record = this.record(ledger, config.id)
+        record.links[key] = current.id
+        record.ignored = record.ignored.filter(entry => entry !== key)
+        current.external = source; current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
+        return [current]
+      }))
+      return { created: true, pushed: ['title', 'description', ...(close ? ['state' as const] : [])], item }
+    } finally { this.running = false }
   }
 }

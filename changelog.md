@@ -1,5 +1,19 @@
 # 更新日志 / Changelog
 
+### 0.11.0 — 2026-11-10
+
+- **GitHub Issues 同步（可回写）**：新增 GitHub 提供方，按 `owner/repo` 仓库映射本地项目，导入分配给同步账号的议题（忽略 Pull Request，可按起始日期过滤）。设置里可用令牌识别当前账号并同步仓库清单。
+- **双向同步**：每轮同步先拉取再回写，且回写按次开启、只作用于已关联议题的卡片——本地标题/描述修改会推送，`done` 以 *completed*、`canceled` 以 *not planned* 关闭议题；不自动重开远端，卡片有执行中的运行或未解决冲突时不推送。未关联卡片可在详情面板「创建外部议题」逐张推送，多个仓库映射时可选择目标仓库。
+- **Agent 工具**：新增 `taskboard_external_sync`：不带参数执行整轮同步，带 `taskId` 推送单张卡片（无关联时创建并关联议题）。
+- **安全与兼容**：回写能力由 provider 描述符声明，禅道/TAPD 仍为只读；推送失败按条计数且不泄露上游响应体；同步结果新增推送/失败计数并持久化。i18n 新增中/英/俄文案。
+
+**English:**
+
+- **GitHub Issues sync with write-back**: new GitHub provider mapping `owner/repo` repositories to local projects; imports issues assigned to the sync account (pull requests ignored, optional start date). Settings identify the token account and discover repositories.
+- **Bidirectional sync**: each round pulls first and then pushes, opt-in and limited to cards already linked to an issue — local title/description edits are pushed, `done` closes the issue as *completed* and `canceled` as *not planned*; remote issues are never reopened automatically, and cards with a running execution or an unresolved conflict are never pushed. Unlinked cards can be pushed one by one from the detail pane ("Create external issue"), with a target repository picker when several repositories map to the project.
+- **Agent tool**: `taskboard_external_sync` — no arguments runs the whole connection sync, a `taskId` pushes one card (creating and linking an issue when none exists).
+- **Safety and compatibility**: write-back is declared by the provider descriptor, so ZenTao/TAPD stay read-only; push failures are counted per card without leaking upstream response bodies; sync results persist pushed/failed counters. New zh/en/ru strings.
+
 ### 0.10.2 — 2026-11-09
 
 - **Worktree 自动提交**：沙箱中的 agent 无法在 worktree 内 `git commit`；结算时由宿主自动提交剩余改动（固定身份 dsh-taskboard），工作不再滞留为未提交状态。

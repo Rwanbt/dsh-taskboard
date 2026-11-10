@@ -1,4 +1,4 @@
-import type { ExternalAccount, ExternalConfig, ExternalItem, ExternalProject, ProviderDescriptor } from '../shared/external.ts'
+import type { ExternalAccount, ExternalConfig, ExternalFields, ExternalItem, ExternalProject, ExternalPushPatch, ProviderDescriptor } from '../shared/external.ts'
 
 /** Providers own transport, platform authentication and normalization, never TaskStore writes. */
 export type ExternalReadContext = { existing: ReadonlyMap<string, { item: ExternalItem; metadataOnly: boolean }> }
@@ -8,6 +8,11 @@ export interface ExternalTaskProvider {
   getItem?(projectId: string, type: string, id: string, signal: AbortSignal): Promise<ExternalItem | undefined>
   listProjects?(signal: AbortSignal): Promise<ExternalProject[]>
   getAccount?(signal: AbortSignal): Promise<ExternalAccount>
+}
+/** Opt-in write-back surface (`capabilities.write`). Read-only providers never implement it. */
+export interface ExternalWriteProvider {
+  createItem(projectId: string, fields: ExternalFields, signal: AbortSignal): Promise<ExternalItem>
+  updateItem(projectId: string, type: string, id: string, patch: ExternalPushPatch, signal: AbortSignal): Promise<ExternalItem>
 }
 export type ProviderDefinition = {
   descriptor: ProviderDescriptor

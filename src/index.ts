@@ -98,6 +98,9 @@ export function apply(ctx: Context): void {
   // provider's prefix cache; calls use the live workspace service below.
   let activeWorkspaces: WorkspaceFace | undefined
   let activeWorkspaceContext: Context | undefined
+  // Created with the workspace registry below; the tool schema is registered
+  // before that and resolves it lazily on each call.
+  let externalSyncService: ExternalSyncService | undefined
   const requireWorkspaces = (): WorkspaceFace => {
     if (activeWorkspaces === undefined) {
       throw new ToolError(ERR.notReady, 'workspace service is not ready; retry after host startup completes')
@@ -142,6 +145,7 @@ export function apply(ctx: Context): void {
     now,
     modelProviders,
     linkedRoots,
+    externalSync: () => externalSyncService,
     ready: async () => {
       if (activeWorkspaces === undefined) {
         throw new ToolError(ERR.notReady, 'workspace service is not ready; retry after host startup completes')
@@ -293,10 +297,11 @@ export function apply(ctx: Context): void {
         workspaceExists: id => workspaces.get(id) !== undefined,
         registry: createBuiltinProviders(),
       })
+      externalSyncService = externalSync
       void storeReady.then(() => externalSync.start()).catch(error => {
         console.warn(`[dsh-taskboard] external sync startup skipped; storage unavailable (${storage.directory()}):`, error)
       })
-      agentDisposers.push(() => externalSync.dispose())
+      agentDisposers.push(() => { externalSyncService = undefined; externalSync.dispose() })
       let disposeRoutes: (() => void) | undefined
       agentCtx.inject(['webServer'], (webCtx: Context) => {
         disposeRoutes = registerTaskboardRoutes(webCtx, {

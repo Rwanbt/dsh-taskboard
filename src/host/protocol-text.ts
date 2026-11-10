@@ -15,7 +15,7 @@ export const TASKBOARD_PROTOCOL = [
   '本机已安装 dsh-taskboard 插件（DSH 任务看板）：任务挂在项目（DSH workspace）上，',
   '用 taskboard_* 工具读写；人在 Web GUI 看板上实时看到同样数据。能力：查板(list/get)、',
   '建卡(create)、改卡(update)、移卡(move)、评论(comment_add/comments)、删除(delete=仅标记)、',
-  '验收清单(checklist)、执行报告(execution_report)。',
+  '验收清单(checklist)、执行报告(execution_report)、外部同步(sync：拉取/回写 GitHub 等外部跟踪器)。',
   '任务带紧急度(urgent红/normal紫/relaxed蓝)、执行方式(claim认领/scheduled定时)与可选指定模型。',
   '工作纪律：',
   '1. 开工先查板：开始工作前先 taskboard_list（按本项目过滤、status=todo），有可认领任务时按纪律认领。',

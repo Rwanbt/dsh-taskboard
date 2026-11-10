@@ -758,6 +758,11 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
           else if (pathname === `${ROUTE_PREFIX}/external/projects`) value = await options.externalSync.discoverProjects(body)
           else if (pathname === `${ROUTE_PREFIX}/external/account`) value = await options.externalSync.discoverAccount()
           else if (pathname === `${ROUTE_PREFIX}/external/sync`) value = await options.externalSync.sync()
+          else if (pathname === `${ROUTE_PREFIX}/external/push`) {
+            if (typeof body.taskId !== 'string' || body.taskId.length === 0) throw new Error('invalid push request')
+            if (body.scope !== undefined && (typeof body.scope !== 'string' || body.scope.length === 0)) throw new Error('invalid push scope')
+            value = await options.externalSync.pushTask(body.taskId, body.scope)
+          }
           else if (pathname === `${ROUTE_PREFIX}/external/cancel`) options.externalSync.cancel()
           else if (pathname === `${ROUTE_PREFIX}/external/ignored/clear`) await options.externalSync.clearIgnored()
           else if (pathname === `${ROUTE_PREFIX}/external/resolve`) {

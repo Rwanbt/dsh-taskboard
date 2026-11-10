@@ -6,7 +6,8 @@ export type ProviderDescriptor = {
   defaultBaseUrl: string
   settingsFields?: Array<{ key: string; label: string; defaultValue: string }>
   authModes: Array<{ id: string; label: string; fields: Array<{ key: string; label: string; secret?: boolean }> }>
-  capabilities: { itemTypes: string[]; projectDiscovery: boolean; accountDiscovery: boolean; pagination: 'page' | 'cursor'; incremental: boolean }
+  /** `write` enables the opt-in outbound phase (create/update/close remote items). */
+  capabilities: { itemTypes: string[]; projectDiscovery: boolean; accountDiscovery: boolean; pagination: 'page' | 'cursor'; incremental: boolean; write?: boolean }
 }
 export type ExternalConnection = {
   id: string; provider: string; baseUrl: string; account: string; authMode: string
@@ -20,7 +21,12 @@ export type ExternalConnection = {
 export type ExternalConfig = ExternalConnection & { credentials: Record<string, string> }
 export type ExternalProject = { id: string; name: string }
 export type ExternalAccount = { account: string; name?: string }
-export type SyncResult = { created: number; updated: number; unchanged: number; conflicts: number; ignored: number; at: number }
+export type SyncResult = {
+  created: number; updated: number; unchanged: number; conflicts: number; ignored: number; at: number
+  /** Outbound counters, present only after a push-capable sync. */
+  pushed?: number
+  pushFailed?: number
+}
 export type ExternalSyncRecord = {
   links: Record<string, string>; ignored: string[]; lastResult?: SyncResult; lastError?: string; lastAttemptAt?: number
 }
@@ -33,8 +39,12 @@ export function normalizeExternalSyncRecords(raw: unknown): Record<string, Exter
       ? Object.fromEntries(Object.entries(e.links).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : {}
     const ignored = Array.isArray(e.ignored) ? [...new Set(e.ignored.filter((v): v is string => typeof v === 'string'))] : []
     const r = e.lastResult as Record<string, unknown> | undefined
-    const lastResult = r && typeof r === 'object' && ['created', 'updated', 'unchanged', 'conflicts', 'ignored', 'at'].every(k => typeof r[k] === 'number' && Number.isFinite(r[k]) && (r[k] as number) >= 0)
-      ? { created: r.created as number, updated: r.updated as number, unchanged: r.unchanged as number, conflicts: r.conflicts as number, ignored: r.ignored as number, at: r.at as number } : undefined
+    const nonNegative = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
+    const lastResult = r && typeof r === 'object' && ['created', 'updated', 'unchanged', 'conflicts', 'ignored', 'at'].every(k => nonNegative(r[k]))
+      && nonNegative(r.pushed ?? 0) && nonNegative(r.pushFailed ?? 0)
+      ? { created: r.created as number, updated: r.updated as number, unchanged: r.unchanged as number, conflicts: r.conflicts as number,
+        ignored: r.ignored as number, at: r.at as number,
+        ...(nonNegative(r.pushed) ? { pushed: r.pushed } : {}), ...(nonNegative(r.pushFailed) ? { pushFailed: r.pushFailed } : {}) } : undefined
     return [[id, { links, ignored, ...(lastResult ? { lastResult } : {}),
       ...(typeof e.lastError === 'string' ? { lastError: e.lastError } : {}),
       ...(typeof e.lastAttemptAt === 'number' && Number.isFinite(e.lastAttemptAt) ? { lastAttemptAt: e.lastAttemptAt } : {}) }]]
@@ -48,6 +58,10 @@ export type ExternalSyncStatus = {
   requiresMappingReview?: boolean
 }
 export type ExternalFields = { title: string; description: string; urgency: 'urgent' | 'normal' | 'relaxed' }
+/** Outbound patch for one linked remote item. `close` is a terminal local state. */
+export type ExternalPushPatch = { title?: string; description?: string; close?: 'completed' | 'not_planned' }
+export type ExternalPushField = 'title' | 'description' | 'state'
+export type ExternalPushOutcome = { created: boolean; pushed: ExternalPushField[]; item: ExternalItem }
 export type ExternalItem = ExternalFields & {
   projectId: string
   type: string

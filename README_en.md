@@ -125,6 +125,7 @@ Available in any session. Project boundary: only sessions belonging to the task'
 | `taskboard_delete` | Soft delete (purge available; running executions cannot be deleted) |
 | `taskboard_checklist` | Acceptance checklist add / check (with evidence) / uncheck |
 | `taskboard_execution_report` | Submit the structured execution report, attached to the current execution |
+| `taskboard_external_sync` | Run the configured external sync (pull, plus GitHub write-back); pass `taskId` to push one card |
 
 **Project argument (0.9.5)**: `workspaceId` in `taskboard_list` and `taskboard_create` accepts a project ID or the absolute path of a registered project root (for example, `D:\work\my-project`). Relative paths and unregistered subdirectories do not identify the project root. Created tasks always store the project ID. Unknown projects fail with `not_found` and correction hints; registered projects without tasks still return zero rows, and omitting the list project filter still lists all projects.
 
@@ -258,7 +259,7 @@ For local development, build first, then link the local repository with `dsh plu
 
 ## External task sync
 
-ZenTao supports project or execution/iteration mapping for Bugs, Stories and Tasks. TAPD supports Bugs, Stories and Tasks. Both ZenTao modes have passed read-only real-deployment checks; TAPD remains locally mock-validated.
+ZenTao supports project or execution/iteration mapping for Bugs, Stories and Tasks. TAPD supports Bugs, Stories and Tasks. GitHub supports repository mapping for Issues, including opt-in write-back. ZenTao's two modes have passed read-only real-deployment checks; TAPD and GitHub remain locally mock-validated.
 
 1. Open **External sync** in settings. ZenTao uses its installation URL without `/api.php/v1`, username and password. Reuse the login username as assignee by default, or enter another assignee. TAPD uses API Basic Auth or Bearer Token and a separate member nickname.
 2. Select the **Sync scope** (Bugs, Stories, Tasks), import destination (Backlog or Todo) and polling interval (0 disables polling; otherwise 5–1440 minutes).
@@ -270,9 +271,17 @@ Project mode reads project Bugs/Stories and aggregates Tasks from all project ex
 
 **Sync unlinked projects** / **Sync unlinked executions/iterations** is off by default. When enabled, every scan discovers all readable scopes, including newly created entries and rows without local associations. New cards from those scopes have no local project; linked scopes still use their configured destination. After a scope is associated and saved, the next sync fills empty card destinations without creating duplicates. Nonempty destinations, archived cards and trashed cards are preserved. Saving with no associations is supported in this mode. Turning it off stops future unlinked scans without deleting cards.
 
+### GitHub Issues
+
+Select **GitHub**, the API base URL (`https://api.github.com`, or `https://<host>/api/v3` on GitHub Enterprise) and a token: a classic PAT with `repo` (or `public_repo` for public repositories) or a fine-grained token with **Issues: read and write**. The sync account is the GitHub login used to filter imported issues; **Identify current account** fills it from the token. Choose item type **Issues**, a start date, an import destination and a polling interval (0 disables polling), then **Sync project list** and map each `owner/repo` repository to a local project. Pull requests returned by the issues endpoint are ignored.
+
+Pull requests aside, the sync imports open issues **assigned to the sync account** into the selected destination as non-executing cards; later syncs update the linked cards. Changing an issue's title/body remotely follows the same three-way merge and conflict rules as ZenTao.
+
+Write-back is opt-in per sync and runs at the end of each sync, only for cards already linked to an issue: a changed title or description is pushed, `done` closes the issue as *completed* and `canceled` closes it as *not planned*. It never reopens a remote issue, never pushes while a card has a running execution, and never overwrites an unresolved conflict. Cards without a link can be pushed one by one from the detail pane (**Create external issue**, with a target repository picker when several repositories map to the project), and agents can call `taskboard_external_sync` (whole connection) or `taskboard_external_sync` with `taskId` (single card). Comments, assignees, labels and remote closures other than the board's own terminal states are not written back.
+
 Old ZenTao connections without a mapping mode retain credentials and tasks but pause automatic sync and require reassociation. Product IDs are never reinterpreted as project IDs. Refresh, associate and save to resume.
 
-Credentials remain in the host-only plaintext `dsh-taskboard-external.json` under active DSH_HOME; protect this file. Passwords/tokens are excluded from public status and task exports. ZenTao obtains in-memory tokens; old token-only configurations are unsupported. Task and sync metadata persistence is atomic. One active connection is supported; screenshots, attachments, webhooks and write-back are excluded.
+Credentials remain in the host-only plaintext `dsh-taskboard-external.json` under active DSH_HOME; protect this file. Passwords/tokens are excluded from public status and task exports. ZenTao obtains in-memory tokens; old token-only configurations are unsupported. Task and sync metadata persistence is atomic. One active connection is supported; screenshots, attachments, webhooks and bidirectional comment sync are excluded, and write-back is currently limited to GitHub Issues.
 
 Real-deployment validation on 2026-10-16 read 4 Bugs, 4 linked Stories and 8 Tasks in project mode, with corresponding execution results. Each mode imported 2 Bugs and 2 Tasks for admin; repeat scans created or updated nothing. No Stories were assigned to that account, so assigned Story imports remain covered by mock tests. Only temporary local ledgers were written; tracker business data was not changed.
 

@@ -104,7 +104,13 @@ describe('provider-driven external UI', () => {
     const host = document.createElement('div'); document.body.append(host); root = createRoot(host)
     await act(async () => { root!.render(createElement(ExternalSyncPanel)) })
     await act(async () => {
-      await waitFor(() => host.querySelectorAll('.dsh-atb-sel').length > 0 && selectOptionLabels(selectByIndex(host, 0)).length === 2)
+      // Wait until the provider select is populated from the descriptors; the
+      // provider set itself is host-owned and grows with new integrations.
+      await waitFor(() => {
+        if (host.querySelectorAll('.dsh-atb-sel').length === 0) return false
+        const labels = selectOptionLabels(selectByIndex(host, 0))
+        return labels.includes('ZenTao') && labels.includes('TAPD')
+      })
     })
     const selects = () => [...host.querySelectorAll<SelectTrigger>('.dsh-atb-sel')]
     await choose(selects()[0]!, 'TAPD')
