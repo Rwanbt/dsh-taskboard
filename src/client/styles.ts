@@ -74,10 +74,10 @@ body {
 .dsh-atb-picon { position: relative; display: inline-flex; }
 button[class*="panelRow"]:has(.dsh-atb-pglyph) { position: relative; }
 .dsh-atb-pstats {
-  position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 9px; top: 50%; transform: translateY(calc(-50% - 1px));
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 11px; line-height: 1; color: var(--atb-text-2, gray);
-  font-variant-numeric: tabular-nums; white-space: nowrap; cursor: help;
+  font-variant-numeric: tabular-nums; white-space: nowrap; cursor: default;
 }
 .dsh-atb-psep { opacity: .5; }
 .dsh-atb-pstats [data-stat="todo"] { color: var(--atb-accent); }
@@ -88,7 +88,14 @@ button[class*="panelRow"]:has(.dsh-atb-pglyph) { position: relative; }
   min-width: 13px; height: 13px; padding: 0 3px;
   border-radius: 7px; background: var(--atb-accent); color: #fff;
   font-size: 9px; line-height: 13px; text-align: center;
-  font-variant-numeric: tabular-nums; pointer-events: none;
+  font-variant-numeric: tabular-nums; cursor: default;
+}
+.dsh-atb-stats-tooltip {
+  position: fixed; z-index: 1100; width: max-content;
+  max-width: min(50vw, calc(100vw - 24px)); padding: 3px 7px;
+  border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-static-neutral-bluish-00); font-size: 13px; line-height: 20px;
+  white-space: pre-line; pointer-events: none; transform: translateY(-50%);
 }
 
 .dsh-atb-search { width: 130px; }

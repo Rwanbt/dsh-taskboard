@@ -49,6 +49,26 @@ function makeBoardPage(controller: BoardController): (props: Record<string, unkn
 
 // ------------------------------------------------------------------ icon
 
+// Shared across renders: entering another counter always removes the old bubble.
+let statsTooltip: HTMLDivElement | undefined
+function hideStatsTooltip(): void {
+  statsTooltip?.remove()
+  statsTooltip = undefined
+}
+function showStatsTooltip(event: React.PointerEvent<HTMLSpanElement>): void {
+  hideStatsTooltip()
+  const target = event.currentTarget
+  const rect = target.getBoundingClientRect()
+  const bubble = document.createElement('div')
+  bubble.className = 'dsh-atb-stats-tooltip'
+  bubble.setAttribute('role', 'tooltip')
+  bubble.textContent = target.getAttribute('aria-label') ?? ''
+  bubble.style.left = `${rect.right + 8}px`
+  bubble.style.top = `${rect.top + rect.height / 2}px`
+  document.body.append(bubble)
+  statsTooltip = bubble
+}
+
 /**
  * The sidebar row glyph: the kanban icon plus live status counts from the
  * controller snapshot. Wide sidebar renders the tri-color digit strip
@@ -87,6 +107,13 @@ function makePanelIcon(controller: BoardController): (props: { size?: number } &
       return () => observer.disconnect()
     }, [])
     const title = translate('shared.stats.title', { todo: counts.todo, doing: counts.doing, review: counts.review })
+    React.useEffect(() => hideStatsTooltip, [title, wide])
+    const tooltipProps = {
+      'aria-label': title,
+      onPointerEnter: showStatsTooltip,
+      onPointerLeave: hideStatsTooltip,
+      onPointerDown: hideStatsTooltip,
+    }
     return React.createElement(
       'span',
       { className: 'dsh-atb-pglyph', ref: glyphRef },
@@ -114,14 +141,14 @@ function makePanelIcon(controller: BoardController): (props: { size?: number } &
           React.createElement('path', { d: 'M6 2v12M10 2v12' }),
         ),
         !wide && counts.todo > 0
-          ? React.createElement('span', { className: 'dsh-atb-pbadge', title, 'aria-hidden': true }, counts.todo)
+          ? React.createElement('span', { className: 'dsh-atb-pbadge', ...tooltipProps }, counts.todo)
           : null,
       ),
       // Place the counts at the row's right edge, separated by |.
       wide && (counts.todo > 0 || counts.doing > 0 || counts.review > 0)
         ? React.createElement(
           'span',
-          { className: 'dsh-atb-pstats', title, 'aria-hidden': true },
+          { className: 'dsh-atb-pstats', ...tooltipProps },
           React.createElement('span', { 'data-stat': 'todo' }, counts.todo),
           React.createElement('span', { className: 'dsh-atb-psep' }, '|'),
           React.createElement('span', { 'data-stat': 'in_progress' }, counts.doing),
