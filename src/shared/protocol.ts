@@ -879,6 +879,34 @@ export type ExecutionRecord = {
   repos?: ExecutionRepoEvidence[]
   /** The agent's structured report, submitted via taskboard_execution_report. */
   report?: ExecutionReport
+  /**
+   * Contract v1: who drives this execution envelope. `board` = the host DSH
+   * session service (default for existing records); `external` = an authorized
+   * agent engine that owns the technical sessions while Task Board keeps the
+   * registry, claim and worktree.
+   */
+  managedBy?: 'board' | 'external'
+  /**
+   * Monotonic fencing token for external executions: bumped on every session
+   * handoff/attempt change. A stale writer presenting an older token is
+   * rejected instead of overwriting a newer attempt.
+   */
+  fencingToken?: number
+  /** Session attempts of the same envelope (failover keeps claim/id/report). */
+  attempts?: ExecutionAttempt[]
+  /** Idempotency key supplied by an external engine on claim. */
+  idempotencyKey?: string
+}
+
+/** One session attempt inside a single external execution envelope. */
+export type ExecutionAttempt = {
+  /** 1-based attempt number. */
+  n: number
+  sessionId?: string
+  startedAt: number
+  endedAt?: number
+  outcome: 'running' | 'succeeded' | 'failed' | 'cancelled'
+  reason?: string
 }
 
 /** The per-model override a task may carry; absent = session default model. */

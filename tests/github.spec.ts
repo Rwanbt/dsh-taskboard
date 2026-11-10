@@ -41,7 +41,7 @@ describe('GitHub provider registration', () => {
       name: 'GitHub', scopeLabel: 'ext.repoScope', defaultBaseUrl: 'https://api.github.com',
       capabilities: { itemTypes: ['issue'], projectDiscovery: true, accountDiscovery: true, write: true },
     })
-    expect(providers.filter(provider => provider.capabilities.write === true).map(provider => provider.id)).toEqual(['github'])
+    expect(providers.filter(provider => provider.capabilities.write === true).map(provider => provider.id)).toEqual(['github', 'gitlab', 'gitea'])
   })
   it('rejects non repository scopes before any request', () => {
     expect(() => createBuiltinProviders().create(config({ mappings: [{ projectId: 'not-a-repo', workspaceId: 'ws' }] })))

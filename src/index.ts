@@ -31,6 +31,8 @@ import { dshHomePath } from './host/sdk.ts'
 import { TaskStore } from './host/store.ts'
 import { ExternalSyncService } from './host/external-sync.ts'
 import { createBuiltinProviders } from './host/external-providers.ts'
+import { PublicApiService } from './host/public-api.ts'
+import { PUBLIC_API_TOKEN_ENV } from './shared/public-api.ts'
 import { TemplateStore } from './host/templates.ts'
 import { ExternalSessionSyncService } from './host/session-sync.ts'
 import { ERR, ToolError, registerTaskboardTools, workspaceFace, type WorkspaceFace } from './host/tools.ts'
@@ -303,10 +305,22 @@ export function apply(ctx: Context): void {
       })
       agentDisposers.push(() => { externalSyncService = undefined; externalSync.dispose() })
       let disposeRoutes: (() => void) | undefined
+      // Agent Board public contract (v1): bearer-authenticated read + execution
+      // envelope lifecycle. Disabled unless the deployment sets a token.
+      const publicApi = new PublicApiService({
+        store,
+        workspaces: workspaceFace(wsCtx.workspaceRegistry),
+        now,
+        token: () => process.env[PUBLIC_API_TOKEN_ENV],
+      })
+      agentDisposers.push(() => publicApi.dispose())
       agentCtx.inject(['webServer'], (webCtx: Context) => {
         disposeRoutes = registerTaskboardRoutes(webCtx, {
           store,
           externalSync,
+          publicApi: {
+            handle: (req, res, url, body) => publicApi.handle(req, res, url, body),
+          },
           workspaces: workspaceFace(wsCtx.workspaceRegistry),
           now,
           maxConcurrent,

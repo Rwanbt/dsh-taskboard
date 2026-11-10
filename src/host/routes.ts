@@ -59,6 +59,7 @@ import type { TemplateStore } from './templates.ts'
 import { MAX_ASSET_BYTES, type AssetStore } from './assets.ts'
 import type { StorageCoordinator } from './storage.ts'
 import { ROUTE_PREFIX, SSE_PATH, type ApiFail, type ApiResult } from '../shared/api.ts'
+import { PUBLIC_API_PREFIX } from '../shared/public-api.ts'
 import type { TaskStore } from './store.ts'
 import { detachPrerequisitesOfTrashed } from './store.ts'
 import { ERR, ToolError } from './tools.ts'
@@ -128,6 +129,14 @@ export interface TaskboardRoutesOptions {
     presets?: CatalogPresetItem[]
     defaultPresetId?: string
   }>
+  /**
+   * Agent Board public execution contract (contract v1). Handled before any
+   * GUI route; the service owns bearer auth, its own JSON envelope and the SSE
+   * event stream.
+   */
+  publicApi?: {
+    handle: (req: IncomingMessage, res: ServerResponse, url: URL, body: Record<string, unknown> | null) => Promise<boolean>
+  }
 }
 
 /** Validate a template's task spec (routes-side, unknown → invalid_input). */
@@ -452,6 +461,13 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
     try {
       const url = new URL(req.url ?? '/', 'http://x')
       const pathname = url.pathname
+
+      // ------------------------------------------- public contract (Agent Board)
+      if (options.publicApi !== undefined && pathname.startsWith(PUBLIC_API_PREFIX)) {
+        const body = req.method === 'GET' || req.method === 'HEAD' ? null : await readBody(req)
+        await options.publicApi.handle(req, res, url, body)
+        return
+      }
 
       // ---------------------------------------------------------------- GET
       if (req.method === 'GET') {
