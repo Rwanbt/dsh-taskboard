@@ -12,7 +12,7 @@ import {
   type TaskLedger,
   type TaskRecord,
 } from '../shared/protocol.ts'
-import { dependencyState, prerequisiteDetails } from '../shared/dependencies.ts'
+import { buildDependencyIndex, dependencyState, prerequisiteDetails } from '../shared/dependencies.ts'
 import type { ExternalReference } from '../shared/external.ts'
 import {
   PUBLIC_API_PREFIX,
@@ -160,8 +160,14 @@ export class PublicApiService {
   private readonly streams = new Set<ServerResponse>()
   private heartbeat?: ReturnType<typeof setInterval>
   private disposed = false
+  private readonly storeReady: Promise<void>
   constructor(private readonly options: PublicApiOptions) {
     this.unsubscribe = options.store.subscribe(change => this.record(change))
+    // A cold process must read the persisted ledger before answering a public
+    // GET: serving an empty board (or masking a corrupt ledger) is unsafe.
+    const load = (options.store as { load?: () => Promise<void> }).load
+    this.storeReady = typeof load === 'function' ? load.call(options.store) : Promise.resolve()
+    void this.storeReady.catch(error => console.warn('[dsh-taskboard] public API store load failed:', error))
   }
   dispose(): void {
     this.disposed = true
@@ -179,6 +185,17 @@ export class PublicApiService {
     if (!secureEqual(header.slice(7).trim(), token)) fail('unauthorized', 'invalid bearer token', 401)
   }
   /**
+   * Authenticate BEFORE the transport buffers a request body. Renders the
+   * 503/401 response itself and returns false when the caller must stop.
+   */
+  preflight(req: IncomingMessage, res: ServerResponse): boolean {
+    try { this.authorised(req); return true } catch (errorValue) {
+      if (errorValue instanceof PublicApiError) error(res, errorValue.code, errorValue.message, errorValue.status)
+      else error(res, 'internal', 'internal error', 500)
+      return false
+    }
+  }
+  /**
    * Handle one request under {@link PUBLIC_API_PREFIX}.
    * @returns true when the request belonged to the public API.
    */
@@ -188,6 +205,7 @@ export class PublicApiService {
     if (this.disposed) { error(res, 'internal', 'service stopped', 503); return true }
     try {
       this.authorised(req)
+      await this.storeReady
       const path = pathname.slice(PUBLIC_API_PREFIX.length) || '/'
       await this.route(req, res, path, url, body)
     } catch (errorValue) {
@@ -212,15 +230,15 @@ export class PublicApiService {
     if (method === 'GET' && path === '/events') { ok(res, this.readEvents(url)); return }
     if (method === 'GET' && path === '/events/stream') { this.streamEvents(req, res, url); return }
     let match = /^\/tasks\/([^/]+)$/.exec(path)
-    if (method === 'GET' && match?.[1] !== undefined) { ok(res, this.taskView(decodeURIComponent(match[1]))); return }
+    if (method === 'GET' && match?.[1] !== undefined) { ok(res, this.taskView(this.decode(match[1]))); return }
     match = /^\/tasks\/([^/]+)\/dependencies$/.exec(path)
-    if (method === 'GET' && match?.[1] !== undefined) { ok(res, this.dependenciesOf(decodeURIComponent(match[1]))); return }
+    if (method === 'GET' && match?.[1] !== undefined) { ok(res, this.dependenciesOf(this.decode(match[1]))); return }
     match = /^\/executions\/([^/]+)$/.exec(path)
-    if (method === 'GET' && match?.[1] !== undefined) { ok(res, this.executionOf(decodeURIComponent(match[1]))); return }
+    if (method === 'GET' && match?.[1] !== undefined) { ok(res, this.executionOf(this.decode(match[1]))); return }
     if (method === 'POST' && path === '/executions/claim') { ok(res, await this.claim(body), 201); return }
     match = /^\/executions\/([^/]+)\/(session|attempts|handoff|complete|interrupt|report)$/.exec(path)
     if (method === 'POST' && match?.[1] !== undefined && match[2] !== undefined) {
-      const executionId = decodeURIComponent(match[1])
+      const executionId = this.decode(match[1])
       const action = match[2]
       if (action === 'session') ok(res, await this.bindSession(executionId, body))
       else if (action === 'attempts') ok(res, await this.newAttempt(executionId, body))
@@ -231,6 +249,10 @@ export class PublicApiService {
       return
     }
     fail('not_found', 'unknown public API route', 404)
+  }
+  /** Percent-decoding is client input: malformed escapes are a 400, never a 500. */
+  private decode(value: string): string {
+    try { return decodeURIComponent(value) } catch { fail('invalid_input', 'malformed path encoding', 400) }
   }
   private projects(): PublicProject[] {
     return this.options.workspaces.list().map(workspace => ({ id: workspace.id, title: workspace.title, path: workspace.path }))
@@ -246,10 +268,13 @@ export class PublicApiService {
     const limitRaw = Number.parseInt(url.searchParams.get('limit') ?? '50', 10)
     const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 50
     const offset = Math.max(Number.parseInt(url.searchParams.get('cursor') ?? '0', 10) || 0, 0)
+    // One index per request: `dependencyState` without it rebuilds the whole
+    // index for every card (the documented O(n²) trap).
+    const index = eligible ? buildDependencyIndex(tasks) : undefined
     const filtered = tasks.filter(task =>
       (statuses.length === 0 || statuses.includes(task.status))
       && (workspaceId === undefined || task.workspaceId === workspaceId)
-      && (!eligible || (task.status === 'todo' && !task.blocked && dependencyState(task, tasks).ready)))
+      && (!eligible || (task.status === 'todo' && !task.blocked && dependencyState(task, tasks, index).ready)))
       .sort((left, right) => right.updatedAt - left.updatedAt)
     return { tasks: filtered.slice(offset, offset + limit).map(summaryOf), ...(offset + limit < filtered.length ? { next: String(offset + limit) } : {}) }
   }
@@ -327,7 +352,14 @@ export class PublicApiService {
       if (workspaceId !== undefined && task.workspaceId !== workspaceId) { failure = new PublicApiError('forbidden', 'task belongs to another project', 403); return undefined }
       if (idempotencyKey !== undefined) {
         const replay = task.executions.find(execution => execution.idempotencyKey === idempotencyKey)
-        if (replay !== undefined) { existingId = replay.id; return undefined }
+        if (replay !== undefined) {
+          if (replay.externalActor !== undefined && replay.externalActor !== actor) {
+            failure = new PublicApiError('already_claimed', 'idempotency key belongs to another actor', 409)
+            return undefined
+          }
+          existingId = replay.id
+          return undefined
+        }
       }
       if (task.status === 'in_progress') {
         this.guardClaim(task, actor)
@@ -344,6 +376,7 @@ export class PublicApiService {
       const execution: ExecutionRecord = {
         id: newExecutionId(), trigger: 'manual', startedAt: now, outcome: 'running', managedBy: 'external',
         fencingToken: 1, attempts: [{ n: 1, startedAt: now, outcome: 'running', ...(sessionId === undefined ? {} : { sessionId }) }],
+        externalActor: actor,
         ...(sessionId === undefined ? {} : { sessionId }),
         ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
       }
@@ -369,7 +402,11 @@ export class PublicApiService {
     if (execution.outcome !== 'running') fail('version_conflict', 'execution already settled', 409)
   }
   private checkFence(execution: ExecutionRecord, ifFencingToken: number | undefined): void {
-    if (ifFencingToken !== undefined && ifFencingToken !== (execution.fencingToken ?? 1)) fail('stale_execution', 'stale fencing token', 409)
+    const current = execution.fencingToken ?? 1
+    // Once a handoff/attempt changed the fence, the guard is MANDATORY: an old
+    // engine that never observed token 2+ must not settle or edit the envelope.
+    if (current > 1 && ifFencingToken === undefined) fail('stale_execution', 'fencing token required after a handoff or attempt change', 409)
+    if (ifFencingToken !== undefined && ifFencingToken !== current) fail('stale_execution', 'stale fencing token', 409)
   }
   private currentAttempt(execution: ExecutionRecord): ExecutionAttempt {
     const attempts = execution.attempts ?? []
@@ -496,6 +533,9 @@ export class PublicApiService {
       try {
         if (execution.managedBy !== 'external') fail('forbidden', 'this execution is managed by the host', 403)
         if (execution.outcome !== 'running') {
+          if (execution.externalActor !== undefined && execution.externalActor !== request.actor) {
+            fail('forbidden', 'only the claiming actor may read or replay this execution', 403)
+          }
           if (execution.outcome === outcome) { alreadySettled = true; return undefined }
           fail('version_conflict', 'execution already settled with another outcome', 409)
         }
@@ -544,6 +584,7 @@ export class PublicApiService {
       const { task, execution } = found
       try {
         if (execution.managedBy !== 'external') fail('forbidden', 'this execution is managed by the host', 403)
+        this.checkFence(execution, request.ifFencingToken)
         const involved = execution.sessionId === request.actor || task.claimedBy === request.actor
           || (execution.attempts ?? []).some(attempt => attempt.sessionId === request.actor)
         if (!involved) fail('forbidden', 'actor does not hold this execution', 403)
@@ -566,6 +607,11 @@ export class PublicApiService {
   private record(change: LedgerChange): void {
     if (this.disposed) return
     const at = this.now()
+    // One snapshot (and one index) for the whole notification: looking it up
+    // per dependant deep-clones and freezes the entire ledger inside the store
+    // write lane, which is the O(n²) memory/latency trap.
+    const ledgerTasks = this.options.store.snapshot().tasks
+    const dependencyIndex = buildDependencyIndex(ledgerTasks)
     const events: PublicEvent[] = []
     const ordinal = () => events.length
     const push = (task: TaskRecord, type: PublicEventType, data?: Record<string, unknown>) => {
@@ -594,13 +640,13 @@ export class PublicApiService {
         }
       }
       if (task.blocked) push(task, 'task.blocked')
-      if (!task.blocked && task.status === 'todo' && dependencyState(task, this.options.store.snapshot().tasks).ready) {
+      if (!task.blocked && task.status === 'todo' && dependencyState(task, ledgerTasks, dependencyIndex).ready) {
         push(task, 'task.ready')
       }
       if (task.status === 'done') {
-        for (const dependent of this.options.store.snapshot().tasks) {
+        for (const dependent of ledgerTasks) {
           if (dependent.trashedAt !== undefined || !(dependent.dependsOn ?? []).includes(task.id)) continue
-          if (dependencyState(dependent, this.options.store.snapshot().tasks).ready) push(dependent, 'task.ready')
+          if (dependencyState(dependent, ledgerTasks, dependencyIndex).ready) push(dependent, 'task.ready')
         }
       }
     }

@@ -41,6 +41,15 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
     if (!credential) throw new Error('enter credentials for this server/account/authentication mode')
     credentials[field.key] = credential
   }
+  // Optional inbound-webhook signing secret (host-only). Never part of an auth
+  // mode, so it is never echoed back by the status API; an empty explicit value
+  // removes it, an omitted value keeps the previous one.
+  const webhookSecretRaw = incoming.webhookSecret
+  if (webhookSecretRaw !== undefined && (typeof webhookSecretRaw !== 'string' || webhookSecretRaw.length > 200)) {
+    throw new Error('invalid webhook secret')
+  }
+  if (typeof webhookSecretRaw === 'string' && webhookSecretRaw.length > 0) credentials.webhookSecret = webhookSecretRaw
+  else if (webhookSecretRaw === undefined && sameIdentity && previous?.credentials.webhookSecret) credentials.webhookSecret = previous.credentials.webhookSecret
   if (provider === 'zentao' && mappingMode !== 'project' && mappingMode !== 'execution'
     && !(allowLegacyMappings && mappingMode === undefined)) throw new Error('select a project or execution mapping mode')
   if (!Array.isArray(e.mappings)) throw new Error('at least one project mapping is required')

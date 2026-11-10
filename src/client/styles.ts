@@ -69,6 +69,23 @@ body {
 .dsh-atb-external button { padding: 7px 10px; border: 1px solid var(--atb-border-2, #d4d4d8); border-radius: 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .dsh-atb-external button:disabled { opacity: .5; cursor: default; }
 .dsh-atb-external fieldset > div > label { flex: 1; }
+/* Contract v1 connection manager: compact rows that wrap on narrow screens. */
+.dsh-atb-external-connections { display: flex; flex-direction: column; gap: 6px; margin: 9px 0 14px; }
+.dsh-atb-external-conn-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.dsh-atb-external-conn-empty { margin: 0; font-size: 12px; color: var(--atb-text-2, #71717a); }
+.dsh-atb-external-connection { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 7px 9px; border-radius: 6px; background: var(--atb-hover); }
+.dsh-atb-external-connection[data-enabled="false"] { opacity: .7; }
+.dsh-atb-external-conn-info { flex: 1 1 220px; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 12px; }
+.dsh-atb-external-conn-name { overflow-wrap: anywhere; }
+.dsh-atb-external-conn-provider, .dsh-atb-external-conn-state { font-size: 12px; color: var(--atb-text-2, #71717a); overflow-wrap: anywhere; }
+.dsh-atb-external-conn-badge { padding: 1px 6px; border-radius: var(--atb-radius-xs, 4px); background: var(--atb-active); font-size: 11px; white-space: nowrap; }
+.dsh-atb-external-conn-badge[data-state="disabled"], .dsh-atb-external-conn-badge[data-state="read-only"] { color: var(--atb-warn); }
+.dsh-atb-external-conn-badge[data-state="enabled"], .dsh-atb-external-conn-badge[data-state="read-write"] { color: var(--atb-success); }
+.dsh-atb-external-conn-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.dsh-atb-external-conn-error { flex: 1 1 100%; margin: 0; font-size: 12px; color: var(--atb-error); }
+.dsh-atb-external-conn-editing { margin: 0; font-size: 12px; color: var(--atb-text-2, #71717a); }
+.dsh-atb-external-capabilities { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 9px 0; font-size: 12px; color: var(--atb-text-2, #71717a); }
+.dsh-atb-external-capabilities code { font-size: 11px; padding: 1px 5px; border-radius: var(--atb-radius-xs, 4px); background: var(--atb-hover); }
 .dsh-atb-panel-root { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .dsh-atb-pglyph { display: inline-flex; align-items: center; }
 .dsh-atb-picon { position: relative; display: inline-flex; }

@@ -62,6 +62,8 @@ export type ProviderCapabilities = {
   /** Contract v1: exchange directions (defaults to inbound + outbound when `write`). */
   directions?: SyncDirection[]
   events?: 'poll' | 'webhook' | 'none'
+  /** Signed inbound webhook is implemented (it only triggers a pull). */
+  webhook?: boolean
   limits?: { pageSize?: number; maxPages?: number; requestTimeoutMs?: number; rateLimitPerMinute?: number }
   /** Default field ownership; omitted fields use three-way merge (title/description/urgency) or remote status. */
   fieldAuthority?: Partial<Record<ExternalField, FieldAuthority>>
@@ -189,6 +191,26 @@ export function normalizeExternalSyncRecords(raw: unknown): Record<string, Exter
       ...(typeof e.lastAttemptAt === 'number' && Number.isFinite(e.lastAttemptAt) ? { lastAttemptAt: e.lastAttemptAt } : {}) }]]
   }))
 }
+/**
+ * Read-only preview of one synchronization round: what WOULD be imported,
+ * linked, conflicted or pushed. Never writes to the ledger or to the remote
+ * side, so a human can inspect a connection before enabling write-back.
+ */
+export type SyncPreview = {
+  connectionId: string
+  provider: string
+  at: number
+  direction: 'inbound' | 'bidirectional'
+  inbound: {
+    create: number; update: number; unchanged: number; link: number; ignore: number; conflicts: number
+    samples: Array<{ itemId: string; title: string; action: 'create' | 'update' | 'unchanged' | 'link' | 'ignore' | 'conflict'; taskId?: string; fields?: string[] }>
+  }
+  outbound: {
+    push: number
+    samples: Array<{ taskId: string; fields: ExternalPushField[] }>
+  }
+}
+
 /** Per-connection run state exposed by the connection manager (contract v1). */
 export type ExternalConnectionState = {
   running: boolean

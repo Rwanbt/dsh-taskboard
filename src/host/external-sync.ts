@@ -1,3 +1,4 @@
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import {
@@ -14,6 +15,7 @@ import {
   type ExternalPushPatch,
   type ExternalSource,
   type ExternalSyncRecord,
+  type SyncPreview,
 } from '../shared/external.ts'
 import { bestExternalMatch, externalKey, externalMatchScore, mergeExternalFields, normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
 import { defaultIsolationOf, defaultPermissionOf, newTaskId, normalizeTitle, type TaskRecord, type TaskLedger } from '../shared/protocol.ts'
@@ -30,6 +32,20 @@ type SyncState = { connections: ExternalConfig[] }
 
 /** Maximum number of configured connections (bounded queue, no unbounded scan). */
 const MAX_CONNECTIONS = 10
+/** Bounded delivery-id memory for inbound webhook de-duplication. */
+const MAX_WEBHOOK_DELIVERIES = 1_000
+/** Providers with an implemented, signed inbound webhook (poll remains authoritative). */
+const WEBHOOK_PROVIDERS = new Set(['github', 'gitlab', 'gitea'])
+
+/** Constant-time comparison of two arbitrary strings. */
+function secureTextEqual(left: string, right: string): boolean {
+  const a = createHash('sha256').update(left).digest()
+  const b = createHash('sha256').update(right).digest()
+  return timingSafeEqual(a, b)
+}
+
+/** One normalized webhook decision, rendered by the route. */
+export type WebhookOutcome = { status: number; body: Record<string, unknown> }
 
 export function normalizeExternalConfig(raw: unknown, previous?: ExternalConfig): ExternalConfig {
   return normalizeConnection(raw, createBuiltinProviders(), previous)
@@ -73,6 +89,8 @@ export class ExternalSyncService {
   private controllers = new Map<string, AbortController>()
   private timer?: ReturnType<typeof setInterval>
   private lastAttempts = new Map<string, number>()
+  private readonly webhookDeliveries = new Set<string>()
+  private readonly webhookOrder: string[] = []
   private readonly registry: ExternalProviderRegistry
   constructor(private readonly options: {
     file: string; store: TaskStore; workspaceExists: (id: string) => boolean
@@ -288,10 +306,71 @@ export class ExternalSyncService {
     if (connectionId === undefined) { for (const controller of this.controllers.values()) controller.abort(); return }
     this.controllers.get(connectionId)?.abort()
   }
+  /**
+   * Verify and accept one inbound webhook. The payload is NEVER applied
+   * directly: it only triggers a pull (the remote API stays authoritative),
+   * which makes duplicated or out-of-order deliveries harmless. Deliberate
+   * duplicates are dropped by delivery id so one event cannot cause a sync
+   * storm.
+   */
+  async receiveWebhook(connectionId: string, headers: Record<string, string | string[] | undefined>, rawBody: string): Promise<WebhookOutcome> {
+    await this.ready
+    const header = (name: string): string | undefined => {
+      const value = headers[name]
+      return Array.isArray(value) ? value[0] : value
+    }
+    const config = this.state.connections.find(candidate => candidate.id === connectionId)
+    if (config === undefined) return { status: 404, body: { ok: false, error: { code: 'not_found', message: 'unknown external connection' } } }
+    if (!WEBHOOK_PROVIDERS.has(config.provider)) {
+      return { status: 501, body: { ok: false, error: { code: 'not_supported', message: 'this provider does not implement signed webhooks' } } }
+    }
+    const secret = config.credentials.webhookSecret
+    if (secret === undefined || secret.length === 0) {
+      return { status: 503, body: { ok: false, error: { code: 'webhook_disabled', message: 'configure a webhook secret for this connection' } } }
+    }
+    const signature = config.provider === 'gitlab'
+      ? (header('x-gitlab-token') ?? '')
+      : config.provider === 'gitea'
+        ? (header('x-gitea-signature') ?? '')
+        : (header('x-hub-signature-256') ?? '')
+    if (!signature) return { status: 401, body: { ok: false, error: { code: 'unauthorized', message: 'missing webhook signature' } } }
+    const digest = createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex')
+    const valid = config.provider === 'gitlab'
+      ? secureTextEqual(signature, secret)
+      : secureTextEqual(signature, config.provider === 'github' ? `sha256=${digest}` : digest)
+    if (!valid) return { status: 401, body: { ok: false, error: { code: 'unauthorized', message: 'invalid webhook signature' } } }
+    const delivery = header('x-github-delivery') ?? header('x-gitea-delivery') ?? header('x-gitlab-event-uuid') ?? digest
+    if (this.webhookDeliveries.has(delivery)) {
+      return { status: 202, body: { ok: true, value: { accepted: true, duplicate: true, sync: 'ignored' } } }
+    }
+    this.webhookDeliveries.add(delivery)
+    this.webhookOrder.push(delivery)
+    while (this.webhookOrder.length > MAX_WEBHOOK_DELIVERIES) {
+      const dropped = this.webhookOrder.shift()
+      if (dropped !== undefined) this.webhookDeliveries.delete(dropped)
+    }
+    const event = header('x-github-event') ?? header('x-gitea-event') ?? header('x-gitlab-event') ?? ''
+    if (event === 'ping' || event === 'system_hooks') {
+      return { status: 200, body: { ok: true, value: { accepted: true, duplicate: false, event, sync: 'not_needed' } } }
+    }
+    if (config.enabled === false) {
+      return { status: 202, body: { ok: true, value: { accepted: true, duplicate: false, event, sync: 'disabled' } } }
+    }
+    // Fire-and-forget: the HTTP ack never waits for a remote round trip. The
+    // pull is authoritative, so ordering does not matter; a failed pull is
+    // recorded in the connection state and retried by the scheduler.
+    void this.sync(config.id).catch(() => {})
+    return { status: 202, body: { ok: true, value: { accepted: true, duplicate: false, event, sync: 'queued' } } }
+  }
+  /** Resolve the connection a live test/draft belongs to (secondary edits too). */
+  private draftPrevious(raw: unknown): ExternalConfig | undefined {
+    const connectionId = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).connectionId : undefined
+    return typeof connectionId === 'string' ? this.connection(connectionId) : this.primary()
+  }
   async test(raw?: unknown): Promise<void> {
     await this.ready
     const config = raw !== undefined && raw !== null && Object.keys(raw as Record<string, unknown>).length > 0
-      ? normalizeConnection(raw, this.registry, this.primary(), true)
+      ? normalizeConnection(raw, this.registry, this.draftPrevious(raw), true)
       : this.primary()
     if (!config) throw new Error('configure a connection first')
     await this.provider(config).test(AbortSignal.timeout(30_000))
@@ -302,7 +381,7 @@ export class ExternalSyncService {
   private resolveDraft(raw: unknown): ExternalConfig {
     if (raw !== undefined && raw !== null && typeof raw === 'object'
       && ('provider' in (raw as Record<string, unknown>) || 'baseUrl' in (raw as Record<string, unknown>))) {
-      return normalizeConnection(raw, this.registry, this.primary(), true)
+      return normalizeConnection(raw, this.registry, this.draftPrevious(raw), true)
     }
     const connectionId = raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).connectionId === 'string'
       ? (raw as Record<string, string>).connectionId : undefined
@@ -353,6 +432,106 @@ export class ExternalSyncService {
     combined.connections = targets.length
     if (failures.length > 0) combined.failedConnections = failures.length
     return combined
+  }
+  /**
+   * Compute what one round WOULD do without touching the ledger or the remote
+   * side. The preview is the required gate before enabling bidirectional sync:
+   * it exposes planned imports, adoptions, conflicts and outbound pushes.
+   */
+  async preview(connectionId?: string): Promise<SyncPreview> {
+    await this.ready
+    if (this.running.size > 0) throw new Error('sync is already running')
+    const config = connectionId !== undefined ? this.connection(connectionId)
+      : this.state.connections.find(candidate => candidate.enabled !== false)
+    if (!config) throw new Error('configure a connection first')
+    if (config.provider === 'zentao' && !config.mappingMode) throw new Error('reassociate projects or executions before previewing')
+    const descriptor = this.registry.get(config.provider).descriptor
+    const provider = this.provider(config)
+    const signal = AbortSignal.timeout(120_000)
+    const at = this.now()
+    const preview: SyncPreview = {
+      connectionId: config.id, provider: config.provider, at, direction: config.direction === 'bidirectional' ? 'bidirectional' : 'inbound',
+      inbound: { create: 0, update: 0, unchanged: 0, link: 0, ignore: 0, conflicts: 0, samples: [] },
+      outbound: { push: 0, samples: [] },
+    }
+    let mappings = config.mappings
+    if (config.provider === 'zentao' && config.includeUnmapped) {
+      if (!provider.listProjects) throw new Error('scope discovery is required for unmapped synchronization')
+      const scopes = await provider.listProjects(signal)
+      const associated = new Map(config.mappings.filter(m => m.workspaceId).map(m => [m.projectId, m]))
+      for (const scope of scopes) {
+        if (!new RegExp(`^${config.mappingMode}:\\d+$`).test(scope.id)) throw new Error('provider returned an unexpected mapping scope')
+        if (!associated.has(scope.id)) associated.set(scope.id, { projectId: scope.id, workspaceId: '' })
+      }
+      mappings = [...associated.values()]
+    }
+    const fetched: Array<{ item: ExternalItem; workspaceId: string }> = []
+    for (const mapping of mappings) {
+      if (mapping.workspaceId && !this.options.workspaceExists(mapping.workspaceId)) throw new Error('mapped workspace no longer exists')
+      const existing = new Map(this.options.store.snapshot().tasks.filter(t => t.external?.connectionId === config.id && t.external.item.projectId === mapping.projectId)
+        .map(t => [JSON.stringify([t.external!.item.type, t.external!.item.id]), { item: t.external!.item, metadataOnly: t.trashedAt !== undefined || ['done', 'canceled', 'archived'].includes(t.status) }]))
+      for (const item of await provider.getItems(mapping.projectId, signal, { existing })) {
+        if (item.projectId !== mapping.projectId || !config.itemTypes.includes(item.type)) throw new Error('provider returned an unexpected scope or work item type')
+        const source = normalizeExternalSource({ connectionId: config.id, provider: config.provider, item, syncedAt: at, conflicts: [] })
+        if (!source) throw new Error('provider returned an invalid work item')
+        fetched.push({ item: source.item, workspaceId: mapping.workspaceId })
+      }
+    }
+    const ledger = this.options.store.snapshot()
+    const record = ledger.externalSync?.[config.id]
+    const ignored = new Set(record?.ignored ?? [])
+    const byKey = new Map(ledger.tasks.filter(task => task.external).map(task => [externalKey(task.external!.connectionId, task.external!.item), task]))
+    const seen = new Set<string>()
+    const sample = (entry: SyncPreview['inbound']['samples'][number]) => { if (preview.inbound.samples.length < 50) preview.inbound.samples.push(entry) }
+    for (const { item: rawItem, workspaceId } of fetched) {
+      const item = { ...rawItem, title: normalizeTitle(rawItem.title) }
+      const key = externalKey(config.id, item)
+      if (seen.has(key)) continue
+      seen.add(key)
+      const task = byKey.get(key)
+      if (ignored.has(key) || task?.trashedAt !== undefined || task?.status === 'archived') {
+        preview.inbound.ignore++; sample({ itemId: item.id, title: item.title, action: 'ignore', ...(task === undefined ? {} : { taskId: task.id }) }); continue
+      }
+      if (task === undefined) {
+        const adopted = config.matchExisting ? this.adoptableTask(ledger, item, workspaceId) : undefined
+        if (adopted !== undefined && 'ambiguous' in adopted) { preview.inbound.ignore++; sample({ itemId: item.id, title: item.title, action: 'ignore' }); continue }
+        if (adopted !== undefined) { preview.inbound.link++; sample({ itemId: item.id, title: item.title, action: 'link', taskId: adopted.card.id }); continue }
+        if (item.closed || (config.assigneeFilter !== false && !(item.assignees ?? [item.assignedTo]).includes(config.account))) {
+          preview.inbound.ignore++; sample({ itemId: item.id, title: item.title, action: 'ignore' }); continue
+        }
+        preview.inbound.create++; sample({ itemId: item.id, title: item.title, action: 'create' }); continue
+      }
+      if (task.status === 'done' || task.status === 'canceled') {
+        const statusChanged = ['status', 'assignedTo', 'assignees', 'closed', 'revision']
+          .some(field => JSON.stringify(task.external!.item[field as keyof ExternalItem]) !== JSON.stringify(item[field as keyof ExternalItem]))
+        if (!statusChanged && task.external!.conflicts.length === 0) { preview.inbound.unchanged++; sample({ itemId: item.id, title: item.title, action: 'unchanged', taskId: task.id }); continue }
+        preview.inbound.update++; sample({ itemId: item.id, title: item.title, action: 'update', taskId: task.id }); continue
+      }
+      const merged = mergeExternalFields(task, task.external!, item,
+        ['in_progress', 'in_review'].includes(task.status) || task.executions.some(execution => execution.outcome === 'running'),
+        adapterFieldAuthorityOf(descriptor))
+      const sameItem = ([...new Set([...Object.keys(task.external!.item), ...Object.keys(item)])] as Array<keyof ExternalItem>)
+        .every(field => JSON.stringify(task.external!.item[field]) === JSON.stringify(item[field]))
+      if (merged.conflicts.length > 0) {
+        preview.inbound.conflicts++
+        preview.inbound.update++
+        sample({ itemId: item.id, title: item.title, action: 'conflict', taskId: task.id, fields: merged.conflicts })
+      } else if (sameItem && task.external!.conflicts.length === 0) {
+        preview.inbound.unchanged++; sample({ itemId: item.id, title: item.title, action: 'unchanged', taskId: task.id })
+      } else {
+        preview.inbound.update++; sample({ itemId: item.id, title: item.title, action: 'update', taskId: task.id })
+      }
+    }
+    if (config.direction === 'bidirectional') {
+      for (const task of ledger.tasks) {
+        if (task.external?.connectionId !== config.id || task.trashedAt !== undefined || task.status === 'archived') continue
+        const plan = this.planPush(task, config)
+        if (plan === undefined) continue
+        preview.outbound.push++
+        if (preview.outbound.samples.length < 50) preview.outbound.samples.push({ taskId: task.id, fields: plan.fields })
+      }
+    }
+    return preview
   }
   private async syncOne(config: ExternalConfig): Promise<SyncResult> {
     if (this.disposed) throw new Error('sync service stopped')

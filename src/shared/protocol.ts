@@ -896,6 +896,8 @@ export type ExecutionRecord = {
   attempts?: ExecutionAttempt[]
   /** Idempotency key supplied by an external engine on claim. */
   idempotencyKey?: string
+  /** Stable consumer identity that owns this external execution envelope. */
+  externalActor?: string
 }
 
 /** One session attempt inside a single external execution envelope. */

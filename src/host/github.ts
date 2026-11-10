@@ -3,7 +3,8 @@ import type { ExternalReadContext, ExternalTaskProvider, ExternalWriteProvider }
 import { externalSend } from './external-http.ts'
 
 const API_VERSION = '2022-11-28'
-const REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+/** `owner/repo`; `.` and `..` path segments are refused (URL path traversal). */
+const REPO_PATTERN = /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 const PAGE_SIZE = 100
 
 /**

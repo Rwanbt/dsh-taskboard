@@ -1,5 +1,29 @@
 # 更新日志 / Changelog
 
+### 0.12.0 — 2026-11-10
+
+- **Contrat d'adaptateur v1**：每个外部提供方声明 `contractVersion`、`operations`、`directions`、`events`、`webhook` 与限制；`assertProviderContract()` 在实例化时校验「声明的操作必须真实实现、写入能力必须声明」，寄存器拒绝未知版本/未知操作。新增 `docs/ADAPTER-CONTRACT.md`。
+- **多连接**：宿主最多保存 10 条独立连接（`{connections: [...]}`，兼容旧的 `{config}` 文件并自动迁移），每条连接独立映射、方向、凭据与同步元数据；按连接同步，轮次可聚合计数并隔离失败。设置界面提供连接列表、状态、启用/停用、编辑、删除与单独同步。
+- **新增真实适配器**：GitLab（REST v4）、Gitea/Forgejo（API v1）、Jira Cloud（REST v3 + ADF→texte）、Linear（GraphQL），均含分页、写回、错误脱敏与确定性模拟测试。ZenTao/TAPD 仍为只读；Bitbucket、Azure DevOps、Trello、GitHub Projects、GitLab Boards **未实现、未宣称支持**。
+- **双向同步显式启用**：连接默认 `inbound`；只有 `direction: "bidirectional"` **且**适配器声明 outbound/write 时才可能回写。`/external/preview` 可在写回前预览创建/关联/更新/冲突/推送。字段权威可配置（`fieldAuthority`），默认 title/description/urgency 三方合并、status/assignees 以本地为准；冲突持久化并阻止该字段推送。
+- **身份 canonique**：一张卡片可通过 `externalRefs` 关联多个外部条目（system/instance/kind/project/id/url/revision/state/provenance），`task.external` 仍是同步主来源；旧账本加载时自动补齐，导出仍只含显式字段。
+- **Webhooks 签名**：GitHub/GitLab/Gitea/Forgejo 提供 `POST /dsh-taskboard/external/webhook/<connectionId>`，HMAC/共享密钥校验、delivery 去重（1 000 条）、`ping` 忽略；载荷仅触发一次拉取（远端 API 始终为权威），重复/乱序投递不会污染状态。
+- **Contrat public Agent Board v1**：`/dsh-taskboard/public/v1`（Bearer token `DSH_TASKBOARD_PUBLIC_TOKEN`，未配置则 503）暴露项目/任务/依赖/执行/事件读取，以及原子 claim、idempotencyKey、session 绑定、attempt、handoff（fencingToken）、report、complete/interrupt。成功只到 `in_review`，`done` 仍仅限人工；host 代管的执行拒绝被外部接管；`docs/AGENT-BOARD-CONTRACT.md` 记录完整契约。
+- **Sécurité/robustesse**：凭据仅宿主可读（含 webhook secret，状态只报告存在性），错误不泄露上游响应体或 URL，外部 ticket 视为不可信数据且仅接受 http(s) URL；事件流有界并在重启后要求全量 resync。
+- **Tests**：新增适配器契约、多连接、预览、webhook、API publique Agent Board、UI 多连接与安全回归测试；`npm run build && npm test` 通过。
+
+**English:**
+
+- **Adapter contract v1**: every provider declares `contractVersion`, `operations`, `directions`, `events`, `webhook` and limits; `assertProviderContract()` verifies at creation that declared operations exist and write surfaces are declared. The registry rejects unknown versions/operations. New `docs/ADAPTER-CONTRACT.md`.
+- **Multiple connections**: the host stores up to 10 independent connections (`{connections: [...]}`, migrating the legacy `{config}` file), each with its own mappings, direction, credentials and sync metadata; per-connection sync aggregates counters and isolates failures. The settings panel lists connections with state, enable/disable, edit, delete and a per-row sync.
+- **New real adapters**: GitLab (REST v4), Gitea/Forgejo (API v1), Jira Cloud (REST v3 + ADF→text), Linear (GraphQL), with pagination, optional write-back, redacted errors and deterministic mock tests. ZenTao/TAPD stay read-only; Bitbucket, Azure DevOps, Trello, GitHub Projects and GitLab Boards are **not implemented and not claimed**.
+- **Explicit bidirectional sync**: connections default to `inbound`; outbound writes require `direction: "bidirectional"` **and** an adapter that declares outbound/write. `/external/preview` previews creates/links/updates/conflicts/pushes before enabling writes. Field authority is configurable; conflicts persist and block that field.
+- **Canonical identity**: a card can reference several external work items through `externalRefs` while `task.external` remains the sync-driving source; old ledgers are migrated on load and exports stay explicit.
+- **Signed webhooks**: GitHub/GitLab/Gitea/Forgejo accept `POST /dsh-taskboard/external/webhook/<connectionId>` with HMAC/shared-secret verification, delivery de-duplication and ping handling; the payload only triggers a pull, so duplicate or out-of-order deliveries cannot corrupt state.
+- **Agent Board public contract v1**: `/dsh-taskboard/public/v1` (Bearer `DSH_TASKBOARD_PUBLIC_TOKEN`, 503 when unset) exposes projects/tasks/dependencies/executions/events plus atomic claim, idempotency keys, session binding, attempts, fenced handoff, reports and complete/interrupt. Success only reaches `in_review`; `done` stays human-only; host-managed executions are refused. `docs/AGENT-BOARD-CONTRACT.md` documents the full contract.
+- **Security/robustness**: credentials (including webhook secrets) stay host-only and status reports presence only; errors never leak upstream bodies or URLs; external tickets are untrusted data and only http(s) URLs are accepted; the event stream is bounded and requires a full resync after restart.
+- **Tests**: new adapter-contract, multi-connection, preview, webhook, public-API and multi-connection UI suites; `npm run build && npm test` passes.
+
 ### 0.11.0 — 2026-11-10
 
 - **GitHub Issues 同步（可回写）**：新增 GitHub 提供方，按 `owner/repo` 仓库映射本地项目，导入分配给同步账号的议题（忽略 Pull Request，可按起始日期过滤）。设置里可用令牌识别当前账号并同步仓库清单。

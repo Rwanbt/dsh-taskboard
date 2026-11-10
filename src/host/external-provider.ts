@@ -128,7 +128,7 @@ export class ExternalProviderRegistry {
 /** Stable capability document for one provider (public API / UI compatibility view). */
 export function adapterCapabilitiesOf(descriptor: ProviderDescriptor): {
   contractVersion: number; kind: string; operations: AdapterOperation[]; directions: string[]
-  itemTypes: string[]; write: boolean; events: string; limits?: ProviderDescriptor['capabilities']['limits']
+  itemTypes: string[]; write: boolean; events: string; webhook: boolean; limits?: ProviderDescriptor['capabilities']['limits']
   fieldAuthority: ReturnType<typeof adapterFieldAuthorityView>
 } {
   return {
@@ -139,6 +139,7 @@ export function adapterCapabilitiesOf(descriptor: ProviderDescriptor): {
     itemTypes: [...descriptor.capabilities.itemTypes],
     write: adapterDirectionsOf(descriptor).includes('outbound'),
     events: descriptor.capabilities.events ?? 'none',
+    webhook: descriptor.capabilities.webhook === true,
     ...(descriptor.capabilities.limits === undefined ? {} : { limits: structuredClone(descriptor.capabilities.limits) }),
     fieldAuthority: adapterFieldAuthorityView(descriptor),
   }

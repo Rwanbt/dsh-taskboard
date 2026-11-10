@@ -5,6 +5,8 @@ import { TapdProvider } from './tapd.ts'
 import { GithubProvider } from './github.ts'
 import { GitlabProvider, GITLAB_PROJECT_PATTERN } from './gitlab.ts'
 import { GiteaProvider, GITEA_REPO_PATTERN } from './gitea.ts'
+import { jiraProviderDefinition } from './jira.ts'
+import { linearProviderDefinition } from './linear.ts'
 
 const validateNumericProjects = (config: ExternalConfig) => {
   if (config.mappings.some(m => !/^\d+$/.test(m.projectId))) throw new Error('provider requires numeric project IDs')
@@ -63,11 +65,11 @@ export function createBuiltinProviders(): ExternalProviderRegistry {
       ],
       capabilities: { itemTypes: ['issue'], projectDiscovery: true, accountDiscovery: true, pagination: 'page', incremental: true, write: true, dedupe: true,
         operations: ['validateConnection', 'getCapabilities', 'discoverProjects', 'listWorkItems', 'getWorkItem', 'createWorkItem', 'updateWorkItem'],
-        directions: ['inbound', 'outbound'], events: 'poll',
+        directions: ['inbound', 'outbound'], events: 'poll', webhook: true,
         limits: { pageSize: 100, maxPages: 1000, requestTimeoutMs: 30_000 } } },
     validate: config => {
       if (config.authMode !== 'token') throw new Error('unsupported GitHub authentication mode')
-      if (config.mappings.some(m => !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(m.projectId))) throw new Error('GitHub scopes must be owner/repo')
+      if (config.mappings.some(m => !/^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(m.projectId))) throw new Error('GitHub scopes must be owner/repo')
     },
     create: config => new GithubProvider(config),
   }).register({
@@ -82,7 +84,7 @@ export function createBuiltinProviders(): ExternalProviderRegistry {
       ],
       capabilities: { itemTypes: ['issue'], projectDiscovery: true, accountDiscovery: true, pagination: 'page', incremental: false, write: true, dedupe: true,
         operations: ['validateConnection', 'getCapabilities', 'discoverProjects', 'listWorkItems', 'getWorkItem', 'createWorkItem', 'updateWorkItem'],
-        directions: ['inbound', 'outbound'], events: 'poll',
+        directions: ['inbound', 'outbound'], events: 'poll', webhook: true,
         limits: { pageSize: 100, maxPages: 1000, requestTimeoutMs: 30_000 } } },
     validate: config => {
       if (config.authMode !== 'token') throw new Error('unsupported GitLab authentication mode')
@@ -101,12 +103,13 @@ export function createBuiltinProviders(): ExternalProviderRegistry {
       ],
       capabilities: { itemTypes: ['issue'], projectDiscovery: true, accountDiscovery: true, pagination: 'page', incremental: false, write: true, dedupe: true,
         operations: ['validateConnection', 'getCapabilities', 'discoverProjects', 'listWorkItems', 'getWorkItem', 'createWorkItem', 'updateWorkItem'],
-        directions: ['inbound', 'outbound'], events: 'poll',
+        directions: ['inbound', 'outbound'], events: 'poll', webhook: true,
         limits: { pageSize: 50, maxPages: 1000, requestTimeoutMs: 30_000 } } },
     validate: config => {
       if (config.authMode !== 'token') throw new Error('unsupported Gitea authentication mode')
       if (config.mappings.some(m => !GITEA_REPO_PATTERN.test(m.projectId))) throw new Error('Gitea scopes must be owner/repo')
     },
     create: config => new GiteaProvider(config),
-  })
+  }).register(jiraProviderDefinition())
+    .register(linearProviderDefinition())
 }

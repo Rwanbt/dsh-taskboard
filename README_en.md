@@ -15,9 +15,22 @@ A **task board plugin for DeepSeek Harness**: humans create cards, agents claim 
 - **Git worktree isolation**: each run works on its own worktree + dedicated task branch, one-click merge at acceptance; parallel multi-repo workspaces are mirrored whole (0.6.3); non-git projects fall back automatically
 - **Efficient acceptance**: DoD acceptance checklists (agent checks items off with evidence), structured execution reports (summary / changed files / checks / artifacts / risks), in-board diff viewer
 - **Live board**: SSE real-time refresh, five-column flow, persisted filters & sorting, JSON import/export, task templates
-- **External task sync**: ZenTao project/execution Bugs, Stories and Tasks, plus TAPD Bugs/Stories/Tasks, with assignee filtering, polling, project mapping and conflict protection. See External task sync below.
+- **External task sync**: ZenTao, TAPD, GitHub, GitLab, Gitea/Forgejo, Jira and Linear; multiple connections, project mapping, explicit write-back, field-level conflicts, sync preview and signed webhooks. See External task sync below and the capability matrix in [docs/ADAPTER-CONTRACT.md](./docs/ADAPTER-CONTRACT.md).
+- **Agent Board public contract v1**: optional bearer-authenticated API (discover work, atomic claim, failover, session handoff, reports, event stream). Task Board always owns the ledger and execution envelope, and `done` stays human-only; see [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md).
 
 **Zero configuration**: install and it works — no tokens, no API keys, no extra services or databases.
+
+## 0.12.0 — universal sync and Agent Board contract (development branch, unreleased)
+
+This branch turns Task Board into a synchronization layer for work, code forges, planning tools and executions. **0.12.0 is not tagged or released**; the stable release remains v0.10.2.
+
+- **Adapter contract v1**: every provider declares its version, operations, directions, events and limits; creation verifies that declared operations are implemented and write surfaces are declared, and the registry rejects unknown versions/operations. New adapters: GitLab, Gitea/Forgejo, Jira Cloud, Linear. ZenTao/TAPD stay read-only; Bitbucket, Azure DevOps, Trello, GitHub Projects and GitLab Boards are **not implemented and not claimed**.
+- **Multiple connections**: up to 10 independent connections, migrating the legacy `{config}` file; each has its own mappings, direction, credentials and sync history, and can be synced, enabled/disabled, edited or deleted on its own.
+- **Explicit bidirectional sync**: read-only by default; outbound writes require `direction: "bidirectional"` **and** a write-capable adapter. `/external/preview` previews creates/links/updates/conflicts/pushes before enabling writes. Title/description/urgency use three-way merge by default; status and assignees stay local; conflicts persist and block that field.
+- **Canonical external identity**: `externalRefs` lets one card reference several remote items (system, instance, kind, project, id, URL, revision, state, provenance) while `task.external` remains the sync-driving source; old ledgers are migrated on load.
+- **Signed webhooks**: GitHub/GitLab/Gitea/Forgejo verify HMAC/shared-secret signatures and de-duplicate delivery ids; the payload only triggers a pull, so duplicate or out-of-order deliveries cannot corrupt state.
+- **Agent Board public API v1**: `/dsh-taskboard/public/v1` uses `DSH_TASKBOARD_PUBLIC_TOKEN` bearer auth (503 when unset) for projects/tasks/dependencies/executions/events plus claim, idempotency keys, attempts, fenced handoff, reports and complete/interrupt. Success only reaches `in_review`; `done` remains human-only.
+- **Tests**: adapter contract, multi-connection, preview, webhook, public API, security regression and multi-connection UI suites; `npm run build && npm test` passes.
 
 ## Rwanbt fork — v0.10.2
 
@@ -36,7 +49,7 @@ This fork adds the following on top of upstream. Full design: [docs/dependencies
 - **DSH design system**: every color, radius and shadow comes from the `--dsw-*` tokens (light and dark). Native `<select>` elements are replaced by a themed, accessible `Select` (popup rendered on `<body>`, full keyboard support). The board uses a borderless layout (tone and elevation instead of outlines) and a monochrome SVG icon set instead of emoji.
 - **Robustness**: the ledger lock now treats transient Windows `EPERM`/`EACCES`/`ENOENT` like contention and retries.
 
-Tests: `npm run build && npm test` (74 files, 1026 tests at v0.10.2). CI passed on Node 22 and 26 before release. Coverage: `npm run test:coverage`; the [coverage report](./tests/qa/COVERAGE.md) records an earlier 975-test baseline (~88.6 % lines), not a fresh v0.10.2 measurement.
+Tests: `npm run build && npm test` (90 files, 1223 tests at v0.12.0; 74 files, 1026 tests at v0.10.2). CI passed on Node 22 and 26 before release. Coverage: `npm run test:coverage`; the [coverage report](./tests/qa/COVERAGE.md) records an earlier 975-test baseline (~88.6 % lines), not a fresh v0.10.2 measurement.
 
 ## Screenshots
 
@@ -259,7 +272,9 @@ For local development, build first, then link the local repository with `dsh plu
 
 ## External task sync
 
-ZenTao supports project or execution/iteration mapping for Bugs, Stories and Tasks. TAPD supports Bugs, Stories and Tasks. GitHub supports repository mapping for Issues, including opt-in write-back. ZenTao's two modes have passed read-only real-deployment checks; TAPD and GitHub remain locally mock-validated.
+ZenTao supports project or execution/iteration mapping for Bugs, Stories and Tasks. TAPD supports Bugs, Stories and Tasks. GitHub, GitLab and Gitea/Forgejo sync Issues; Jira Cloud and Linear sync Issues. ZenTao's two modes have passed read-only real-deployment checks; TAPD, GitHub, GitLab, Gitea, Jira and Linear remain locally mock-validated (no real credentials; production compatibility is not claimed).
+
+Settings stores **up to 10 connections**, each with its own provider, authentication, scope, project mappings and sync direction. The connection list shows enabled state, last sync/error and offers per-connection sync, enable/disable, edit and delete. Legacy single-connection files are migrated automatically.
 
 1. Open **External sync** in settings. ZenTao uses its installation URL without `/api.php/v1`, username and password. Reuse the login username as assignee by default, or enter another assignee. TAPD uses API Basic Auth or Bearer Token and a separate member nickname.
 2. Select the **Sync scope** (Bugs, Stories, Tasks), import destination (Backlog or Todo) and polling interval (0 disables polling; otherwise 5–1440 minutes).
@@ -281,11 +296,40 @@ Pull requests aside, the sync imports open issues **assigned to the sync account
 
 Write-back is opt-in per sync and runs at the end of each sync, only for cards already linked to an issue — including adopted ones: a changed title or description is pushed, `done` closes the issue as *completed* and `canceled` closes it as *not planned*, but only when the card's status changed since the last successful push. It never reopens a remote issue, never pushes while a card has a running execution, and never overwrites an unresolved conflict. Cards without a link can be pushed one by one from the detail pane (**Create external issue**, with a target repository picker when several repositories map to the project), and agents can call `taskboard_external_sync` (whole connection) or `taskboard_external_sync` with `taskId` (single card). Comments, assignees, labels and remote closures other than the board's own terminal states are not written back; the sync reports pulled/created/linked/ambiguous/pushed counters.
 
+### GitLab, Gitea/Forgejo, Jira Cloud, Linear
+
+- **GitLab**: API root defaults to `https://gitlab.com/api/v4` (self-hosted: `https://<host>/api/v4`), Personal Access Token via `PRIVATE-TOKEN`; maps `group/project` (subgroups supported), syncs Issues (merge requests are never imported) with optional create/update/close.
+- **Gitea/Forgejo**: API root defaults to `https://gitea.com/api/v1`, token auth; maps `owner/repo`, ignores pull requests, optional write-back.
+- **Jira Cloud**: REST v3, Basic auth (email + API token), maps project keys (`ABC`); descriptions convert between ADF and plain text, closure uses a workflow transition whose category is `done`. Jira Cloud only (Server/DC wiki markup is unsupported).
+- **Linear**: GraphQL, API key (no `Bearer`), maps team keys (`ENG`); cursor pagination, completion/cancellation from state types, optional create/update.
+
+All three forges support optional signed webhooks at `POST /dsh-taskboard/external/webhook/<connectionId>`: `X-Hub-Signature-256` for GitHub, `X-Gitea-Signature` for Gitea/Forgejo, and `X-Gitlab-Token` for GitLab. A webhook only triggers a pull (the remote API stays authoritative); duplicate delivery ids are dropped and out-of-order events cannot overwrite newer state. The webhook secret lives in `credentials.webhookSecret` (never returned to the client).
+
+### Write-back, preview and conflicts
+
+Every connection is read-only by default (`inbound`). Write-back runs only when bidirectional sync is explicitly selected **and** the provider declares write capability; only title/description changed since the last successful push are sent, `done` closes as *completed*, `canceled` as *not planned*, remote issues are never reopened, running cards are never pushed, and fields with an unresolved conflict are never overwritten. `POST /dsh-taskboard/external/preview` previews creates/links/updates/conflicts/pushes without writing on either side.
+
 Old ZenTao connections without a mapping mode retain credentials and tasks but pause automatic sync and require reassociation. Product IDs are never reinterpreted as project IDs. Refresh, associate and save to resume.
 
-Credentials remain in the host-only plaintext `dsh-taskboard-external.json` under active DSH_HOME; protect this file. Passwords/tokens are excluded from public status and task exports. ZenTao obtains in-memory tokens; old token-only configurations are unsupported. Task and sync metadata persistence is atomic. One active connection is supported; screenshots, attachments, webhooks and bidirectional comment sync are excluded, and write-back is currently limited to GitHub Issues.
+Credentials remain in the host-only plaintext `dsh-taskboard-external.json` under active DSH_HOME (mode `0600`); protect this file. Passwords, tokens and webhook secrets are excluded from public status, task exports, errors and logs. ZenTao obtains in-memory tokens; old token-only configurations are unsupported. Task and sync metadata persistence is atomic. Screenshots/attachments and bidirectional comment sync are excluded; Bitbucket, Azure DevOps, Trello, GitHub Projects and GitLab Boards are not implemented.
 
 Real-deployment validation on 2026-10-16 read 4 Bugs, 4 linked Stories and 8 Tasks in project mode, with corresponding execution results. Each mode imported 2 Bugs and 2 Tasks for admin; repeat scans created or updated nothing. No Stories were assigned to that account, so assigned Story imports remain covered by mock tests. Only temporary local ledgers were written; tracker business data was not changed.
+
+## Agent Board public contract (v1)
+
+Task Board remains the sole owner of the task ledger and execution envelope; Agent Board (or any authorized orchestrator) is a controlled consumer that cannot read ledger files and cannot move a task to `done`.
+
+```bash
+# Set before starting the host; without it the public API returns 503 and everything else works normally.
+export DSH_TASKBOARD_PUBLIC_TOKEN="long-random-token"
+
+curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
+  http://127.0.0.1:<port>/dsh-taskboard/public/v1/meta
+curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
+  "http://127.0.0.1:<port>/dsh-taskboard/public/v1/tasks?eligible=true"
+```
+
+Endpoints: `/meta`, `/projects`, `/tasks`, `/tasks/:id`, `/tasks/:id/dependencies`, `/executions/:id`, `/events` (SSE: `/events/stream`); lifecycle: `POST /executions/claim`, `:id/session`, `:id/attempts`, `:id/handoff`, `:id/report`, `:id/complete`, `:id/interrupt`. Full fields, error codes, idempotency and fencing semantics: [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md). Without Agent Board, Task Board runs fully independently; leaving the token unset disables the API entirely.
 
 ## Changelog
 

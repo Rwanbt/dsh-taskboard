@@ -136,6 +136,8 @@ export interface TaskboardRoutesOptions {
    */
   publicApi?: {
     handle: (req: IncomingMessage, res: ServerResponse, url: URL, body: Record<string, unknown> | null) => Promise<boolean>
+    /** Optional pre-body bearer check (production service provides it). */
+    preflight?: (req: IncomingMessage, res: ServerResponse) => boolean
   }
 }
 
@@ -229,6 +231,18 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown> |
   } catch {
     return null
   }
+}
+
+/** Read the raw request body (webhook signatures cover exact bytes). */
+async function readRawBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = []
+  let total = 0
+  for await (const chunk of req) {
+    total += (chunk as Buffer).length
+    if (total > MAX_BODY_BYTES) throw new Error('body too large')
+    chunks.push(chunk as Buffer)
+  }
+  return Buffer.concat(chunks).toString('utf8')
 }
 
 /** Read one bounded binary upload without ever buffering beyond the file cap. */
@@ -464,8 +478,35 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
 
       // ------------------------------------------- public contract (Agent Board)
       if (options.publicApi !== undefined && pathname.startsWith(PUBLIC_API_PREFIX)) {
+        // Authenticate BEFORE buffering a body: an unauthenticated caller must
+        // never make the host parse up to MAX_BODY_BYTES.
+        const preflight = (options.publicApi as { preflight?: (req: IncomingMessage, res: ServerResponse) => boolean }).preflight
+        if (preflight !== undefined && !preflight(req, res)) return
         const body = req.method === 'GET' || req.method === 'HEAD' ? null : await readBody(req)
         await options.publicApi.handle(req, res, url, body)
+        return
+      }
+
+      // --------------------------------------- external webhooks (HMAC-signed)
+      // No cookie/session auth: the provider proves authenticity with a shared
+      // secret over the exact raw bytes, and the payload only triggers a pull.
+      const webhookPrefix = `${ROUTE_PREFIX}/external/webhook/`
+      if (req.method === 'POST' && pathname.startsWith(webhookPrefix)) {
+        if (!options.externalSync) { res.writeHead(501); res.end(); return }
+        const connectionId = pathname.slice(webhookPrefix.length)
+        if (!connectionId || connectionId.includes('/')) {
+          const f = fail('invalid_input', 'invalid webhook connection id')
+          json(res, f.res, f.status)
+          return
+        }
+        let raw: string
+        try { raw = await readRawBody(req) } catch {
+          const f = fail('invalid_input', `request body exceeds ${MAX_BODY_BYTES} bytes`)
+          json(res, f.res, 413)
+          return
+        }
+        const outcome = await options.externalSync.receiveWebhook(decodeURIComponent(connectionId), req.headers, raw)
+        json(res, outcome.body as never, outcome.status)
         return
       }
 
@@ -778,6 +819,7 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
           else if (pathname === `${ROUTE_PREFIX}/external/projects`) value = await options.externalSync.discoverProjects(body)
           else if (pathname === `${ROUTE_PREFIX}/external/account`) value = await options.externalSync.discoverAccount(body)
           else if (pathname === `${ROUTE_PREFIX}/external/sync`) value = await options.externalSync.sync(connectionId)
+          else if (pathname === `${ROUTE_PREFIX}/external/preview`) value = await options.externalSync.preview(connectionId)
           else if (pathname === `${ROUTE_PREFIX}/external/push`) {
             if (typeof body.taskId !== 'string' || body.taskId.length === 0) throw new Error('invalid push request')
             if (body.scope !== undefined && (typeof body.scope !== 'string' || body.scope.length === 0)) throw new Error('invalid push scope')

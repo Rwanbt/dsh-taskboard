@@ -320,6 +320,7 @@ export function apply(ctx: Context): void {
           externalSync,
           publicApi: {
             handle: (req, res, url, body) => publicApi.handle(req, res, url, body),
+            preflight: (req, res) => publicApi.preflight(req, res),
           },
           workspaces: workspaceFace(wsCtx.workspaceRegistry),
           now,

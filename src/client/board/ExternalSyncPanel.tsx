@@ -1,11 +1,48 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n/runtime.ts'
 import { Select } from './Select.tsx'
-import type { ExternalProject, ExternalSyncStatus, ProviderDescriptor } from '../../shared/external.ts'
+import { adapterDirectionsOf, adapterOperationsOf } from '../../shared/external.ts'
+import type {
+  ExternalConnection,
+  ExternalConnectionState,
+  ExternalProject,
+  ExternalSyncStatus,
+  ProviderDescriptor,
+} from '../../shared/external.ts'
 import type { WorkspaceView } from '../../shared/api.ts'
 import { externalRequest, externalTypeLabel } from '../external-api.ts'
 
 type Status = ExternalSyncStatus
+type Translate = ReturnType<typeof useT>
+
+/**
+ * Translate one capability vocabulary token (adapter kind, operation, event
+ * source). Unknown tokens fall back to their raw id so a newer host can add a
+ * capability without the board inventing a label — and without ever showing
+ * a capability the descriptor did not declare.
+ */
+function capabilityLabel(t: Translate, prefix: string, id: string): string {
+  const key = `${prefix}${id}`
+  const label = t(key)
+  return label === key ? id : label
+}
+
+/** Display name of a connection: explicit label, else the provider name. */
+function connectionName(connection: ExternalConnection, providers: readonly ProviderDescriptor[] | undefined): string {
+  return connection.label ?? providers?.find(provider => provider.id === connection.provider)?.name ?? connection.provider
+}
+
+/**
+ * Outbound writes are opt-in AND adapter-declared: an adapter must expose the
+ * `outbound` direction and the legacy `write` gate before the consent block is
+ * offered at all. A read-only descriptor can therefore never be saved as
+ * bidirectional from this UI.
+ */
+function canWriteProvider(provider: ProviderDescriptor | undefined): boolean {
+  return provider !== undefined && provider.capabilities.write === true && adapterDirectionsOf(provider).includes('outbound')
+}
+
+/** Themed scope picker (provider-discovered projects + manual ID entry). */
 function ScopePicker({ value, projects, loaded, onChange, t, ariaLabel }: { value: string; projects: ExternalProject[]; loaded: boolean; onChange: (value: string) => void; t: (key: string) => string; ariaLabel: string }) {
   const [manual, setManual] = useState(false)
   return <>
@@ -28,6 +65,53 @@ function ScopePicker({ value, projects, loaded, onChange, t, ariaLabel }: { valu
     {(manual || !projects.length) && <input aria-label={t('ext.enterScopeId')} value={value} onChange={e => onChange(e.target.value)} />}
   </>
 }
+
+/** One row of the connection manager. */
+function ConnectionRow({ connection, provider, state, disabled, running, t, onEdit, onToggle, onSync, onRemove }: {
+  connection: ExternalConnection
+  provider: ProviderDescriptor | undefined
+  state: ExternalConnectionState | undefined
+  /** Any sync/action currently in flight (all rows are frozen). */
+  disabled: boolean
+  /** This very connection is being synchronized. */
+  running: boolean
+  t: Translate
+  onEdit: () => void
+  onToggle: () => void
+  onSync: () => void
+  onRemove: () => void
+}) {
+  const name = connectionName(connection, provider === undefined ? undefined : [provider])
+  const enabled = connection.enabled !== false
+  const hasId = connection.id !== undefined && connection.id !== ''
+  const lastResult = state?.lastResult
+  return <div className="dsh-atb-external-connection" role="listitem" data-connection-id={connection.id} data-enabled={enabled}>
+    <div className="dsh-atb-external-conn-info">
+      <b className="dsh-atb-external-conn-name">{name}</b>
+      <span className="dsh-atb-external-conn-badge" data-state={enabled ? 'enabled' : 'disabled'}>{t(enabled ? 'ext.conn.enabled' : 'ext.conn.disabled')}</span>
+      <span className="dsh-atb-external-conn-provider">{provider?.name ?? connection.provider} · {connection.account}</span>
+    </div>
+    <div className="dsh-atb-external-conn-state" role="status">
+      {running
+        ? t('ext.conn.running')
+        : lastResult !== undefined
+          ? t('ext.conn.lastSync', { at: new Date(lastResult.at).toLocaleString() })
+          : state?.requiresMappingReview === true
+            ? t('ext.conn.mappingReview')
+            : t('ext.conn.neverSync')}
+      {state !== undefined && state.ignoredCount > 0 && <> · {t('ext.conn.ignored', { count: state.ignoredCount })}</>}
+    </div>
+    {state?.lastError !== undefined && <p className="dsh-atb-external-conn-error" role="alert">{t('ext.conn.error')}: {state.lastError}</p>}
+    <div className="dsh-atb-external-conn-actions">
+      <button type="button" data-action="edit" aria-label={`${t('ext.conn.edit')}: ${name}`} disabled={disabled} onClick={onEdit}>{t('ext.conn.edit')}</button>
+      <button type="button" data-action="toggle" aria-pressed={enabled} aria-label={`${t(enabled ? 'ext.conn.disable' : 'ext.conn.enable')}: ${name}`}
+        disabled={disabled || !hasId} onClick={onToggle}>{t(enabled ? 'ext.conn.disable' : 'ext.conn.enable')}</button>
+      <button type="button" data-action="sync" aria-label={`${t('ext.conn.sync')}: ${name}`} disabled={disabled || running} onClick={onSync}>{t('ext.conn.sync')}</button>
+      <button type="button" data-action="remove" aria-label={`${t('ext.conn.remove')}: ${name}`} disabled={disabled || !hasId} onClick={onRemove}>{t('ext.conn.remove')}</button>
+    </div>
+  </div>
+}
+
 export function ExternalSyncPanel() {
   const t = useT()
   const [status, setStatus] = useState<Status>()
@@ -48,19 +132,54 @@ export function ExternalSyncPanel() {
   const [importStatus, setImportStatus] = useState<'backlog' | 'todo'>('backlog')
   const [assigneeFilter, setAssigneeFilter] = useState(true)
   const [matchExisting, setMatchExisting] = useState(false)
+  const [direction, setDirection] = useState<'inbound' | 'bidirectional'>('inbound')
   const [mappings, setMappings] = useState<Array<{ projectId: string; workspaceId: string }>>([{ projectId: '', workspaceId: '' }])
   const [workspaces, setWorkspaces] = useState<WorkspaceView[]>([])
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
   const [action, setAction] = useState('')
+  const [actingOn, setActingOn] = useState<string>()
+  const [message, setMessage] = useState('')
   const [savedDraft, setSavedDraft] = useState<string>()
+  /** Connection currently loaded in the form; undefined while creating one. */
+  const [editingId, setEditingId] = useState<string>()
+  /** True when the form creates a new connection instead of updating one. */
+  const [createNew, setCreateNew] = useState(false)
+
   const descriptor = status?.providers?.find(p => p.id === providerId)
+  // Contract v1 exposes every connection; older hosts only return the primary.
+  const connections = status?.connections ?? (status?.config !== undefined ? [status.config] : [])
+  const connectionStates = status?.connectionStates ?? {}
+  const stateOf = (connection: ExternalConnection): ExternalConnectionState | undefined => {
+    const declared = connection.id !== undefined ? connectionStates[connection.id] : undefined
+    if (declared !== undefined) return declared
+    const legacy = status?.config
+    if (legacy === undefined) return undefined
+    if (connection.id !== undefined && legacy.id !== undefined && connection.id !== legacy.id) return undefined
+    return { running: status?.running === true, ignoredCount: status?.ignoredCount ?? 0,
+      ...(status?.lastResult !== undefined ? { lastResult: status.lastResult } : {}),
+      ...(status?.lastError !== undefined ? { lastError: status.lastError } : {}),
+      ...(status?.lastAttemptAt !== undefined ? { lastAttemptAt: status.lastAttemptAt } : {}),
+      ...(status?.requiresMappingReview !== undefined ? { requiresMappingReview: status.requiresMappingReview } : {}) }
+  }
+  const anyRunning = status?.running === true || Object.values(connectionStates).some(state => state.running)
+  const frozen = busy || anyRunning
+  const editing = editingId !== undefined ? connections.find(connection => connection.id === editingId) : undefined
+  // A new connection always starts empty: it cannot inherit the primary credentials.
+  const knownConnection = createNew ? undefined : editingId === undefined ? status?.config : editing
+  const isPrimaryEditing = connections[0] === undefined
+    ? editingId === undefined
+    : editingId === undefined || connections[0].id === editingId
+  const credentialPresent = isPrimaryEditing && !createNew ? status?.credentialPresent : undefined
   const lastResult = status?.lastResult
   const authentication = descriptor?.authModes.find(m => m.id === authMode)
   const effectiveAccount = providerId === 'zentao' && reuseLogin ? (credentials.username ?? '').trim() : account
-  const canKeepCredentials = status?.config?.provider === providerId && status.config.authMode === authMode
-    && status.config.account === effectiveAccount && status.config.baseUrl === baseUrl.replace(/\/$/, '')
-  const draft = () => ({ provider: providerId, baseUrl, account: effectiveAccount, authMode, credentials, settings, itemTypes, since, intervalMinutes: Number(interval), importStatus, assigneeFilter, matchExisting, ...(providerId === 'zentao' ? { mappingMode, includeUnmapped, mappings: mappings.filter(m => includeUnmapped || m.workspaceId) } : { mappings }) })
+  const canKeepCredentials = knownConnection?.provider === providerId && knownConnection.authMode === authMode
+    && knownConnection.account === effectiveAccount && knownConnection.baseUrl === baseUrl.replace(/\/$/, '')
+  const canWrite = canWriteProvider(descriptor)
+  const operations = descriptor === undefined ? [] : adapterOperationsOf(descriptor)
+  const draft = () => ({ provider: providerId, baseUrl, account: effectiveAccount, authMode, credentials, settings, itemTypes, since,
+    intervalMinutes: Number(interval), importStatus, assigneeFilter, matchExisting, direction,
+    ...(providerId === 'zentao' ? { mappingMode, includeUnmapped, mappings: mappings.filter(m => includeUnmapped || m.workspaceId) } : { mappings }) })
   const fingerprint = (values = draft()) => JSON.stringify({ ...values,
     itemTypes: [...values.itemTypes].sort(),
     mappings: values.mappings.filter(m => m.projectId && m.workspaceId).slice().sort((a, b) => a.projectId.localeCompare(b.projectId)),
@@ -70,12 +189,50 @@ export function ExternalSyncPanel() {
   useEffect(() => {
     if (status && savedDraft === undefined) setSavedDraft(currentDraft)
   }, [status, savedDraft, currentDraft])
+  /** Fill the whole form from one stored connection. */
+  const loadConnection = (connection: ExternalConnection) => {
+    const provider = status?.providers.find(item => item.id === connection.provider)
+    const writable = canWriteProvider(provider)
+    const primary = connections[0]
+    const isPrimary = primary !== undefined && (primary.id !== undefined ? primary.id === connection.id : primary === connection)
+    setEditingId(connection.id); setCreateNew(false)
+    setProviderId(connection.provider)
+    setBaseUrl(connection.baseUrl)
+    setAccount(connection.account)
+    setAuthMode(connection.authMode)
+    // The host never returns secrets: keep them as blanks and let it preserve
+    // the stored values when the identity is unchanged.
+    setCredentials(isPrimary ? status?.credentialValues ?? {} : {})
+    setSettings({ ...Object.fromEntries((provider?.settingsFields ?? []).map(field => [field.key, field.defaultValue])), ...connection.settings })
+    setItemTypes(connection.itemTypes)
+    setSince(connection.since)
+    setIntervalMinutes(String(connection.intervalMinutes))
+    setMappingMode(connection.mappingMode ?? 'project')
+    setIncludeUnmapped(connection.includeUnmapped ?? false)
+    setImportStatus(connection.importStatus ?? 'backlog')
+    setAssigneeFilter(connection.assigneeFilter ?? true)
+    setMatchExisting(connection.matchExisting ?? provider?.capabilities.dedupe === true)
+    setDirection(writable && connection.direction === 'bidirectional' ? 'bidirectional' : 'inbound')
+    setReuseLogin(connection.provider !== 'zentao' || (isPrimary && connection.account === (status?.credentialValues?.username ?? '').trim()))
+    setMappings(connection.provider === 'zentao' && !connection.mappingMode ? [] : connection.mappings)
+    setProjects([]); setProjectsLoaded(false)
+    setSavedDraft(undefined)
+  }
   const selectProvider = (p: ProviderDescriptor) => {
     setProviderId(p.id); setBaseUrl(p.defaultBaseUrl); setAuthMode(p.authModes[0]!.id)
     setReuseLogin(true); setMappingMode('project'); setIncludeUnmapped(false)
     setAssigneeFilter(true); setMatchExisting(p.capabilities.dedupe === true)
     setCredentials({}); setSettings(Object.fromEntries((p.settingsFields ?? []).map(f => [f.key, f.defaultValue])))
     setItemTypes([p.capabilities.itemTypes[0]!]); setProjects([]); setProjectsLoaded(false); setMappings(p.id === 'zentao' ? [] : [{ projectId: '', workspaceId: '' }])
+    setDirection('inbound')
+  }
+  /** Empty the form and prepare a brand-new connection (first provider). */
+  const startNew = () => {
+    setEditingId(undefined); setCreateNew(true)
+    setAccount(''); setSince(''); setIntervalMinutes('0'); setImportStatus('backlog'); setDirection('inbound')
+    const first = status?.providers?.[0]
+    if (first !== undefined) selectProvider(first)
+    setSavedDraft(undefined)
   }
   useEffect(() => {
     let active = true
@@ -84,6 +241,7 @@ export function ExternalSyncPanel() {
       setStatus(s); setWorkspaces(ws.value ?? [])
       const c = s.config
       if (c) {
+        setEditingId(c.id); setCreateNew(false)
         setProviderId(c.provider); setAuthMode(c.authMode); setItemTypes(c.itemTypes); setSettings(c.settings)
         setCredentials(s.credentialValues ?? {})
         setMappingMode(c.mappingMode ?? 'project')
@@ -92,8 +250,9 @@ export function ExternalSyncPanel() {
         setAssigneeFilter(c.assigneeFilter ?? true)
         setMatchExisting(c.matchExisting ?? (s.providers.find(p => p.id === c.provider)?.capabilities.dedupe === true))
         setReuseLogin(c.provider !== 'zentao' || c.account === (s.credentialValues?.username ?? '').trim())
+        setDirection(c.direction === 'bidirectional' && canWriteProvider(s.providers.find(p => p.id === c.provider)) ? 'bidirectional' : 'inbound')
         setBaseUrl(c.baseUrl); setAccount(c.account); setSince(c.since); setIntervalMinutes(String(c.intervalMinutes)); setMappings(c.provider === 'zentao' && !c.mappingMode ? [] : c.mappings)
-      } else if (s.providers?.[0]) selectProvider(s.providers[0])
+      } else if (s.providers?.[0]) { setCreateNew(true); selectProvider(s.providers[0]) }
     }).catch(e => { if (active) setMessage(String(e.message)) })
     return () => { active = false }
   }, [])
@@ -104,7 +263,7 @@ export function ExternalSyncPanel() {
     }, 3000)
     return () => { active = false; clearInterval(timer) }
   }, [])
-  const act = async (path: string, body: unknown = {}) => {
+  const act = async (path: string, body: unknown = {}): Promise<boolean> => {
     setBusy(true); setAction(path); setMessage('')
     try {
       const result = await externalRequest<unknown>(path, body)
@@ -119,17 +278,73 @@ export function ExternalSyncPanel() {
       if (path === '/account' && result && typeof result === 'object' && 'account' in result) setAccount(String(result.account))
       const next = await externalRequest<Status>('')
       if (path === '/config') {
-        const savedCredentials = next.credentialValues ?? {}
+        // The host answers { id }; a legacy host/mock answers the status itself.
+        const savedId = result !== null && typeof result === 'object' && typeof (result as { id?: unknown }).id === 'string'
+          ? (result as { id: string }).id : undefined
+        const savedPrimary = savedId !== undefined
+          ? next.config?.id === savedId
+          : editingId === undefined || next.config?.id === editingId
+        const savedCredentials = savedPrimary ? next.credentialValues ?? {} : credentials
         setCredentials(savedCredentials)
         setSavedDraft(fingerprint({ ...draft(), credentials: savedCredentials }))
+        if (savedId !== undefined) { setEditingId(savedId); setCreateNew(false) }
       }
       setStatus(next); setMessage(path === '/projects' ? t(providerId === 'zentao' ? (includeUnmapped ? 'ext.unmappedMappingsFound' : 'ext.mappingsFound') : 'ext.projectsFound', { count: (result as ExternalProject[]).length }) : t('ext.success'))
-    } catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+      return true
+    } catch (e) { setMessage(e instanceof Error ? e.message : String(e)); return false }
     finally { setBusy(false); setAction('') }
   }
+  /** Update one stored connection instead of appending a second one. */
+  const configureBody = () => ({ ...draft(), ...(editingId !== undefined ? { connectionId: editingId } : createNew ? { createNew: true } : {}) })
+  const syncConnection = async (connection: ExternalConnection) => {
+    setActingOn(connection.id)
+    try { await act('/sync', connection.id !== undefined ? { connectionId: connection.id } : {}) }
+    finally { setActingOn(undefined) }
+  }
+  const toggleConnection = async (connection: ExternalConnection) => {
+    if (connection.id === undefined) return
+    setActingOn(connection.id)
+    try { await act('/enabled', { connectionId: connection.id, enabled: connection.enabled === false }) }
+    finally { setActingOn(undefined) }
+  }
+  const removeConnection = async (connection: ExternalConnection) => {
+    const id = connection.id
+    if (id === undefined) return
+    if (!window.confirm(t('ext.conn.confirmRemove', { name: connectionName(connection, status?.providers) }))) return
+    setActingOn(id)
+    const ok = await act('/remove', { connectionId: id })
+    setActingOn(undefined)
+    if (ok && editingId === id) startNew()
+  }
+  const enabledConnections = connections.filter(connection => connection.enabled !== false)
+  const totalIgnored = connections.reduce((sum, connection) => sum + (stateOf(connection)?.ignoredCount ?? 0), 0)
   return <section className="dsh-atb-diag-sec dsh-atb-external">
     <h4>{t('ext.heading')}</h4><p>{t('ext.hint')}</p>
-    <fieldset disabled={busy || status?.running} style={{ border: 0, padding: 0 }}>
+    <div className="dsh-atb-external-connections">
+      <div className="dsh-atb-external-conn-head">
+        <b>{t('ext.conn.title')}</b>
+        <button type="button" data-action="new" disabled={frozen} onClick={startNew}>{t('ext.conn.new')}</button>
+      </div>
+      {connections.length === 0
+        ? <p className="dsh-atb-external-conn-empty">{t('ext.conn.empty')}</p>
+        : <div role="list" aria-label={t('ext.conn.title')}>
+          {connections.map((connection, index) => <ConnectionRow
+            key={connection.id ?? `connection-${index}`}
+            connection={connection}
+            provider={status?.providers.find(p => p.id === connection.provider)}
+            state={stateOf(connection)}
+            disabled={frozen}
+            running={stateOf(connection)?.running === true || (busy && actingOn === connection.id)}
+            t={t}
+            onEdit={() => loadConnection(connection)}
+            onToggle={() => void toggleConnection(connection)}
+            onSync={() => void syncConnection(connection)}
+            onRemove={() => void removeConnection(connection)}
+          />)}
+        </div>}
+      {editing !== undefined && <p className="dsh-atb-external-conn-editing">{t('ext.conn.editing', { name: connectionName(editing, status?.providers) })}</p>}
+    </div>
+    <fieldset disabled={frozen} style={{ border: 0, padding: 0 }}>
       <label>{t('ext.provider')}<Select
         full
         ariaLabel={t('ext.provider')}
@@ -140,6 +355,14 @@ export function ExternalSyncPanel() {
         }}
         options={(status?.providers ?? []).map(p => ({ value: p.id, label: p.name }))}
       /></label>
+      {descriptor !== undefined && <div className="dsh-atb-external-capabilities" role="group" aria-label={t('ext.capabilities')}>
+        <span>{t('ext.capabilities')}</span>
+        <span>{t('ext.contractVersion', { version: descriptor.contractVersion ?? status?.contractVersion ?? 1 })}</span>
+        {descriptor.kind !== undefined && <span>{t('ext.kind')}: {capabilityLabel(t, 'ext.kind.', descriptor.kind)}</span>}
+        {operations.length > 0 && <span>{t('ext.operations')}: {operations.map(operation => <code key={operation}>{capabilityLabel(t, 'ext.op.', operation)}</code>)}</span>}
+        {descriptor.capabilities.events !== undefined && <span>{t('ext.events')}: {capabilityLabel(t, 'ext.events.', descriptor.capabilities.events)}</span>}
+        <span className="dsh-atb-external-conn-badge" data-state={canWrite ? 'read-write' : 'read-only'}>{t(canWrite ? 'ext.readWrite' : 'ext.readOnly')}</span>
+      </div>}
       <label>{t(providerId === 'zentao' ? 'ext.url' : 'ext.apiUrl')}<input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} /></label>
       {providerId !== 'zentao' && <>
         <label>{t('ext.account')}<input value={account} onChange={e => setAccount(e.target.value)} /></label>
@@ -153,7 +376,7 @@ export function ExternalSyncPanel() {
         options={(descriptor?.authModes ?? []).map(m => ({ value: m.id, label: t(m.label) }))}
       /></label>
       {authentication?.fields.map(field => <label key={field.key}>{t(field.label)}<input type={field.secret === false ? 'text' : 'password'} autoComplete={field.secret === false ? 'username' : 'new-password'} value={credentials[field.key] ?? ''}
-        placeholder={canKeepCredentials && status?.credentialPresent[field.key] ? t('ext.tokenSaved') : ''}
+        placeholder={canKeepCredentials && credentialPresent?.[field.key] ? t('ext.tokenSaved') : ''}
         onChange={e => setCredentials({ ...credentials, [field.key]: e.target.value })} /></label>)}
       {providerId === 'zentao' && <>
         <label style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={reuseLogin}
@@ -166,6 +389,18 @@ export function ExternalSyncPanel() {
           <input type="checkbox" style={{ width: 'auto' }} checked={itemTypes.includes(type)} disabled={providerId === 'zentao' && itemTypes.length === 1 && itemTypes.includes(type)} onChange={e => setItemTypes(e.target.checked ? [...itemTypes, type] : itemTypes.filter(v => v !== type))} />{externalTypeLabel(type, t)}
         </label>)}
       </div>
+      {canWrite && <>
+        <div className="dsh-atb-external-options" role="group" aria-label={t('ext.direction')}>
+          <span>{t('ext.direction')}</span>
+          <label style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={direction === 'bidirectional'}
+              onChange={e => setDirection(e.target.checked ? 'bidirectional' : 'inbound')} />{t('ext.bidirectional')}
+          </label>
+        </div>
+        {direction === 'bidirectional'
+          ? <p role="alert">{t('ext.bidirectionalWarning')}</p>
+          : <p>{t('ext.inboundOnly')}</p>}
+      </>}
       {descriptor?.settingsFields?.map(field => <label key={field.key}>{t(field.label)}<input value={settings[field.key] ?? field.defaultValue} onChange={e => setSettings({ ...settings, [field.key]: e.target.value })} /></label>)}
       <label>{t('ext.since')}<input type="date" value={since} onChange={e => setSince(e.target.value)} /></label>
       <label>{t('ext.interval')}<input type="number" min="0" max="1440" value={interval} onChange={e => setIntervalMinutes(e.target.value)} /></label>
@@ -197,7 +432,8 @@ export function ExternalSyncPanel() {
         <label style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={includeUnmapped}
           onChange={e => setIncludeUnmapped(e.target.checked)} />{t(mappingMode === 'project' ? 'ext.syncUnmappedProjects' : 'ext.syncUnmappedExecutions')}</label>
       </>}
-      {providerId === 'zentao' && status?.requiresMappingReview && <p role="alert">{t('ext.remapRequired')}</p>}
+      {providerId === 'zentao' && (editing === undefined ? status?.requiresMappingReview : stateOf(editing)?.requiresMappingReview) === true
+        && <p role="alert">{t('ext.remapRequired')}</p>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '9px 0' }}>
         <button type="button" onClick={() => void act('/test', { ...draft(), mappings: providerId === 'zentao' ? mappings.filter(m => m.workspaceId) : mappings.filter(m => m.projectId || m.workspaceId) })}>{t('ext.test')}</button>
         {descriptor?.capabilities.projectDiscovery && <button type="button" onClick={() => void act('/projects', { ...draft(), mappings: [] })}>{t(providerId === 'zentao' ? 'ext.discoverMappings' : 'ext.discoverProjects')}</button>}
@@ -231,10 +467,11 @@ export function ExternalSyncPanel() {
       {dirty && <p role="status">{t('ext.unsavedChanges')}</p>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {providerId !== 'zentao' && <button type="button" onClick={() => setMappings([...mappings, { projectId: '', workspaceId: '' }])}>{t('ext.addMapping')}</button>}
-        {descriptor?.capabilities.accountDiscovery && <button type="button" disabled={!status?.config} onClick={() => void act('/account')}>{t('ext.discoverAccount')}</button>}
-        <button type="button" disabled={providerId === 'zentao' && projectsLoaded && mappings.some(m => m.workspaceId && !projects.some(p => p.id === m.projectId))} onClick={() => void act('/config', draft())}>{t('ext.save')}</button>
-        <button type="button" disabled={!status?.config || status.requiresMappingReview || dirty} title={dirty ? t('ext.unsavedChanges') : undefined} onClick={() => void act('/sync')}>{t('ext.sync')}</button>
-        <button type="button" disabled={!status?.ignoredCount} onClick={() => void act('/ignored/clear')}>{t('ext.clearIgnored')}</button>
+        {descriptor?.capabilities.accountDiscovery && <button type="button" disabled={connections.length === 0} onClick={() => void act('/account')}>{t('ext.discoverAccount')}</button>}
+        <button type="button" disabled={providerId === 'zentao' && projectsLoaded && mappings.some(m => m.workspaceId && !projects.some(p => p.id === m.projectId))} onClick={() => void act('/config', configureBody())}>{t('ext.save')}</button>
+        <button type="button" disabled={enabledConnections.length === 0 || dirty
+          || enabledConnections.every(connection => stateOf(connection)?.requiresMappingReview === true)} title={dirty ? t('ext.unsavedChanges') : undefined} onClick={() => void act('/sync')}>{t('ext.sync')}</button>
+        <button type="button" disabled={totalIgnored === 0} onClick={() => void act('/ignored/clear')}>{t('ext.clearIgnored')}</button>
       </div>
     </fieldset>
     {(action === '/sync' || status?.running) && <button type="button" onClick={() => { void externalRequest('/cancel', {}).catch(() => {}) }}>{t('ext.cancel')}</button>}

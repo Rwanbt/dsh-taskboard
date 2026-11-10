@@ -3,7 +3,7 @@ import type { ExternalReadContext, ExternalTaskProvider, ExternalWriteProvider }
 import { externalSend } from './external-http.ts'
 
 /** Gitea/Forgejo repository scope: `owner/repo` (no subgroups). */
-export const GITEA_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+export const GITEA_REPO_PATTERN = /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 /** Gitea caps page sizes at 50, so every listing uses that hard limit. */
 const PAGE_SIZE = 50
 const MAX_PAGE = 1_000

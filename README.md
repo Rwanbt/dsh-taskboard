@@ -15,9 +15,22 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 - **Git Worktree 隔离**：每次执行独立 worktree + 任务分支（分支命名可按看板预设或任务级自定义，0.9.11），验收时一键合并；并列多仓库工作区整区镜像隔离（0.6.3）；非 git 项目自动降级
 - **验收效率**：DoD 验收清单（agent 勾选附证据）、结构化执行报告（摘要/改动文件/自验/产物/风险）、看板内 diff 查看器
 - **实时看板**：SSE 实时刷新、五列流转、筛选排序持久化、JSON 导入导出、任务模板
-- **外部任务同步**：禅道按项目或执行/迭代同步缺陷、需求和任务，以及 TAPD 缺陷、需求、任务；按处理人导入，支持定时同步、项目映射和冲突保护。配置说明见下文「外部任务同步」。
+- **外部任务同步**：ZenTao、TAPD、GitHub、GitLab、Gitea/Forgejo、Jira、Linear；多连接、项目映射、显式双向写回、字段级冲突、同步预览与签名 Webhook。配置说明见下文「外部任务同步」，能力矩阵见 [docs/ADAPTER-CONTRACT.md](./docs/ADAPTER-CONTRACT.md)。
+- **Agent Board 公共契约 v1**：可选的 Bearer 认证 API（发现任务、原子认领、失败转移、会话交接、报告与事件流），Task Board 始终拥有台账与执行信封，`done` 仅限人工；见 [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md)。
 
 **零配置**：安装即用——无需 Token、无需 API Key、无需额外服务或数据库。
+
+## 0.12.0 — 通用同步与 Agent Board 契约（开发分支，未发布）
+
+本分支在 v0.10.2 之上实现「任务、代码 forge、计划平台与执行」的统一同步层。**0.12.0 尚未打标签或发布**；稳定发布仍为 v0.10.2。
+
+- **适配器契约 v1**：每个提供方声明版本、操作、方向、事件与限制；实例化时校验「声明的操作必须真实实现、写能力必须声明」，寄存器拒绝未知版本/操作。新增 GitLab、Gitea/Forgejo、Jira Cloud、Linear；ZenTao/TAPD 仍为只读；Bitbucket、Azure DevOps、Trello、GitHub Projects、GitLab Boards **未实现，也未宣称支持**。
+- **多连接**：最多 10 条独立连接，旧 `{config}` 文件自动迁移；每条连接独立映射、方向、凭据与同步记录，可按连接同步、启用/停用、编辑或删除。
+- **显式双向同步**：默认只读；只有 `direction: "bidirectional"` 且适配器声明写能力时才回写。`/external/preview` 在写入前预览新建/关联/更新/冲突/推送。标题、描述、优先级默认三方合并，状态与处理人以本地为准；冲突持久化并阻止该字段推送。
+- **规范外部身份**：`externalRefs` 允许一张卡片关联多个外部条目（系统、实例、类型、项目、ID、URL、修订、状态、来源），`task.external` 仍为同步主来源；旧台账加载时自动补齐。
+- **签名 Webhook**：GitHub/GitLab/Gitea/Forgejo 支持 HMAC/共享密钥校验与 delivery 去重；载荷仅触发一次拉取，重复或乱序投递不会污染状态。
+- **Agent Board 公共 API v1**：`/dsh-taskboard/public/v1` 使用 `DSH_TASKBOARD_PUBLIC_TOKEN` Bearer 认证（未配置则 503），覆盖项目/任务/依赖/执行/事件读取与 claim、幂等键、attempt、fencing handoff、report、complete/interrupt；成功只进入 `in_review`，`done` 仍仅限人工。
+- **测试**：适配器契约、多连接、预览、Webhook、公共 API、安全回归与多连接 UI；`npm run build && npm test` 通过。
 
 ## Rwanbt 分支 — v0.10.2
 
@@ -36,7 +49,7 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 - **DSH 设计规范**：颜色、圆角、阴影全部取自 `--dsw-*` 设计令牌（亮/暗主题）。原生 `<select>` 替换为主题化、可访问的 `Select`（弹层挂载到 `<body>`，完整键盘支持）。看板采用无边框布局（以色调与阴影区分层级），图标统一为单色 SVG，不再使用 emoji。
 - **健壮性**：台账锁在 Windows 上遇到瞬时 `EPERM`/`EACCES`/`ENOENT` 时按争用处理并重试。
 
-测试：`npm run build && npm test`（v0.10.2：74 个文件、1026 个用例），发布前 CI 在 Node 22 与 26 上通过。覆盖率：`npm run test:coverage`；[覆盖率报告](./tests/qa/COVERAGE.md)记录的是较早的 975 用例基线（行覆盖约 88.6%），并非 v0.10.2 的重新测量。
+测试：`npm run build && npm test`（v0.12.0：90 个文件、1223 个用例全部通过；v0.10.2 为 74 个文件、1026 个用例），发布前 CI 在 Node 22 与 26 上通过。覆盖率：`npm run test:coverage`；[覆盖率报告](./tests/qa/COVERAGE.md)记录的是较早的 975 用例基线（行覆盖约 88.6%），并非 v0.10.2 的重新测量。
 
 ## 界面
 
@@ -259,7 +272,9 @@ node tests/manual-git-e2e.mjs   # 真 git 端到端手测（worktree 全链路 +
 
 ## 外部任务同步
 
-禅道支持按「关联项目」或「关联执行/迭代」同步缺陷、研发需求和任务；TAPD 支持缺陷、需求、任务。两种禅道模式已在真实环境进行只读验证；TAPD 仍以本地模拟验证为主。
+ZenTao 支持按「关联项目」或「关联执行/迭代」同步缺陷、研发需求和任务；TAPD 支持缺陷、需求、任务；GitHub/GitLab/Gitea/Forgejo 同步 Issues；Jira Cloud 与 Linear 同步 Issue。两种禅道模式已在真实环境进行只读验证；TAPD、GitHub、GitLab、Gitea、Jira、Linear 目前以本地模拟服务器验证为主（无真实凭据，不宣称生产兼容性已验证）。
+
+设置中可保存**最多 10 条连接**，每条连接独立选择提供方、认证、同步范围、项目映射与同步方向。连接列表显示启用状态、最近同步/错误，并支持单独同步、启用/停用、编辑与删除。旧版单连接配置会自动迁移。
 
 1. 打开设置，选择「外部同步」。禅道填写安装地址（不含 `/api.php/v1`）、登录用户名和密码，默认同步此登录账号的任务，也可指定其他处理人。TAPD 使用 API Basic Auth 或 Bearer Token，单独填写处理人成员昵称。
 2. 在「同步范围」中勾选缺陷、需求、任务，至少选择一项。在「导入到」选择待规划或待办；自动同步间隔为 0 时关闭，开启范围为 5～1440 分钟。
@@ -283,13 +298,42 @@ node tests/manual-git-e2e.mjs   # 真 git 端到端手测（worktree 全链路 +
 
 状态回写按次开启，在每轮同步末尾只对已关联议题的卡片（含复用卡片）执行：本地标题或描述有修改时推送；`done` 以 *completed* 关闭议题，`canceled` 以 *not planned* 关闭，且仅当卡片状态自上次成功推送后发生变化。不会自动重开远端议题；卡片有执行中的运行或存在未解决冲突时不推送。未关联卡片可在详情面板逐张推送（「创建外部议题」，同一项目映射多个仓库时可选择目标仓库）；agent 可调用 `taskboard_external_sync`（整轮同步）或带 `taskId` 的单卡推送。评论、处理人、标签以及看板以外的远端状态变更不会回写；同步结果会分别显示拉取/新建/复用/歧义/推送计数。
 
+### GitLab、Gitea / Forgejo、Jira Cloud、Linear
+
+- **GitLab**：API 根地址默认 `https://gitlab.com/api/v4`（自建实例填 `https://<host>/api/v4`），Personal Access Token 使用 `PRIVATE-TOKEN`；映射 `group/project`（支持子组），同步 Issue 与 MR 分离（MR 永远不会被导入），可选创建/修改/关闭。
+- **Gitea / Forgejo**：API 根地址默认 `https://gitea.com/api/v1`，Token 连接；映射 `owner/repo`，忽略 Pull Request，可选写回。
+- **Jira Cloud**：REST v3，Basic 认证（邮箱 + API Token），映射项目 Key（如 `ABC`）；描述在 ADF 与纯文本间转换，关闭使用工作流中 `done` 类别的 transition。仅 Jira Cloud（Server/DC 的 wiki markup 不支持）。
+- **Linear**：GraphQL，API Key（无需 `Bearer`），映射团队 Key（如 `ENG`）；分页 cursor，按状态类型判断完成/取消，可选创建与更新。
+
+三种 forge 都支持可选的签名 Webhook：`POST /dsh-taskboard/external/webhook/<connectionId>`，GitHub 用 `X-Hub-Signature-256`、Gitea/Forgejo 用 `X-Gitea-Signature`、GitLab 用 `X-Gitlab-Token`。Webhook 只触发拉取，远端 API 始终是权威；重复 delivery 会被去重，乱序事件不会覆盖较新状态。Webhook 密钥通过连接配置的 `credentials.webhookSecret` 保存（不会返回到前端）。
+
+### 写回、预览与冲突
+
+每条连接默认只读（`inbound`）。只有显式选择「双向同步」且提供方声明写能力时，才会在同步末尾回写已关联卡片：仅推送自上次成功推送后修改的标题/描述；`done` 关闭为 *completed*、`canceled` 关闭为 *not planned*；不自动重开远端，执行中的卡片不推送，冲突字段不推送。`POST /dsh-taskboard/external/preview` 可在启用写回前预览新建/关联/更新/冲突/推送数量与样本，预览不写入任何一侧。
+
 **旧配置处理**：缺少新映射方式的旧禅道配置暂停自动同步，保留凭据和已有任务，并提示重新关联项目或执行/迭代。旧产品 ID 不会被自动解释为项目 ID；重新获取清单、关联并保存后恢复。
 
-连接凭据保存在活动 DSH_HOME 的 `dsh-taskboard-external.json`（host 专用明文文件，需妥善保护），密码和 Token 不返回前端、不进入任务导出。禅道自动获取内存 Token，不支持旧 Token 认证配置。任务与同步记录原子保存，失败不提交部分任务。当前支持一个活动连接，暂不包含截图、附件、Webhook 和评论双向同步；状态回写目前仅支持 GitHub Issues。
+连接凭据保存在活动 DSH_HOME 的 `dsh-taskboard-external.json`（权限 `0600`，host 专用明文文件，需妥善保护），密码、Token 和 Webhook 密钥不返回前端、不进入任务导出、不出现在错误或日志中。禅道自动获取内存 Token，不支持旧 Token 认证配置。任务与同步记录原子保存，失败不提交部分任务。暂不包含截图/附件同步与评论双向同步；Bitbucket、Azure DevOps、Trello、GitHub Projects、GitLab Boards 未实现。
 
 2026-10-16 实测：项目模式读取 4 个缺陷、4 条项目需求和 8 个开发任务；执行模式读取到相同范围的数据。两种模式分别按 admin 导入 2 个缺陷、2 个任务，第二轮均无新增和更新；需求未分配给该账号，因此未导入，需求按处理人导入另有模拟集成测试覆盖。测试仅写入临时本地账本，不修改禅道业务数据。
 
 接口依据：[项目需求](https://www.zentao.net/book/api/692.html)、[执行需求](https://www.zentao.net/book/api/693.html)、[项目下执行清单](https://www.zentao.net/book/api/710.html)、[执行任务](https://www.zentao.net/book/api/715.html)。
+
+## Agent Board 公共契约（v1）
+
+Task Board 仍是任务台账与执行信封的唯一所有者；Agent Board（或任何授权编排器）是只读/受控消费者，不能读取台账文件，也不能把任务移入 `done`。
+
+```bash
+# 宿主启动前设置；未设置时公共 API 返回 503，其余功能照常工作
+export DSH_TASKBOARD_PUBLIC_TOKEN="long-random-token"
+
+curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
+  http://127.0.0.1:<port>/dsh-taskboard/public/v1/meta
+curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
+  "http://127.0.0.1:<port>/dsh-taskboard/public/v1/tasks?eligible=true"
+```
+
+端点：`/meta`、`/projects`、`/tasks`、`/tasks/:id`、`/tasks/:id/dependencies`、`/executions/:id`、`/events`（SSE：`/events/stream`）；生命周期：`POST /executions/claim`、`:id/session`、`:id/attempts`、`:id/handoff`、`:id/report`、`:id/complete`、`:id/interrupt`。完整字段、错误码、幂等与 fencing 语义见 [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md)。没有 Agent Board 时 Task Board 完全独立运行；不配置 Token 即彻底关闭该接口。
 
 ## 升级日志
 
