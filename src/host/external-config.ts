@@ -1,6 +1,16 @@
-import type { ExternalConfig } from '../shared/external.ts'
+import {
+  ADAPTER_CONTRACT_VERSION,
+  EXTERNAL_SYNC_FIELDS,
+  adapterDirectionsOf,
+  adapterSupports,
+  type ExternalConfig,
+  type ExternalField,
+} from '../shared/external.ts'
 import { newTaskId } from '../shared/protocol.ts'
 import type { ExternalProviderRegistry } from './external-provider.ts'
+
+/** Fields an inbound v1 connection may synchronize. */
+const SYNC_FIELD_SET = new Set<ExternalField>(EXTERNAL_SYNC_FIELDS)
 
 /** Platform-neutral validation; each registered provider validates its own scope/options. */
 export function normalizeConnection(raw: unknown, registry: ExternalProviderRegistry, previous?: ExternalConfig, allowEmptyMappings = false, allowLegacyMappings = false): ExternalConfig {
@@ -63,9 +73,40 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
     if (typeof value !== 'string') throw new Error('invalid provider setting')
     settings[field.key] = value.trim()
   }
+  // Contract v1: outbound writes require an explicit `bidirectional` direction.
+  // Omitting it on a fresh or legacy connection keeps the connection read-only,
+  // even for adapters that implement write operations.
+  const sameProviderPrevious = previous?.provider === provider
+  const directionRaw = e.direction ?? (sameProviderPrevious ? previous.direction : undefined) ?? 'inbound'
+  if (directionRaw !== 'inbound' && directionRaw !== 'bidirectional') throw new Error('invalid sync direction')
+  const direction = directionRaw
+  if (direction === 'bidirectional') {
+    if (!adapterDirectionsOf(descriptor).includes('outbound')
+      || !adapterSupports(descriptor, 'createWorkItem') || !adapterSupports(descriptor, 'updateWorkItem')) {
+      throw new Error('this provider does not support write-back')
+    }
+  }
+  const previousFields = sameProviderPrevious ? previous.syncFields : undefined
+  const rawFields = e.syncFields ?? previousFields
+  const syncFields: ExternalField[] = rawFields === undefined
+    ? ['title', 'description', 'urgency', 'status']
+    : Array.isArray(rawFields) ? [...new Set(rawFields)] as ExternalField[] : []
+  if (!syncFields.length || syncFields.some(field => !SYNC_FIELD_SET.has(field))) throw new Error('invalid synchronized field list')
+  const conflictPolicy = e.conflictPolicy ?? (sameProviderPrevious ? previous.conflictPolicy : undefined) ?? 'manual'
+  if (conflictPolicy !== 'manual') throw new Error('unsupported conflict policy')
+  const enabledRaw = e.enabled ?? previous?.enabled ?? true
+  if (typeof enabledRaw !== 'boolean') throw new Error('invalid enabled flag')
+  const labelRaw = e.label ?? previous?.label
+  if (labelRaw !== undefined && (typeof labelRaw !== 'string' || labelRaw.length > 120)) throw new Error('invalid connection label')
+  const label = typeof labelRaw === 'string' ? labelRaw.trim() || undefined : undefined
   const config: ExternalConfig = { id: sameSource ? previous!.id : newTaskId(), provider, baseUrl: url, account, authMode,
     credentials, itemTypes: [...new Set(itemTypes)], settings, mappings, intervalMinutes, since, importStatus, assigneeFilter, matchExisting,
+    direction, syncFields, conflictPolicy, enabled: enabledRaw, ...(label !== undefined ? { label } : {}),
     ...(mappingMode === 'project' || mappingMode === 'execution' ? { mappingMode, includeUnmapped } : {}) }
+  // Contract version belongs to the adapter registry, not to imported data.
+  if (definition.descriptor.contractVersion !== undefined && definition.descriptor.contractVersion !== ADAPTER_CONTRACT_VERSION) {
+    throw new Error('unsupported external adapter contract version')
+  }
   definition.validate?.(config)
   return config
 }

@@ -24,7 +24,7 @@ import {
   type TaskRecord,
 } from '../shared/protocol.ts'
 import type { StorageQueue } from './storage-queue.ts'
-import { normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
+import { externalReferenceOf, normalizeExternalReferences, normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
 
 /** One committed ledger mutation, handed to change subscribers. */
 export interface LedgerChange {
@@ -178,6 +178,23 @@ export class TaskStore {
           if (external === undefined) delete task.external
           else task.external = external
         }
+        // Contract v1 (additive, no schema bump): every external source gets its
+        // canonical reference, and malformed reference lists degrade instead of
+        // bricking the board.
+        const refs = normalizeExternalReferences(task.externalRefs)
+        if (task.external !== undefined) {
+          const primaryRef = externalReferenceOf(task.external)
+          if (!refs.some(ref => ref.system === primaryRef.system && ref.instance === primaryRef.instance
+            && ref.kind === primaryRef.kind && ref.project === primaryRef.project && ref.id === primaryRef.id)) {
+            refs.unshift(primaryRef)
+          } else {
+            const index = refs.findIndex(ref => ref.system === primaryRef.system && ref.instance === primaryRef.instance
+              && ref.kind === primaryRef.kind && ref.project === primaryRef.project && ref.id === primaryRef.id)
+            refs[index] = { ...refs[index]!, revision: primaryRef.revision, syncedAt: primaryRef.syncedAt, primary: true }
+          }
+        }
+        if (refs.length > 0) task.externalRefs = refs
+        else delete task.externalRefs
         // F8 availability contract: an invalid OPTIONAL link must never make
         // the whole board unloadable (`taskboard_ledger_unavailable` forced
         // manual JSON surgery). The load gate validates link SHAPE; the

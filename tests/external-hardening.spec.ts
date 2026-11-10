@@ -91,6 +91,8 @@ describe('durable single-ledger synchronization', () => {
   it('retains old product credentials and tasks but pauses polling until explicitly reassociated', async () => {
     const f = await fixture(); await f.service.sync(); f.service.dispose()
     const saved = JSON.parse(await readFile(f.file, 'utf8'))
+    // Simulate a pre-0.12 single-connection file: legacy shape only.
+    delete saved.connections
     delete saved.config.mappingMode; saved.config.mappings[0].projectId = '1'; saved.config.intervalMinutes = 5
     await writeFile(f.file, JSON.stringify(saved))
     await f.store.mutate('task-updated', ledger => {
@@ -110,7 +112,9 @@ describe('durable single-ledger synchronization', () => {
       expect((await service.status()).config!.id).toBe(saved.config.id)
       expect((await service.status()).requiresMappingReview).toBe(false)
       expect((await service.sync()).created).toBe(1)
-      expect(f.store.snapshot().tasks[0]).toEqual(oldTasks[0])
+      // `externalRefs` is additive canonical identity (contract v1) rebuilt from
+      // the mutated source on reload; all task content stays untouched.
+      expect({ ...f.store.snapshot().tasks[0], externalRefs: undefined }).toEqual({ ...oldTasks[0], externalRefs: undefined })
     } finally { service.dispose(); vi.useRealTimers() }
   })
   it('tests unsaved form credentials without overwriting the saved connection', async () => {

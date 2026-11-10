@@ -893,6 +893,12 @@ export type TaskModel = {
 export type TaskRecord = {
   /** External tracker provenance; local execution state remains independent. */
   external?: import('./external.ts').ExternalSource
+  /**
+   * Contract v1 canonical external identities: a card may reference several
+   * remote items (issue + ticket + card) without duplicating the work.
+   * `external` remains the sync-driving source (`primary` reference).
+   */
+  externalRefs?: import('./external.ts').ExternalReference[]
   id: string
   title: string
   description: string

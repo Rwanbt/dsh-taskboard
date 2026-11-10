@@ -1,6 +1,20 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { ExternalItem, ExternalPushBase, ExternalPushField, ExternalPushOutcome, ExternalPushPatch, ExternalSource, ExternalSyncRecord } from '../shared/external.ts'
+import {
+  ADAPTER_CONTRACT_VERSION,
+  adapterDirectionsOf,
+  adapterFieldAuthorityOf,
+  externalReferenceOf,
+  upsertExternalReference,
+  type ExternalConnectionState,
+  type ExternalItem,
+  type ExternalPushBase,
+  type ExternalPushField,
+  type ExternalPushOutcome,
+  type ExternalPushPatch,
+  type ExternalSource,
+  type ExternalSyncRecord,
+} from '../shared/external.ts'
 import { bestExternalMatch, externalKey, externalMatchScore, mergeExternalFields, normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
 import { defaultIsolationOf, defaultPermissionOf, newTaskId, normalizeTitle, type TaskRecord, type TaskLedger } from '../shared/protocol.ts'
 import type { TaskStore } from './store.ts'
@@ -11,23 +25,54 @@ import { normalizeConnection } from './external-config.ts'
 export type { ExternalConfig, SyncResult } from '../shared/external.ts'
 export type { ExternalTaskProvider } from './external-provider.ts'
 
-type SyncState = { config?: ExternalConfig }
+/** Host-only persisted state. Credentials never leave this file. */
+type SyncState = { connections: ExternalConfig[] }
+
+/** Maximum number of configured connections (bounded queue, no unbounded scan). */
+const MAX_CONNECTIONS = 10
 
 export function normalizeExternalConfig(raw: unknown, previous?: ExternalConfig): ExternalConfig {
   return normalizeConnection(raw, createBuiltinProviders(), previous)
 }
 
-/** Host-only connection state. Credential files live outside task exports. */
+/** Strip credentials before any status/UI/export path sees a connection. */
+function publicConnection(config: ExternalConfig) {
+  const { credentials: _credentials, ...rest } = config
+  return rest
+}
+
+function sumResults(results: SyncResult[]): SyncResult {
+  const base: SyncResult = { created: 0, updated: 0, unchanged: 0, conflicts: 0, ignored: 0, at: 0 }
+  for (const result of results) {
+    base.created += result.created; base.updated += result.updated; base.unchanged += result.unchanged
+    base.conflicts += result.conflicts; base.ignored += result.ignored
+    base.at = Math.max(base.at, result.at)
+    if (result.linked !== undefined) base.linked = (base.linked ?? 0) + result.linked
+    if (result.ambiguous !== undefined) base.ambiguous = (base.ambiguous ?? 0) + result.ambiguous
+    if (result.pushed !== undefined) base.pushed = (base.pushed ?? 0) + result.pushed
+    if (result.pushFailed !== undefined) base.pushFailed = (base.pushFailed ?? 0) + result.pushFailed
+  }
+  return base
+}
+
+/**
+ * External synchronization service (contract v1).
+ *
+ * Owns every configured connection, the opt-in outbound phase and the
+ * non-secret sync metadata committed atomically with imported tasks. A
+ * connection only writes remotely when its stored `direction` is
+ * `bidirectional` — adapter write capability alone never authorizes a push.
+ */
 export class ExternalSyncService {
-  private state: SyncState = {}
-  private volatileError?: string
+  private state: SyncState = { connections: [] }
+  private volatileErrors = new Map<string, string>()
   private ready: Promise<void>
   private lane: Promise<unknown> = Promise.resolve()
-  private running = false
+  private running = new Set<string>()
   private disposed = false
-  private controller?: AbortController
+  private controllers = new Map<string, AbortController>()
   private timer?: ReturnType<typeof setInterval>
-  private lastAttempt = 0
+  private lastAttempts = new Map<string, number>()
   private readonly registry: ExternalProviderRegistry
   constructor(private readonly options: {
     file: string; store: TaskStore; workspaceExists: (id: string) => boolean
@@ -44,32 +89,51 @@ export class ExternalSyncService {
   private now(): number { return this.options.now?.() ?? Date.now() }
   private async load(): Promise<void> {
     try {
-      const raw = JSON.parse(await readFile(this.options.file, 'utf8')) as SyncState & Partial<ExternalSyncRecord>
-      if (raw.config) {
-        if (typeof raw.config.id !== 'string' || !raw.config.id) throw new Error('invalid connection identity')
-        this.state.config = { ...normalizeConnection(raw.config, this.registry, undefined, false, true), id: raw.config.id }
+      const raw = JSON.parse(await readFile(this.options.file, 'utf8')) as SyncState & Partial<ExternalSyncRecord> & {
+        connections?: unknown; config?: unknown
       }
+      const candidates = Array.isArray(raw.connections) ? raw.connections : raw.config !== undefined ? [raw.config] : []
+      if (candidates.length > MAX_CONNECTIONS) throw new Error('too many configured connections')
+      const connections: ExternalConfig[] = []
+      for (const candidate of candidates) {
+        if (!candidate || typeof candidate !== 'object') throw new Error('invalid connection entry')
+        const value = candidate as Record<string, unknown>
+        if (typeof value.id !== 'string' || !value.id) throw new Error('invalid connection identity')
+        const normalized = normalizeConnection(value, this.registry, undefined, false, true)
+        connections.push({ ...normalized, id: value.id })
+      }
+      if (new Set(connections.map(connection => connection.id)).size !== connections.length) throw new Error('duplicate connection identity')
+      this.state = { connections }
       await this.options.store.load()
-      // Move existing non-secret metadata once; token-only authentication is still rejected above.
-      if (this.state.config && (Object.keys(raw.links ?? {}).length || raw.ignored?.length || raw.lastResult || raw.lastError)) {
-        const id = this.state.config.id
-        const migrated = normalizeExternalSyncRecords({ [id]: raw })[id]!
+      // Move the single-connection metadata of 0.10/0.11 into the ledger once.
+      const legacy = raw.config !== undefined && raw.config !== null && typeof raw.config === 'object'
+        ? (raw.config as Record<string, unknown>) : undefined
+      const legacyId = typeof legacy?.id === 'string' ? legacy.id : connections[0]?.id
+      if (legacyId && (Object.keys(raw.links ?? {}).length || raw.ignored?.length || raw.lastResult || raw.lastError)) {
+        const migrated = normalizeExternalSyncRecords({ [legacyId]: raw })[legacyId]!
         await this.options.store.mutate('external-sync-updated', ledger => {
-          if (ledger.externalSync?.[id]) return undefined
-          ledger.externalSync ??= {}; ledger.externalSync[id] = migrated
+          if (ledger.externalSync?.[legacyId]) return undefined
+          ledger.externalSync ??= {}; ledger.externalSync[legacyId] = migrated
           return []
         })
       }
-      this.lastAttempt = this.state.config ? this.options.store.snapshot().externalSync?.[this.state.config.id]?.lastAttemptAt ?? 0 : 0
+      for (const connection of connections) {
+        this.lastAttempts.set(connection.id, this.options.store.snapshot().externalSync?.[connection.id]?.lastAttemptAt ?? 0)
+      }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.volatileError = 'External sync configuration could not be loaded; reconfigure the connection.'
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        this.volatileErrors.set('', 'External sync configuration could not be loaded; reconfigure the connection.')
+      }
     }
     await this.options.store.load()
   }
   private async persist(): Promise<void> {
     await mkdir(dirname(this.options.file), { recursive: true })
     const temp = `${this.options.file}.tmp`
-    await writeFile(temp, JSON.stringify(this.state), { mode: 0o600 })
+    // `config` mirrors the primary connection for one release so pre-0.12
+    // tooling and rollback keep working; `connections` is authoritative.
+    const payload = { ...this.state, ...(this.primary() === undefined ? { config: undefined } : { config: this.primary() }) }
+    await writeFile(temp, JSON.stringify(payload), { mode: 0o600 })
     await rename(temp, this.options.file)
   }
   private serial<T>(run: () => Promise<T>): Promise<T> {
@@ -77,38 +141,96 @@ export class ExternalSyncService {
     this.lane = next.catch(() => {})
     return next
   }
+  private primary(): ExternalConfig | undefined { return this.state.connections[0] }
+  private connection(id: string): ExternalConfig {
+    const config = this.state.connections.find(candidate => candidate.id === id)
+    if (config === undefined) throw new Error('unknown external connection')
+    return config
+  }
+  private recordOf(connectionId: string): ExternalSyncRecord | undefined {
+    return this.options.store.snapshot().externalSync?.[connectionId]
+  }
+  private stateOf(config: ExternalConfig): ExternalConnectionState {
+    const record = this.recordOf(config.id)
+    return { running: this.running.has(config.id),
+      lastResult: record?.lastResult, lastError: this.volatileErrors.get(config.id) ?? record?.lastError,
+      lastAttemptAt: record?.lastAttemptAt, ignoredCount: record?.ignored.length ?? 0,
+      requiresMappingReview: config.provider === 'zentao' && !config.mappingMode }
+  }
   async status(): Promise<ExternalSyncStatus> {
     await this.ready
-    const config = this.state.config ? (({ credentials: _credentials, ...rest }) => rest)(this.state.config) : undefined
-    const credentialPresent = Object.fromEntries(Object.entries(this.state.config?.credentials ?? {}).map(([key, value]) => [key, Boolean(value)]))
-    const mode = config && this.registry.get(config.provider).descriptor.authModes.find(m => m.id === config.authMode)
-    const credentialValues = Object.fromEntries((mode?.fields ?? []).filter(f => f.secret === false).map(f => [f.key, this.state.config!.credentials[f.key] ?? '']))
-    const record = config ? this.options.store.snapshot().externalSync?.[config.id] : undefined
-    return { config, credentialPresent, credentialValues, providers: this.registry.list(), running: this.running,
-      requiresMappingReview: config?.provider === 'zentao' && !config.mappingMode,
-      lastResult: record?.lastResult, lastError: this.volatileError ?? record?.lastError, lastAttemptAt: record?.lastAttemptAt, ignoredCount: record?.ignored.length ?? 0 }
+    const connections = this.state.connections.map(publicConnection)
+    const primary = connections[0]
+    const credentialPresent = Object.fromEntries(Object.entries(this.primary()?.credentials ?? {}).map(([key, value]) => [key, Boolean(value)]))
+    const mode = primary && this.registry.get(primary.provider).descriptor.authModes.find(m => m.id === primary.authMode)
+    const credentialValues = Object.fromEntries((mode?.fields ?? []).filter(f => f.secret === false)
+      .map(f => [f.key, this.primary()?.credentials[f.key] ?? '']))
+    const connectionStates = Object.fromEntries(this.state.connections.map(config => [config.id, this.stateOf(config)]))
+    const primaryState = this.primary() === undefined ? undefined : this.stateOf(this.primary()!)
+    return { config: primary, connections, connectionStates, contractVersion: ADAPTER_CONTRACT_VERSION,
+      credentialPresent, credentialValues, providers: this.registry.list(), running: this.running.size > 0,
+      requiresMappingReview: primaryState?.requiresMappingReview,
+      lastResult: primaryState?.lastResult, lastError: primaryState?.lastError ?? this.volatileErrors.get(''),
+      lastAttemptAt: primaryState?.lastAttemptAt, ignoredCount: primaryState?.ignoredCount ?? 0 }
   }
-  async configure(raw: unknown): Promise<void> {
+  /**
+   * Create or update a connection. With one existing connection and no
+   * explicit id, the call updates it (0.10/0.11 client compatibility); pass
+   * `createNew` to append a second connection instead.
+   * @returns the stable connection id.
+   */
+  async configure(raw: unknown, connectionId?: string, createNew = false): Promise<string> {
     await this.ready
-    if (this.running) throw new Error('sync is running')
-    await this.serial(async () => {
-      if (this.running) throw new Error('sync is running')
-      const config = normalizeConnection(raw, this.registry, this.state.config)
+    if (this.running.size > 0) throw new Error('sync is running')
+    return this.serial(async () => {
+      if (this.running.size > 0) throw new Error('sync is running')
+      const incoming = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+      let previous: ExternalConfig | undefined
+      if (connectionId !== undefined) previous = this.connection(connectionId)
+      else if (typeof incoming.id === 'string') previous = this.state.connections.find(candidate => candidate.id === incoming.id)
+      else if (!createNew && this.state.connections.length === 1) previous = this.state.connections[0]
+      const config = normalizeConnection(raw, this.registry, previous)
       if (config.mappings.some(m => m.workspaceId ? !this.options.workspaceExists(m.workspaceId) : !config.includeUnmapped)) throw new Error('unknown workspace')
+      const id = previous?.id ?? (this.state.connections.some(candidate => candidate.id === config.id) || !config.id ? newTaskId() : config.id)
+      const stored: ExternalConfig = { ...config, id }
+      if (previous === undefined && this.state.connections.length >= MAX_CONNECTIONS) throw new Error('too many configured connections')
       const old = this.state
-      this.state = { config }
+      this.state = { connections: previous === undefined
+        ? [...old.connections, stored]
+        : old.connections.map(candidate => candidate.id === previous!.id ? stored : candidate) }
       try { await this.persist() } catch (e) { this.state = old; throw e }
-      this.volatileError = undefined
+      this.volatileErrors.delete(id)
+      this.volatileErrors.delete('')
+      return id
     })
   }
-  async clearIgnored(): Promise<void> {
+  /** Remove one connection. Sync metadata stays in the ledger for audit. */
+  async removeConnection(id: string): Promise<void> {
     await this.ready
-    if (this.running) throw new Error('sync is running')
+    if (this.running.size > 0) throw new Error('sync is running')
     await this.serial(async () => {
-      if (this.running) throw new Error('sync is running')
-      if (!this.state.config) throw new Error('configure a connection first')
+      if (this.running.size > 0) throw new Error('sync is running')
+      this.connection(id)
+      const old = this.state
+      this.state = { connections: old.connections.filter(candidate => candidate.id !== id) }
+      try { await this.persist() } catch (e) { this.state = old; throw e }
+      this.lastAttempts.delete(id); this.volatileErrors.delete(id)
+    })
+  }
+  /** Enable/disable a connection without editing its credentials or mappings. */
+  async setEnabled(id: string, enabled: boolean): Promise<void> {
+    const config = this.connection(id)
+    await this.configure({ ...publicConnection(config), enabled }, id)
+  }
+  async clearIgnored(connectionId?: string): Promise<void> {
+    await this.ready
+    if (this.running.size > 0) throw new Error('sync is running')
+    await this.serial(async () => {
+      if (this.running.size > 0) throw new Error('sync is running')
+      const config = connectionId !== undefined ? this.connection(connectionId) : this.primary()
+      if (!config) throw new Error('configure a connection first')
       await this.options.store.mutate('external-sync-updated', ledger => {
-        const record = this.record(ledger, this.state.config!.id)
+        const record = this.record(ledger, config.id)
         record.ignored = []; record.links = {}
         return []
       })
@@ -127,6 +249,10 @@ export class ExternalSyncService {
         else task[key] = task.external.item[key]
       }
       task.external.conflicts = task.external.conflicts.filter(k => k !== key)
+      if (task.externalRefs !== undefined) {
+        task.externalRefs = task.externalRefs.map(ref => ref.project === task.external!.item.projectId && ref.id === task.external!.item.id
+          && ref.system === task.external!.provider ? { ...ref, state: task.external!.conflicts.length === 0 ? 'linked' : 'conflict' } : ref)
+      }
       task.version++; task.updatedAt = this.now(); task.updatedBy = { kind: 'user' }
       return [task]
     })
@@ -142,52 +268,107 @@ export class ExternalSyncService {
   }
   private async tick(): Promise<void> {
     await this.ready
-    const interval = this.state.config?.intervalMinutes ?? 0
-    if (this.state.config?.provider === 'zentao' && !this.state.config.mappingMode) return
-    if (interval && !this.running && this.now() - this.lastAttempt >= interval * 60_000) await this.sync()
+    for (const config of this.state.connections) {
+      if (config.enabled === false) continue
+      const interval = config.intervalMinutes
+      if (!interval) continue
+      if (config.provider === 'zentao' && !config.mappingMode) continue
+      const lastAttempt = this.lastAttempts.get(config.id) ?? 0
+      if (this.now() - lastAttempt < interval * 60_000) continue
+      try { await this.sync(config.id) } catch { /* next tick retries; the record carries the error */ }
+    }
   }
-  dispose(): void { this.disposed = true; if (this.timer) clearInterval(this.timer); this.controller?.abort() }
-  cancel(): void { this.controller?.abort() }
+  dispose(): void {
+    this.disposed = true
+    if (this.timer) clearInterval(this.timer)
+    for (const controller of this.controllers.values()) controller.abort()
+    this.controllers.clear()
+  }
+  cancel(connectionId?: string): void {
+    if (connectionId === undefined) { for (const controller of this.controllers.values()) controller.abort(); return }
+    this.controllers.get(connectionId)?.abort()
+  }
   async test(raw?: unknown): Promise<void> {
     await this.ready
-    const config = raw ? normalizeConnection(raw, this.registry, this.state.config, true) : this.state.config
+    const config = raw !== undefined && raw !== null && Object.keys(raw as Record<string, unknown>).length > 0
+      ? normalizeConnection(raw, this.registry, this.primary(), true)
+      : this.primary()
     if (!config) throw new Error('configure a connection first')
     await this.provider(config).test(AbortSignal.timeout(30_000))
   }
-  private provider(config: ExternalConfig): ExternalTaskProvider { return this.options.provider?.(config) ?? this.registry.create(config) }
+  private provider(config: ExternalConfig): ExternalTaskProvider {
+    return this.options.provider?.(config) ?? this.registry.create(config)
+  }
+  private resolveDraft(raw: unknown): ExternalConfig {
+    if (raw !== undefined && raw !== null && typeof raw === 'object'
+      && ('provider' in (raw as Record<string, unknown>) || 'baseUrl' in (raw as Record<string, unknown>))) {
+      return normalizeConnection(raw, this.registry, this.primary(), true)
+    }
+    const connectionId = raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).connectionId === 'string'
+      ? (raw as Record<string, string>).connectionId : undefined
+    const config = connectionId !== undefined ? this.connection(connectionId) : this.primary()
+    if (!config) throw new Error('configure a connection first')
+    return config
+  }
   async discoverProjects(raw?: unknown) {
     await this.ready
-    const config = raw ? normalizeConnection(raw, this.registry, this.state.config, true) : this.state.config
-    if (!config) throw new Error('configure a connection first')
+    const config = this.resolveDraft(raw)
     const descriptor = this.registry.get(config.provider).descriptor
     const provider = this.provider(config)
     if (!descriptor.capabilities.projectDiscovery || !provider.listProjects) throw new Error('project discovery is not supported')
     return provider.listProjects(AbortSignal.timeout(30_000))
   }
-  async discoverAccount() {
+  async discoverAccount(raw?: unknown) {
     await this.ready
-    if (!this.state.config) throw new Error('configure a connection first')
-    const definition = this.registry.get(this.state.config.provider)
-    const provider = this.provider(this.state.config)
+    const config = this.resolveDraft(raw)
+    const definition = this.registry.get(config.provider)
+    const provider = this.provider(config)
     if (!definition.descriptor.capabilities.accountDiscovery || !provider.getAccount) throw new Error('this provider requires an explicit assignee account')
     return provider.getAccount(AbortSignal.timeout(30_000))
   }
-  async sync(): Promise<SyncResult> {
+  /**
+   * Synchronize one connection, or every enabled connection when no id is
+   * given. Multi-connection rounds sum the counters; a single failure is
+   * surfaced as an error after the other connections were still processed.
+   */
+  async sync(connectionId?: string): Promise<SyncResult> {
     await this.ready
     if (this.disposed) throw new Error('sync service stopped')
-    if (this.running) throw new Error('sync is already running')
-    if (!this.state.config) throw new Error('configure a connection first')
-    if (this.state.config.provider === 'zentao' && !this.state.config.mappingMode) throw new Error('reassociate projects or executions before synchronizing')
-    this.running = true
-    this.lastAttempt = this.now()
-    const config = structuredClone(this.state.config)
-    this.controller = new AbortController()
-    const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(300_000)])
+    if (this.running.size > 0) throw new Error('sync is already running')
+    const targets = connectionId !== undefined
+      ? [this.connection(connectionId)]
+      : this.state.connections.filter(config => config.enabled !== false)
+    if (targets.length === 0) throw new Error('configure a connection first')
+    const results: SyncResult[] = []
+    const failures: string[] = []
+    for (const config of targets) {
+      if (this.running.size > 0) throw new Error('sync is already running')
+      try { results.push(await this.syncOne(config)) } catch (error) {
+        failures.push(config.id)
+        if (targets.length === 1) throw error
+      }
+    }
+    if (results.length === 0) throw new Error('External sync failed. Check connection, credentials, permissions and server availability.')
+    const combined = sumResults(results)
+    combined.connections = targets.length
+    if (failures.length > 0) combined.failedConnections = failures.length
+    return combined
+  }
+  private async syncOne(config: ExternalConfig): Promise<SyncResult> {
+    if (this.disposed) throw new Error('sync service stopped')
+    if (config.provider === 'zentao' && !config.mappingMode) throw new Error('reassociate projects or executions before synchronizing')
+    this.running.add(config.id)
+    this.lastAttempts.set(config.id, this.now())
+    const attemptsAt = this.now()
+    const controller = new AbortController()
+    this.controllers.set(config.id, controller)
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(300_000)])
     const result: SyncResult = { created: 0, updated: 0, unchanged: 0, conflicts: 0, ignored: 0, at: this.now(), linked: 0, ambiguous: 0 }
     let committed = false
     try {
       await this.options.store.load()
       const provider = this.provider(config)
+      const descriptor = this.registry.get(config.provider).descriptor
       let mappings = config.mappings
       if (config.provider === 'zentao' && config.includeUnmapped) {
         if (!provider.listProjects) throw new Error('scope discovery is required for unmapped synchronization')
@@ -234,7 +415,7 @@ export class ExternalSyncService {
             if (task?.trashedAt !== undefined) { ignored.add(key); result.ignored++; continue }
             if (ignored.has(key)) { result.ignored++; continue }
             if (task?.status === 'archived') { result.unchanged++; continue }
-            const source: ExternalSource = { connectionId: config.id, provider: config.provider, providerName: this.registry.get(config.provider).descriptor.name, item, syncedAt: result.at, conflicts: [] }
+            const source: ExternalSource = { connectionId: config.id, provider: config.provider, providerName: descriptor.name, item, syncedAt: result.at, conflicts: [] }
             if (!task) {
               // Opt-in dedupe: a card the user already created for this item is
               // adopted instead of duplicating it. Adoption happens before the
@@ -245,6 +426,7 @@ export class ExternalSyncService {
               if (adopted !== undefined) {
                 const card = adopted.card
                 card.external = { ...source, pushBase: this.localPushBase(card) }
+                card.externalRefs = upsertExternalReference(card.externalRefs, externalReferenceOf(card.external))
                 card.version++; card.updatedAt = result.at; card.updatedBy = { kind: 'user' }
                 changed.push(card); byKey.set(key, card); links[key] = card.id
                 result.linked = (result.linked ?? 0) + 1
@@ -256,7 +438,8 @@ export class ExternalSyncService {
                 isolation: defaultIsolationOf(ledger.settings), permission: defaultPermissionOf(ledger.settings),
                 model: ledger.settings?.defaultModel, presetId: ledger.settings?.defaultPresetId,
                 version: 1, createdAt: result.at, updatedAt: result.at, createdBy: { kind: 'user' }, updatedBy: { kind: 'user' },
-                comments: [], executions: [], external: { ...source, pushBase: { title: item.title, description: item.description, status: config.importStatus ?? 'backlog' } } }
+                comments: [], executions: [], external: { ...source, pushBase: { title: item.title, description: item.description, status: config.importStatus ?? 'backlog' } },
+                externalRefs: [externalReferenceOf({ ...source })] }
               ledger.tasks.push(created); changed.push(created); byKey.set(key, created); links[key] = created.id; result.created++
             } else {
               links[key] = task.id
@@ -264,39 +447,46 @@ export class ExternalSyncService {
               if (workspaceChanged) task.workspaceId = workspaceId
               if (task.status === 'done' || task.status === 'canceled') {
                 const old = task.external!.item
-                const statusChanged = ['status', 'assignedTo', 'assignees', 'closed'].some(key => JSON.stringify(old[key as keyof ExternalItem]) !== JSON.stringify(item[key as keyof ExternalItem]))
+                const statusChanged = ['status', 'assignedTo', 'assignees', 'closed', 'revision'].some(field => JSON.stringify(old[field as keyof ExternalItem]) !== JSON.stringify(item[field as keyof ExternalItem]))
                 if (!workspaceChanged && !statusChanged && !task.external!.conflicts.length) { result.unchanged++; continue }
                 task.external = { ...task.external!, item: { ...old, status: item.status, assignedTo: item.assignedTo, closed: item.closed,
-                  ...(item.assignees !== undefined ? { assignees: item.assignees } : {}) }, conflicts: [], syncedAt: result.at,
+                  ...(item.assignees !== undefined ? { assignees: item.assignees } : {}), ...(item.revision !== undefined ? { revision: item.revision } : {}) },
+                  conflicts: [], syncedAt: result.at,
                   pushBase: task.external!.pushBase ?? { title: old.title, description: old.description, status: task.status } }
                 if (item.assignees === undefined) delete task.external.item.assignees
+                task.externalRefs = upsertExternalReference(task.externalRefs, externalReferenceOf(task.external))
                 task.version++; task.updatedAt = result.at
                 changed.push(task); result.updated++
                 continue
               }
               const merged = mergeExternalFields(task, task.external!, item,
-                ['in_progress', 'in_review'].includes(task.status) || task.executions.some(e => e.outcome === 'running'))
+                ['in_progress', 'in_review'].includes(task.status) || task.executions.some(e => e.outcome === 'running'),
+                adapterFieldAuthorityOf(descriptor))
               source.conflicts = merged.conflicts
               const previous = task.external!.item
               source.pushBase = task.external!.pushBase ?? { title: previous.title, description: previous.description, status: task.status }
-              const sameItem = ([...new Set([...Object.keys(previous), ...Object.keys(item)])] as Array<keyof ExternalItem>).every(key => JSON.stringify(previous[key]) === JSON.stringify(item[key]))
+              const sameItem = ([...new Set([...Object.keys(previous), ...Object.keys(item)])] as Array<keyof ExternalItem>).every(field => JSON.stringify(previous[field]) === JSON.stringify(item[field]))
               if (!workspaceChanged && sameItem && JSON.stringify(task.external!.conflicts) === JSON.stringify(source.conflicts)) { result.unchanged++; continue }
               Object.assign(task, merged.fields)
-              task.external = source; task.version++; task.updatedAt = result.at
+              task.external = source
+              task.externalRefs = upsertExternalReference(task.externalRefs, externalReferenceOf(source, source.conflicts.length > 0 ? 'conflict' : 'linked'))
+              task.version++; task.updatedAt = result.at
               changed.push(task); result.updated++
               if (source.conflicts.length) result.conflicts++
             }
           }
           record.ignored = [...ignored]; record.links = links; record.lastResult = result
-          record.lastAttemptAt = this.lastAttempt; delete record.lastError
+          record.lastAttemptAt = attemptsAt; delete record.lastError
           return changed
         })
         committed = true
-        this.volatileError = undefined
+        this.volatileErrors.delete(config.id)
       })
-      // Opt-in outbound phase. It runs only after the inbound merge committed,
-      // so `task.external.item` is the freshest remote base for every diff.
-      if (this.registry.get(config.provider).descriptor.capabilities.write === true) {
+      // Opt-in outbound phase: BOTH the stored direction and the adapter
+      // capability must authorize it. It runs only after the inbound merge
+      // committed, so `task.external.item` is the freshest remote base.
+      if (config.direction === 'bidirectional' && adapterDirectionsOf(descriptor).includes('outbound')
+        && descriptor.capabilities.write === true) {
         result.pushed = 0
         result.pushFailed = 0
         await this.pushLinked(config, signal, result)
@@ -306,20 +496,26 @@ export class ExternalSyncService {
     } catch (error) {
       // Never expose server bodies or request URLs (which may contain credentials).
       const message = committed ? 'Tasks were updated, but sync completion reporting failed.' : 'External sync failed. Check connection, credentials, permissions and server availability.'
-      this.volatileError = message
+      this.volatileErrors.set(config.id, message)
       try {
         await this.serial(async () => this.options.store.mutate('external-sync-updated', ledger => {
           const record = this.record(ledger, config.id)
-          record.lastAttemptAt = this.lastAttempt; record.lastError = message
+          record.lastAttemptAt = attemptsAt; record.lastError = message
           return []
         }))
-      } catch { this.volatileError = `${message} Sync status could not be saved.` }
-      throw new Error(this.volatileError, { cause: error })
-    } finally { this.running = false; this.controller = undefined }
+      } catch { this.volatileErrors.set(config.id, `${message} Sync status could not be saved.`) }
+      throw new Error(this.volatileErrors.get(config.id) ?? message, { cause: error })
+    } finally {
+      this.running.delete(config.id)
+      this.controllers.delete(config.id)
+    }
   }
   /** Fail closed: write-back requires both the descriptor flag and the methods. */
   private writeProvider(config: ExternalConfig): ExternalWriteProvider {
-    if (this.registry.get(config.provider).descriptor.capabilities.write !== true) throw new Error('this provider does not support write-back')
+    const descriptor = this.registry.get(config.provider).descriptor
+    if (adapterDirectionsOf(descriptor).includes('outbound') === false || descriptor.capabilities.write !== true) {
+      throw new Error('this provider does not support write-back')
+    }
     const provider = this.provider(config) as Partial<ExternalWriteProvider>
     if (typeof provider.createItem !== 'function' || typeof provider.updateItem !== 'function') throw new Error('provider write-back is unavailable')
     return provider as ExternalWriteProvider
@@ -355,9 +551,10 @@ export class ExternalSyncService {
    * must not push its pre-link wording back). Conflicts are never overwritten,
    * running executions are never raced, and reopening stays a remote action.
    */
-  private planPush(task: TaskRecord): { patch: ExternalPushPatch; fields: ExternalPushField[] } | undefined {
+  private planPush(task: TaskRecord, config: ExternalConfig): { patch: ExternalPushPatch; fields: ExternalPushField[] } | undefined {
     const source = task.external
     if (source === undefined) return undefined
+    if (config.direction !== 'bidirectional') return undefined
     if (task.executions.some(execution => execution.outcome === 'running')) return undefined
     const conflicts = new Set(source.conflicts)
     const base = source.pushBase
@@ -380,7 +577,7 @@ export class ExternalSyncService {
     const completed: Array<{ id: string; version: number; source: ExternalSource }> = []
     for (const task of pending) {
       signal.throwIfAborted()
-      const plan = this.planPush(task)
+      const plan = this.planPush(task, config)
       if (plan === undefined) continue
       try {
         const item = await write.updateItem(task.external!.item.projectId, task.external!.item.type, task.external!.item.id, plan.patch, signal)
@@ -403,6 +600,7 @@ export class ExternalSyncService {
           // A card edited while its push was in flight keeps the newer local edits.
           if (task === undefined || task.trashedAt !== undefined || task.version !== entry.version) continue
           task.external = entry.source
+          task.externalRefs = upsertExternalReference(task.externalRefs, externalReferenceOf(entry.source))
           task.version++; task.updatedAt = this.now(); task.updatedBy = { kind: 'user' }
           changed.push(task)
         }
@@ -413,7 +611,7 @@ export class ExternalSyncService {
   private async recordResult(config: ExternalConfig, result: SyncResult): Promise<void> {
     await this.serial(async () => this.options.store.mutate('external-sync-updated', ledger => {
       const record = this.record(ledger, config.id)
-      record.lastResult = result; record.lastAttemptAt = this.lastAttempt; delete record.lastError
+      record.lastResult = result; record.lastAttemptAt = this.lastAttempts.get(config.id); delete record.lastError
       return []
     }))
   }
@@ -425,22 +623,29 @@ export class ExternalSyncService {
     return candidates[0]!
   }
   /** Push one card (or create and link a remote item for an unlinked card). */
-  async pushTask(taskId: string, scope?: string): Promise<ExternalPushOutcome> {
+  async pushTask(taskId: string, scope?: string, connectionId?: string): Promise<ExternalPushOutcome> {
     await this.ready
     if (this.disposed) throw new Error('sync service stopped')
-    if (this.running) throw new Error('sync is already running')
-    if (!this.state.config) throw new Error('configure a connection first')
-    const config = structuredClone(this.state.config)
+    if (this.running.size > 0) throw new Error('sync is already running')
+    const snapshotTask = this.options.store.snapshot().tasks.find(candidate => candidate.id === taskId)
+    const linkedConnection = snapshotTask?.external?.connectionId
+    const config = linkedConnection !== undefined ? this.connection(linkedConnection)
+      : connectionId !== undefined ? this.connection(connectionId) : this.primary()
+    if (!config) throw new Error('configure a connection first')
+    const descriptor = this.registry.get(config.provider).descriptor
+    if (!adapterDirectionsOf(descriptor).includes('outbound') || descriptor.capabilities.write !== true) throw new Error('this provider does not support write-back')
+    if (config.direction !== 'bidirectional') throw new Error('enable bidirectional sync for this connection before pushing')
     const write = this.writeProvider(config)
+    if (snapshotTask === undefined || snapshotTask.trashedAt !== undefined) throw new Error('task not found')
     const signal = AbortSignal.timeout(120_000)
-    this.running = true
+    this.running.add(config.id)
     try {
       const snapshot = this.options.store.snapshot()
       const task = snapshot.tasks.find(candidate => candidate.id === taskId)
       if (task === undefined || task.trashedAt !== undefined) throw new Error('task not found')
       if (task.external !== undefined) {
         if (task.external.connectionId !== config.id) throw new Error('task is linked to another external connection')
-        const plan = this.planPush(task)
+        const plan = this.planPush(task, config)
         if (plan === undefined) return { created: false, pushed: [], item: task.external.item }
         const item = await write.updateItem(task.external.item.projectId, task.external.item.type, task.external.item.id, plan.patch, signal)
         const source = normalizeExternalSource({ connectionId: config.id, provider: config.provider,
@@ -450,6 +655,7 @@ export class ExternalSyncService {
           const current = ledger.tasks.find(candidate => candidate.id === task.id)
           if (current === undefined || current.trashedAt !== undefined) throw new Error('task not found')
           current.external = { ...source, pushBase: this.nextPushBase(task, plan.fields) }
+          current.externalRefs = upsertExternalReference(current.externalRefs, externalReferenceOf(current.external))
           current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
           return [current]
         }))
@@ -471,10 +677,11 @@ export class ExternalSyncService {
         record.links[key] = current.id
         record.ignored = record.ignored.filter(entry => entry !== key)
         current.external = { ...source, pushBase: { title: item.title, description: item.description, status: task.status } }
+        current.externalRefs = upsertExternalReference(current.externalRefs, { ...externalReferenceOf(current.external), provenance: 'created' })
         current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
         return [current]
       }))
       return { created: true, pushed: ['title', 'description', ...(close ? ['state' as const] : [])], item }
-    } finally { this.running = false }
+    } finally { this.running.delete(config.id) }
   }
 }

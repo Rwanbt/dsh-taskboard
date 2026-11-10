@@ -61,7 +61,7 @@ async function fixture(configure: Record<string, unknown> = {}) {
   await service.configure({
     provider: 'github', baseUrl: 'https://api.github.com', account: 'octocat', authMode: 'token',
     credentials: { token: 'private-token' }, itemTypes: ['issue'],
-    mappings: [{ projectId: 'octo/repo', workspaceId: 'ws' }], intervalMinutes: 0, ...configure,
+    mappings: [{ projectId: 'octo/repo', workspaceId: 'ws' }], intervalMinutes: 0, direction: 'bidirectional', ...configure,
   })
   return {
     service, store, updates, creates,

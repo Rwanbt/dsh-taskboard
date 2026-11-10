@@ -56,7 +56,7 @@ async function fixture(options: { tasks?: TaskRecord[]; connect?: Record<string,
   await service.configure({
     provider: 'github', baseUrl: 'https://api.github.com', account: 'octocat', authMode: 'token',
     credentials: { token: 'private-token' }, itemTypes: ['issue'],
-    mappings: [{ projectId: 'octo/repo', workspaceId: 'ws' }], intervalMinutes: 0,
+    mappings: [{ projectId: 'octo/repo', workspaceId: 'ws' }], intervalMinutes: 0, direction: 'bidirectional',
     ...(options.connect ?? {}),
   })
   if (options.tasks !== undefined) {

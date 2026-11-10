@@ -753,18 +753,30 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
         if (!options.externalSync) { res.writeHead(501); res.end(); return }
         try {
           let value: unknown = {}
-          if (pathname === `${ROUTE_PREFIX}/external/config`) await options.externalSync.configure(body)
+          const connectionId = typeof body.connectionId === 'string' && body.connectionId.length > 0 ? body.connectionId : undefined
+          if (pathname === `${ROUTE_PREFIX}/external/config`) {
+            if (body.createNew !== undefined && typeof body.createNew !== 'boolean') throw new Error('invalid connection creation flag')
+            value = { id: await options.externalSync.configure(body, connectionId, body.createNew === true) }
+          }
           else if (pathname === `${ROUTE_PREFIX}/external/test`) await options.externalSync.test(Object.keys(body).length ? body : undefined)
           else if (pathname === `${ROUTE_PREFIX}/external/projects`) value = await options.externalSync.discoverProjects(body)
-          else if (pathname === `${ROUTE_PREFIX}/external/account`) value = await options.externalSync.discoverAccount()
-          else if (pathname === `${ROUTE_PREFIX}/external/sync`) value = await options.externalSync.sync()
+          else if (pathname === `${ROUTE_PREFIX}/external/account`) value = await options.externalSync.discoverAccount(body)
+          else if (pathname === `${ROUTE_PREFIX}/external/sync`) value = await options.externalSync.sync(connectionId)
           else if (pathname === `${ROUTE_PREFIX}/external/push`) {
             if (typeof body.taskId !== 'string' || body.taskId.length === 0) throw new Error('invalid push request')
             if (body.scope !== undefined && (typeof body.scope !== 'string' || body.scope.length === 0)) throw new Error('invalid push scope')
-            value = await options.externalSync.pushTask(body.taskId, body.scope)
+            value = await options.externalSync.pushTask(body.taskId, body.scope, connectionId)
           }
-          else if (pathname === `${ROUTE_PREFIX}/external/cancel`) options.externalSync.cancel()
-          else if (pathname === `${ROUTE_PREFIX}/external/ignored/clear`) await options.externalSync.clearIgnored()
+          else if (pathname === `${ROUTE_PREFIX}/external/cancel`) options.externalSync.cancel(connectionId)
+          else if (pathname === `${ROUTE_PREFIX}/external/remove`) {
+            if (connectionId === undefined) throw new Error('invalid connection id')
+            await options.externalSync.removeConnection(connectionId)
+          }
+          else if (pathname === `${ROUTE_PREFIX}/external/enabled`) {
+            if (connectionId === undefined || typeof body.enabled !== 'boolean') throw new Error('invalid enable request')
+            await options.externalSync.setEnabled(connectionId, body.enabled)
+          }
+          else if (pathname === `${ROUTE_PREFIX}/external/ignored/clear`) await options.externalSync.clearIgnored(connectionId)
           else if (pathname === `${ROUTE_PREFIX}/external/resolve`) {
             if (typeof body.taskId !== 'string' || typeof body.field !== 'string' || typeof body.acceptExternal !== 'boolean' || typeof body.ifVersion !== 'number') throw new Error('invalid conflict resolution')
             await options.externalSync.resolve(body.taskId, body.field, body.acceptExternal, body.ifVersion)
