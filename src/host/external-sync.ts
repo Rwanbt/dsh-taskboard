@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { ExternalItem, ExternalPushField, ExternalPushOutcome, ExternalPushPatch, ExternalSource, ExternalSyncRecord } from '../shared/external.ts'
-import { externalKey, mergeExternalFields, normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
+import type { ExternalItem, ExternalPushBase, ExternalPushField, ExternalPushOutcome, ExternalPushPatch, ExternalSource, ExternalSyncRecord } from '../shared/external.ts'
+import { bestExternalMatch, externalKey, externalMatchScore, mergeExternalFields, normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
 import { defaultIsolationOf, defaultPermissionOf, newTaskId, normalizeTitle, type TaskRecord, type TaskLedger } from '../shared/protocol.ts'
 import type { TaskStore } from './store.ts'
 import type { ExternalConfig, ExternalSyncStatus, SyncResult } from '../shared/external.ts'
@@ -183,7 +183,7 @@ export class ExternalSyncService {
     const config = structuredClone(this.state.config)
     this.controller = new AbortController()
     const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(300_000)])
-    const result: SyncResult = { created: 0, updated: 0, unchanged: 0, conflicts: 0, ignored: 0, at: this.now() }
+    const result: SyncResult = { created: 0, updated: 0, unchanged: 0, conflicts: 0, ignored: 0, at: this.now(), linked: 0, ambiguous: 0 }
     let committed = false
     try {
       await this.options.store.load()
@@ -236,13 +236,27 @@ export class ExternalSyncService {
             if (task?.status === 'archived') { result.unchanged++; continue }
             const source: ExternalSource = { connectionId: config.id, provider: config.provider, providerName: this.registry.get(config.provider).descriptor.name, item, syncedAt: result.at, conflicts: [] }
             if (!task) {
-              if (item.closed || !(item.assignees ?? [item.assignedTo]).includes(config.account)) continue
+              // Opt-in dedupe: a card the user already created for this item is
+              // adopted instead of duplicating it. Adoption happens before the
+              // import filters on purpose — the card exists regardless of who
+              // the remote item is assigned to.
+              const adopted = config.matchExisting ? this.adoptableTask(ledger, item, workspaceId) : undefined
+              if (adopted !== undefined && 'ambiguous' in adopted) { result.ambiguous = (result.ambiguous ?? 0) + 1; continue }
+              if (adopted !== undefined) {
+                const card = adopted.card
+                card.external = { ...source, pushBase: this.localPushBase(card) }
+                card.version++; card.updatedAt = result.at; card.updatedBy = { kind: 'user' }
+                changed.push(card); byKey.set(key, card); links[key] = card.id
+                result.linked = (result.linked ?? 0) + 1
+                continue
+              }
+              if (item.closed || (config.assigneeFilter !== false && !(item.assignees ?? [item.assignedTo]).includes(config.account))) continue
               const created: TaskRecord = { id: newTaskId(), title: item.title, description: item.description, urgency: item.urgency,
                 workspaceId, prompt: '', status: config.importStatus ?? 'backlog', blocked: false, execution: { mode: 'claim' },
                 isolation: defaultIsolationOf(ledger.settings), permission: defaultPermissionOf(ledger.settings),
                 model: ledger.settings?.defaultModel, presetId: ledger.settings?.defaultPresetId,
                 version: 1, createdAt: result.at, updatedAt: result.at, createdBy: { kind: 'user' }, updatedBy: { kind: 'user' },
-                comments: [], executions: [], external: source }
+                comments: [], executions: [], external: { ...source, pushBase: { title: item.title, description: item.description, status: config.importStatus ?? 'backlog' } } }
               ledger.tasks.push(created); changed.push(created); byKey.set(key, created); links[key] = created.id; result.created++
             } else {
               links[key] = task.id
@@ -253,7 +267,8 @@ export class ExternalSyncService {
                 const statusChanged = ['status', 'assignedTo', 'assignees', 'closed'].some(key => JSON.stringify(old[key as keyof ExternalItem]) !== JSON.stringify(item[key as keyof ExternalItem]))
                 if (!workspaceChanged && !statusChanged && !task.external!.conflicts.length) { result.unchanged++; continue }
                 task.external = { ...task.external!, item: { ...old, status: item.status, assignedTo: item.assignedTo, closed: item.closed,
-                  ...(item.assignees !== undefined ? { assignees: item.assignees } : {}) }, conflicts: [], syncedAt: result.at }
+                  ...(item.assignees !== undefined ? { assignees: item.assignees } : {}) }, conflicts: [], syncedAt: result.at,
+                  pushBase: task.external!.pushBase ?? { title: old.title, description: old.description, status: task.status } }
                 if (item.assignees === undefined) delete task.external.item.assignees
                 task.version++; task.updatedAt = result.at
                 changed.push(task); result.updated++
@@ -263,6 +278,7 @@ export class ExternalSyncService {
                 ['in_progress', 'in_review'].includes(task.status) || task.executions.some(e => e.outcome === 'running'))
               source.conflicts = merged.conflicts
               const previous = task.external!.item
+              source.pushBase = task.external!.pushBase ?? { title: previous.title, description: previous.description, status: task.status }
               const sameItem = ([...new Set([...Object.keys(previous), ...Object.keys(item)])] as Array<keyof ExternalItem>).every(key => JSON.stringify(previous[key]) === JSON.stringify(item[key]))
               if (!workspaceChanged && sameItem && JSON.stringify(task.external!.conflicts) === JSON.stringify(source.conflicts)) { result.unchanged++; continue }
               Object.assign(task, merged.fields)
@@ -308,21 +324,50 @@ export class ExternalSyncService {
     if (typeof provider.createItem !== 'function' || typeof provider.updateItem !== 'function') throw new Error('provider write-back is unavailable')
     return provider as ExternalWriteProvider
   }
+  private localPushBase(task: TaskRecord): ExternalPushBase {
+    return { title: task.title, description: task.description, status: task.status }
+  }
+  /** Existing unlinked cards in the mapped project that already name this item. */
+  private adoptableTask(ledger: TaskLedger, item: ExternalItem, workspaceId: string): { card: TaskRecord } | { ambiguous: true } | undefined {
+    const candidates: Array<{ card: TaskRecord; score: number }> = []
+    for (const card of ledger.tasks) {
+      // A trashed, archived or already-linked card is never re-adopted.
+      if (card.external !== undefined || card.trashedAt !== undefined || card.status === 'archived') continue
+      if (card.workspaceId !== workspaceId) continue
+      const score = externalMatchScore(card, item.id, item.title)
+      if (score !== undefined) candidates.push({ card, score })
+    }
+    return bestExternalMatch(candidates)
+  }
+  /** Push baseline after this round: only pushed fields advance. */
+  private nextPushBase(task: TaskRecord, fields: readonly ExternalPushField[]): ExternalPushBase {
+    const source = task.external!
+    const previous = source.pushBase ?? { title: source.item.title, description: source.item.description, status: task.status }
+    return {
+      title: fields.includes('title') ? task.title : previous.title,
+      description: fields.includes('description') ? task.description : previous.description,
+      status: fields.includes('state') ? task.status : previous.status,
+    }
+  }
   /**
-   * Compare a card with its last-known remote item. Conflicts are never
-   * overwritten, running executions are never raced, and reopening a remote
-   * item stays an explicit remote action.
+   * Compare a card with what was last pushed (never with the last seen remote
+   * state: an inbound merge must not mask a local edit, and an adopted card
+   * must not push its pre-link wording back). Conflicts are never overwritten,
+   * running executions are never raced, and reopening stays a remote action.
    */
   private planPush(task: TaskRecord): { patch: ExternalPushPatch; fields: ExternalPushField[] } | undefined {
     const source = task.external
     if (source === undefined) return undefined
     if (task.executions.some(execution => execution.outcome === 'running')) return undefined
     const conflicts = new Set(source.conflicts)
+    const base = source.pushBase
     const patch: ExternalPushPatch = {}
     const fields: ExternalPushField[] = []
-    if (task.title !== source.item.title && !conflicts.has('title')) { patch.title = task.title; fields.push('title') }
-    if (task.description !== source.item.description && !conflicts.has('description')) { patch.description = task.description; fields.push('description') }
-    if ((task.status === 'done' || task.status === 'canceled') && !source.item.closed) {
+    if (task.title !== (base?.title ?? source.item.title) && !conflicts.has('title')) { patch.title = task.title; fields.push('title') }
+    if (task.description !== (base?.description ?? source.item.description) && !conflicts.has('description')) { patch.description = task.description; fields.push('description') }
+    // Legacy sources (no push baseline) keep the pre-dedupe close rule.
+    const statusChanged = base === undefined || base.status !== task.status
+    if ((task.status === 'done' || task.status === 'canceled') && statusChanged && !source.item.closed) {
       patch.close = task.status === 'canceled' ? 'not_planned' : 'completed'
       fields.push('state')
     }
@@ -342,7 +387,7 @@ export class ExternalSyncService {
         const source = normalizeExternalSource({ connectionId: config.id, provider: config.provider,
           providerName: this.registry.get(config.provider).descriptor.name, item, syncedAt: this.now(), conflicts: task.external!.conflicts })
         if (source === undefined) throw new Error('provider returned an invalid work item')
-        completed.push({ id: task.id, version: task.version, source })
+        completed.push({ id: task.id, version: task.version, source: { ...source, pushBase: this.nextPushBase(task, plan.fields) } })
         result.pushed = (result.pushed ?? 0) + 1
       } catch {
         if (signal.aborted) throw new Error('request aborted')
@@ -404,7 +449,8 @@ export class ExternalSyncService {
         await this.serial(async () => this.options.store.mutate('task-updated', ledger => {
           const current = ledger.tasks.find(candidate => candidate.id === task.id)
           if (current === undefined || current.trashedAt !== undefined) throw new Error('task not found')
-          current.external = source; current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
+          current.external = { ...source, pushBase: this.nextPushBase(task, plan.fields) }
+          current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
           return [current]
         }))
         return { created: false, pushed: plan.fields, item }
@@ -424,7 +470,8 @@ export class ExternalSyncService {
         const record = this.record(ledger, config.id)
         record.links[key] = current.id
         record.ignored = record.ignored.filter(entry => entry !== key)
-        current.external = source; current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
+        current.external = { ...source, pushBase: { title: item.title, description: item.description, status: task.status } }
+        current.version++; current.updatedAt = this.now(); current.updatedBy = { kind: 'user' }
         return [current]
       }))
       return { created: true, pushed: ['title', 'description', ...(close ? ['state' as const] : [])], item }

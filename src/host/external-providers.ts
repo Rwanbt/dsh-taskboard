@@ -52,7 +52,7 @@ export function createBuiltinProviders(): ExternalProviderRegistry {
       authModes: [
         { id: 'token', label: 'ext.githubToken', fields: [{ key: 'token', label: 'ext.githubToken' }] },
       ],
-      capabilities: { itemTypes: ['issue'], projectDiscovery: true, accountDiscovery: true, pagination: 'page', incremental: true, write: true } },
+      capabilities: { itemTypes: ['issue'], projectDiscovery: true, accountDiscovery: true, pagination: 'page', incremental: true, write: true, dedupe: true } },
     validate: config => {
       if (config.authMode !== 'token') throw new Error('unsupported GitHub authentication mode')
       if (config.mappings.some(m => !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(m.projectId))) throw new Error('GitHub scopes must be owner/repo')

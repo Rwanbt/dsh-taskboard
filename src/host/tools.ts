@@ -1473,7 +1473,9 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       + 'board, then push local card changes back when the provider supports write-back (GitHub). '
       + 'Pass taskId to push ONE card instead: a linked card updates its remote issue, an unlinked card gets a new '
       + 'remote issue linked to it. Requires a saved connection in Settings → External sync. '
-      + 'Returns pull and push counters, or the pushed fields for a single card.',
+      + 'When "Reuse existing cards" is enabled, cards that already reference an item (#number in the title, or the '
+      + 'first issue URL in the description) are linked instead of duplicated. '
+      + 'Returns pull/push counters (including linked and ambiguous), or the pushed fields for a single card.',
     parameters: {
       taskId: { type: 'string', description: 'Push only this card (optional). Omit to run the full connection sync.' },
       scope: { type: 'string', description: 'Remote scope for this push (GitHub: owner/repo). Only needed when several scopes map to the card\'s project.' },
@@ -1482,7 +1484,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       schema: JSON_OUT,
       render: (_args, value) => {
         const v = value as { mode?: string; taskId?: string; created?: number; updated?: number; unchanged?: number
-          conflicts?: number; ignored?: number; pushed?: number; pushFailed?: number
+          conflicts?: number; ignored?: number; pushed?: number; pushFailed?: number; linked?: number; ambiguous?: number
           pushedFields?: string[]; item?: { type?: string; id?: string; url?: string } }
         if (v.mode === 'push') {
           const fields = v.pushedFields ?? []
@@ -1491,7 +1493,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           return [{ type: 'text', text: `外部同步：任务 ${v.taskId ?? '?'} 已推送 ${fields.join(', ')}${target}。` }]
         }
         return [{ type: 'text', text: `外部同步完成：拉取新建 ${v.created ?? 0} · 更新 ${v.updated ?? 0} · 冲突 ${v.conflicts ?? 0}`
-          + ` · 忽略 ${v.ignored ?? 0} · 推送 ${v.pushed ?? 0} · 推送失败 ${v.pushFailed ?? 0}。` }]
+          + ` · 忽略 ${v.ignored ?? 0} · 关联现有 ${v.linked ?? 0} · 歧义跳过 ${v.ambiguous ?? 0}`
+          + ` · 推送 ${v.pushed ?? 0} · 推送失败 ${v.pushFailed ?? 0}。` }]
       },
     },
     async execute(args: { taskId?: string; scope?: string }) {

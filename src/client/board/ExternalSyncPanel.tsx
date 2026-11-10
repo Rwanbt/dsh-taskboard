@@ -46,6 +46,8 @@ export function ExternalSyncPanel() {
   const [mappingMode, setMappingMode] = useState<'project' | 'execution'>('project')
   const [includeUnmapped, setIncludeUnmapped] = useState(false)
   const [importStatus, setImportStatus] = useState<'backlog' | 'todo'>('backlog')
+  const [assigneeFilter, setAssigneeFilter] = useState(true)
+  const [matchExisting, setMatchExisting] = useState(false)
   const [mappings, setMappings] = useState<Array<{ projectId: string; workspaceId: string }>>([{ projectId: '', workspaceId: '' }])
   const [workspaces, setWorkspaces] = useState<WorkspaceView[]>([])
   const [busy, setBusy] = useState(false)
@@ -58,7 +60,7 @@ export function ExternalSyncPanel() {
   const effectiveAccount = providerId === 'zentao' && reuseLogin ? (credentials.username ?? '').trim() : account
   const canKeepCredentials = status?.config?.provider === providerId && status.config.authMode === authMode
     && status.config.account === effectiveAccount && status.config.baseUrl === baseUrl.replace(/\/$/, '')
-  const draft = () => ({ provider: providerId, baseUrl, account: effectiveAccount, authMode, credentials, settings, itemTypes, since, intervalMinutes: Number(interval), importStatus, ...(providerId === 'zentao' ? { mappingMode, includeUnmapped, mappings: mappings.filter(m => includeUnmapped || m.workspaceId) } : { mappings }) })
+  const draft = () => ({ provider: providerId, baseUrl, account: effectiveAccount, authMode, credentials, settings, itemTypes, since, intervalMinutes: Number(interval), importStatus, assigneeFilter, matchExisting, ...(providerId === 'zentao' ? { mappingMode, includeUnmapped, mappings: mappings.filter(m => includeUnmapped || m.workspaceId) } : { mappings }) })
   const fingerprint = (values = draft()) => JSON.stringify({ ...values,
     itemTypes: [...values.itemTypes].sort(),
     mappings: values.mappings.filter(m => m.projectId && m.workspaceId).slice().sort((a, b) => a.projectId.localeCompare(b.projectId)),
@@ -71,6 +73,7 @@ export function ExternalSyncPanel() {
   const selectProvider = (p: ProviderDescriptor) => {
     setProviderId(p.id); setBaseUrl(p.defaultBaseUrl); setAuthMode(p.authModes[0]!.id)
     setReuseLogin(true); setMappingMode('project'); setIncludeUnmapped(false)
+    setAssigneeFilter(true); setMatchExisting(p.capabilities.dedupe === true)
     setCredentials({}); setSettings(Object.fromEntries((p.settingsFields ?? []).map(f => [f.key, f.defaultValue])))
     setItemTypes([p.capabilities.itemTypes[0]!]); setProjects([]); setProjectsLoaded(false); setMappings(p.id === 'zentao' ? [] : [{ projectId: '', workspaceId: '' }])
   }
@@ -86,6 +89,8 @@ export function ExternalSyncPanel() {
         setMappingMode(c.mappingMode ?? 'project')
         setIncludeUnmapped(c.includeUnmapped ?? false)
         setImportStatus(c.importStatus ?? 'backlog')
+        setAssigneeFilter(c.assigneeFilter ?? true)
+        setMatchExisting(c.matchExisting ?? (s.providers.find(p => p.id === c.provider)?.capabilities.dedupe === true))
         setReuseLogin(c.provider !== 'zentao' || c.account === (s.credentialValues?.username ?? '').trim())
         setBaseUrl(c.baseUrl); setAccount(c.account); setSince(c.since); setIntervalMinutes(String(c.intervalMinutes)); setMappings(c.provider === 'zentao' && !c.mappingMode ? [] : c.mappings)
       } else if (s.providers?.[0]) selectProvider(s.providers[0])
@@ -174,6 +179,13 @@ export function ExternalSyncPanel() {
           { value: 'todo', label: t('ext.importTodo') },
         ]}
       /></label>
+      <label style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={assigneeFilter}
+        onChange={e => setAssigneeFilter(e.target.checked)} />{t('ext.assigneeFilter')}</label>
+      {descriptor?.capabilities.dedupe === true && <>
+        <label style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={matchExisting}
+          onChange={e => setMatchExisting(e.target.checked)} />{t('ext.matchExisting')}</label>
+        {matchExisting && <p>{t('ext.matchExistingHint')}</p>}
+      </>}
       {providerId === 'zentao' && <div className="dsh-atb-external-options" role="radiogroup" aria-label={t('ext.mappingMode')}>
         <span>{t('ext.mappingMode')}</span>
           {(['project', 'execution'] as const).map(mode => <label key={mode} style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -231,6 +243,8 @@ export function ExternalSyncPanel() {
     {status?.lastError && <p role="alert">{status.lastError}</p>}
     {status?.lastAttemptAt !== undefined && <p>{t('ext.lastAttempt')}: {new Date(status.lastAttemptAt).toLocaleString()}</p>}
     {status?.lastResult && <p>{t('ext.result', status.lastResult)} · {new Date(status.lastResult.at).toLocaleString()}</p>}
+    {lastResult !== undefined && (lastResult.linked ?? 0) > 0 && <p>{t('ext.resultLinked', { count: lastResult.linked ?? 0 })}</p>}
+    {lastResult !== undefined && (lastResult.ambiguous ?? 0) > 0 && <p>{t('ext.resultAmbiguous', { count: lastResult.ambiguous ?? 0 })}</p>}
     {lastResult !== undefined && (lastResult.pushed ?? 0) > 0 && <p>{t('ext.resultPushed', { count: lastResult.pushed ?? 0 })}</p>}
     {lastResult !== undefined && (lastResult.pushFailed ?? 0) > 0 && <p>{t('ext.resultPushFailed', { count: lastResult.pushFailed ?? 0 })}</p>}
   </section>

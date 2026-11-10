@@ -116,7 +116,8 @@ describe('provider-driven external UI', () => {
     await choose(selects()[0]!, 'TAPD')
     expect(selectText(selects()[1]!)).toContain('Basic Auth')
     expect(host.querySelectorAll('input[type=password]')).toHaveLength(2)
-    expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(3)
+    // 3 item types + the assignee filter (the dedupe checkbox is GitHub-only).
+    expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(4)
     expect((host.querySelector('input') as HTMLInputElement).value).toBe('https://api.tapd.cn')
     await choose(selects()[1]!, 'Bearer Token')
     expect(host.querySelectorAll('input[type=password]')).toHaveLength(1)
@@ -154,7 +155,7 @@ describe('provider-driven external UI', () => {
     expect(host.textContent).not.toContain('private-access-token')
     await choose(selects()[0]!, 'ZenTao')
     expect(selectText(selects()[1]!)).toContain('Username and password')
-    expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(5)
+    expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(6)
     expect(host.querySelector<HTMLInputElement>('input[type=password]')!.value).toBe('')
     await update(host.querySelector<HTMLInputElement>('input[autocomplete=username]')!, 'login-alice')
     const reuse = host.querySelector<HTMLInputElement>('input[type=checkbox]')!

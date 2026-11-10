@@ -50,6 +50,12 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
   if (since && (!/^\d{4}-\d{2}-\d{2}$/.test(since) || !Number.isFinite(Date.parse(since)) || new Date(since).toISOString().slice(0, 10) !== since)) throw new Error('invalid start date')
   const itemTypes: string[] = e.itemTypes === undefined ? [descriptor.capabilities.itemTypes[0]!] : Array.isArray(e.itemTypes) ? e.itemTypes : []
   if (!itemTypes.length || itemTypes.some(type => !descriptor.capabilities.itemTypes.includes(type))) throw new Error('unsupported or empty work item types')
+  const assigneeFilter = e.assigneeFilter === undefined ? true : e.assigneeFilter
+  if (typeof assigneeFilter !== 'boolean') throw new Error('invalid assignee filter setting')
+  if (e.matchExisting !== undefined && typeof e.matchExisting !== 'boolean') throw new Error('invalid dedupe setting')
+  // Adopting existing cards is opt-in per provider: only providers that can
+  // recognize their own references in card text may enable it.
+  const matchExisting = descriptor.capabilities.dedupe === true && e.matchExisting !== false
   const rawSettings = e.settings && typeof e.settings === 'object' ? e.settings as Record<string, unknown> : {}
   const settings: Record<string, string> = {}
   for (const field of descriptor.settingsFields ?? []) {
@@ -58,7 +64,7 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
     settings[field.key] = value.trim()
   }
   const config: ExternalConfig = { id: sameSource ? previous!.id : newTaskId(), provider, baseUrl: url, account, authMode,
-    credentials, itemTypes: [...new Set(itemTypes)], settings, mappings, intervalMinutes, since, importStatus,
+    credentials, itemTypes: [...new Set(itemTypes)], settings, mappings, intervalMinutes, since, importStatus, assigneeFilter, matchExisting,
     ...(mappingMode === 'project' || mappingMode === 'execution' ? { mappingMode, includeUnmapped } : {}) }
   definition.validate?.(config)
   return config
