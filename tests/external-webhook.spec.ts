@@ -64,6 +64,8 @@ describe('signed external webhooks', () => {
     const first = await f.service.receiveWebhook(f.id, githubHeaders(body, 'delivery-a'), body)
     expect(first).toMatchObject({ status: 202, body: { ok: true, value: { accepted: true, duplicate: false, sync: 'queued' } } })
     await waitFor(() => f.reads() > 0)
+    // The read helper returns before the ledger commit: wait for the card itself.
+    await waitFor(() => f.store.snapshot().tasks.length === 1)
     const tasksAfterFirst = f.store.snapshot().tasks
     expect(tasksAfterFirst).toHaveLength(1)
     // Duplicate delivery: acknowledged, no second pull, no state change.
@@ -110,6 +112,7 @@ describe('signed external webhooks', () => {
     const body = JSON.stringify({ action: 'edited', issue: { title: 'Malicious <script>alert(1)</script>', state: 'closed' } })
     expect((await f.service.receiveWebhook(f.id, githubHeaders(body), body)).status).toBe(202)
     await waitFor(() => f.reads() > 0)
+    await waitFor(() => f.store.snapshot().tasks.length === 1)
     const task = f.store.snapshot().tasks[0]!
     expect(task.title).toBe('Remote title')
     expect(task.external!.item.title).toBe('Remote title')
