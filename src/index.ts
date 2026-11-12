@@ -307,6 +307,9 @@ export function apply(ctx: Context): void {
       let disposeRoutes: (() => void) | undefined
       // Agent Board public contract (v1): bearer-authenticated read + execution
       // envelope lifecycle. Disabled unless the deployment sets a token.
+      // Create the local token at startup so a peer plugin can find it before
+      // its first request (otherwise neither side would ever call first).
+      resolvePublicToken()
       const publicApi = new PublicApiService({
         store,
         workspaces: workspaceFace(wsCtx.workspaceRegistry),
