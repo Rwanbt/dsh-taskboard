@@ -1317,11 +1317,16 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     }, exec: unknown) {
       try {
         const { actor } = caller(exec as ToolRunContext)
+        // The project boundary applies to EVERY agent write, not only
+        // update/delete/move: a session must not edit another project's
+        // acceptance checklist (audit A10).
+        const claimScope = await callerClaimScope(deps, exec as ToolRunContext)
         // R1: guards + the checklist edit itself run inside the mutation.
         let next: TaskRecord | undefined
         await store.mutate('task-updated', ledger => {
           const { index, task } = liveTaskAt(ledger, args.id)
           versionGuard(task, args.ifVersion)
+          assertProjectAccess(claimScope, allowClaimFromLinkedRootsOf(ledger.settings), task)
           if (task.status === 'archived') throw new ToolError(ERR.invalidTransition, 'archived tasks are immutable')
           next = structuredClone(task)
           const checklist: ChecklistItem[] = next.checklist === undefined ? [] : [...next.checklist]
@@ -1379,7 +1384,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       'Submit the structured execution report for the task you are currently executing (summary / changed '
       + 'files / how you verified / artifacts / remaining risk). Submit BEFORE moving the task to in_review; '
       + 'a later submission overwrites the previous report. If your run already settled, you may back-submit '
-      + 'onto your latest succeeded execution while you still hold the task. Commits and diffs are host-collected.',
+      + 'onto your latest succeeded execution while you still hold the task. A task you claimed directly '
+      + '(no execution envelope) stores the report on the task itself. Commits and diffs are host-collected.',
     parameters: {
       summary: { type: 'string', required: true, description: 'What was done (1..2000 chars).' },
       changedFiles: {
@@ -1404,9 +1410,10 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       render: (_args, value) => {
         const v = value as { taskId?: string; executionId?: string; report?: { summary?: string } }
         if (v.taskId === undefined || v.report === undefined) return [{ type: 'text', text: '报告提交失败。' }]
+        const target = v.executionId === undefined ? `任务 ${v.taskId}` : `任务 ${v.taskId}（执行 ${v.executionId}）`
         return [{
           type: 'text',
-          text: `执行报告已记录到任务 ${v.taskId}（执行 ${v.executionId}）：${v.report.summary?.slice(0, 120) ?? ''}\n`
+          text: `执行报告已记录到${target}：${v.report.summary?.slice(0, 120) ?? ''}\n`
             + '接下来：taskboard_comment_add 留交接评论，然后 taskboard_move 移至待验收 in_review。',
         }]
       },
@@ -1457,10 +1464,27 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
             return undefined
           })
         }
-        if (taskId === undefined || executionId === undefined) {
-          throw new ToolError(ERR.forbidden, 'no running execution and no settled execution of yours to report on — reports attach to your running execution, or back-submit onto your latest succeeded one while you hold the task')
+        // Path 3 (manual claim, audit A15): the main conversation claimed the
+        // card directly (taskboard_move todo→in_progress) and therefore has no
+        // execution envelope. Its report belongs to the TASK and is shown to
+        // the reviewer; a new run clears it. Only the claim holder may write it.
+        if (taskId === undefined) {
+          await store.mutate('task-updated', ledger => {
+            for (const task of ledger.tasks) {
+              if (task.trashedAt !== undefined || task.status !== 'in_progress' || task.claimedBy !== sessionId) continue
+              task.report = report
+              task.updatedAt = deps.now()
+              task.updatedBy = { kind: 'agent', sessionId }
+              taskId = task.id
+              return [task]
+            }
+            return undefined
+          })
         }
-        return json({ taskId, executionId, report })
+        if (taskId === undefined) {
+          throw new ToolError(ERR.forbidden, 'back-submit onto your latest succeeded one while you hold the task, attach the report to a task you claim directly, or submit it from your running execution — no running or settled execution of yours was found')
+        }
+        return json({ taskId, ...(executionId !== undefined ? { executionId } : {}), report })
       } catch (error) { fail(error) }
     },
   })) as () => void)
@@ -1497,13 +1521,27 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           + ` · 推送 ${v.pushed ?? 0} · 推送失败 ${v.pushFailed ?? 0}。` }]
       },
     },
-    async execute(args: { taskId?: string; scope?: string }) {
+    async execute(args: { taskId?: string; scope?: string }, exec: unknown) {
       try {
         const service = deps.externalSync?.()
         if (service === undefined) throw new ToolError(ERR.invalidInput, 'external sync is not available in this host')
+        // The project boundary applies to external writes too (audit A11). A
+        // GLOBAL sync pulls and pushes every mapped project, so an agent
+        // session may not trigger it; that stays an operator action (GUI/API
+        // route). Direct operator invocation without an agent is unchanged.
+        const agentSession = (exec as ToolRunContext | undefined)?.agent
         if (args.taskId === undefined) {
           if (args.scope !== undefined) throw new ToolError(ERR.invalidInput, 'scope requires taskId')
+          if (agentSession !== undefined) {
+            throw new ToolError(ERR.forbidden, 'a full external sync spans every project; run it from the Task Board GUI. An agent session may only push one card of its own project.')
+          }
           return json({ mode: 'sync', ...await service.sync() })
+        }
+        if (agentSession !== undefined) {
+          const claimScope = await callerClaimScope(deps, exec as ToolRunContext)
+          const target = store.get(args.taskId)
+          if (target === undefined || target.trashedAt !== undefined) throw new ToolError(ERR.notFound, `no task ${args.taskId}`)
+          assertProjectAccess(claimScope, allowClaimFromLinkedRootsOf(store.snapshot().settings), target)
         }
         const outcome = await service.pushTask(args.taskId, args.scope)
         return json({

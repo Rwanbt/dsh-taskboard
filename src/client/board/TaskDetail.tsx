@@ -280,7 +280,8 @@ function ReportBlock({ task, execution = task.executions.at(-1), historical = fa
   const [copyError, setCopyError] = useState(false)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => () => clearTimeout(copyTimer.current), [])
-  const report = execution?.report
+  // A manual claim has no execution envelope: its report lives on the task.
+  const report = execution?.report ?? (historical ? undefined : task.report)
   const isReviewOrDone = task.status === 'in_review' || task.status === 'done'
 
   // If not review/done and no report submitted, keep quiet
@@ -746,7 +747,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   const canEditDependencies = task.status !== 'in_progress' && task.status !== 'archived' && task.trashedAt === undefined
   const archiveResult = archiveState.sessionArchive?.taskId === task.id ? archiveState.sessionArchive.result : undefined
   const isReviewOrDone = task.status === 'in_review' || task.status === 'done'
-  const hasReport = task.executions.some(e => e.report !== undefined)
+  const hasReport = task.report !== undefined || task.executions.some(e => e.report !== undefined)
   // Issue #51 Plan A: pending = user comments not yet delivered to the
   // conversation. The deliver action exists ONLY on in_review cards (the
   // acceptance-review loop); the host gate enforces the same invariant.

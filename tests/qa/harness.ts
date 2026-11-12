@@ -94,8 +94,8 @@ export interface QaHost {
   clock: { now: number }
   post(path: string, body?: unknown): Promise<{ status: number; json: any }>
   get(path: string): Promise<{ status: number; json: any }>
-  /** Invoke one agent tool by name with the QA agent session. */
-  tool(name: string, args: Record<string, unknown>): Promise<any>
+  /** Invoke one agent tool by name with the QA agent session (or an override). */
+  tool(name: string, args: Record<string, unknown>, execOverride?: unknown): Promise<any>
   /** Render one tool output the way the model would see it. */
   render(name: string, args: Record<string, unknown>, value: unknown): string
   dispose(): Promise<void>
@@ -213,10 +213,10 @@ export async function createQaHost(options: {
     clock,
     post,
     get,
-    async tool(name, args) {
+    async tool(name, args, execOverride) {
       const tool = registered.get(name)
       if (tool === undefined) throw new Error(`tool not registered: ${name}`)
-      return tool.execute(args, exec)
+      return tool.execute(args, execOverride ?? exec)
     },
     render(name, args, value) {
       const tool = registered.get(name)

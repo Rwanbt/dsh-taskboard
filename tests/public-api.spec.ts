@@ -197,6 +197,73 @@ describe('public API execution lifecycle', () => {
   })
 })
 
+describe('public API board-content writes (audit A03)', () => {
+  it('creates a claim-mode card and never lets the caller set execution config', async () => {
+    const f = await fixture()
+    const created = await call(f.service, 'POST', '/tasks', {
+      workspaceId: 'ws', title: 'New card', description: 'd', actor: 'agent-board:1',
+      execution: { mode: 'scheduled', cron: '* * * * *' }, model: { provider: 'p', model: 'm' },
+      status: 'todo', urgency: 'urgent',
+    }, 'secret-token')
+    expect(created.status).toBe(201)
+    const value = created.body as { value: { id: string; version: number; executionMode: string; status: string } }
+    expect(value.value).toMatchObject({ version: 1, executionMode: 'claim', status: 'todo' })
+    const stored = f.store.get(value.value.id)!
+    expect(stored.model).toBeUndefined()
+    expect(stored.execution).toEqual({ mode: 'claim' })
+    expect(stored.createdBy).toEqual({ kind: 'agent', sessionId: 'agent-board:1' })
+    expect(stored.urgency).toBe('urgent')
+    f.service.dispose()
+  })
+  it('refuses an unknown workspace, a missing title and a foreign prerequisite', async () => {
+    const f = await fixture()
+    expect((await call(f.service, 'POST', '/tasks', { workspaceId: 'nope', title: 'x' }, 'secret-token')).status).toBe(400)
+    expect((await call(f.service, 'POST', '/tasks', { workspaceId: 'ws' }, 'secret-token')).status).toBe(400)
+    await f.store.mutate('task-created', ledger => { ledger.tasks.push(task({ id: 'other-task', workspaceId: 'other' })); return [...ledger.tasks] })
+    const bad = await call(f.service, 'POST', '/tasks', { workspaceId: 'ws', title: 'x', dependsOn: ['other-task'] }, 'secret-token')
+    expect(bad.status).toBe(400)
+    expect(f.store.snapshot().tasks).toHaveLength(1)
+    f.service.dispose()
+  })
+  it('updates with a version guard and refuses terminal cards', async () => {
+    const f = await fixture()
+    await f.store.mutate('task-created', ledger => { ledger.tasks.push(task()); return [...ledger.tasks] })
+    const updated = await call(f.service, 'POST', '/tasks/t-api-1/update', { ifVersion: 1, title: 'Renamed', blocked: true }, 'secret-token')
+    expect(updated.status).toBe(200)
+    expect(f.store.get('t-api-1')).toMatchObject({ title: 'Renamed', blocked: true, version: 2 })
+    const stale = await call(f.service, 'POST', '/tasks/t-api-1/update', { ifVersion: 1, title: 'Again' }, 'secret-token')
+    expect(stale.status).toBe(409)
+    await f.store.mutate('task-updated', ledger => { const record = ledger.tasks[0]!; record.status = 'done'; return [record] })
+    const terminal = await call(f.service, 'POST', '/tasks/t-api-1/update', { ifVersion: 2, title: 'Nope' }, 'secret-token')
+    expect(terminal.status).toBe(409)
+    // An engine may ask for a human decision but may never clear the wait.
+    await f.store.mutate('task-updated', ledger => {
+      const record = ledger.tasks[0]!
+      record.status = 'todo'; record.waitingForHuman = true; record.version = 3
+      return [record]
+    })
+    const clear = await call(f.service, 'POST', '/tasks/t-api-1/update', { ifVersion: 3, waitingForHuman: false }, 'secret-token')
+    expect(clear.status).toBe(403)
+    expect(f.store.get('t-api-1')!.waitingForHuman).toBe(true)
+    f.service.dispose()
+  })
+  it('appends a comment attributed to the calling actor', async () => {
+    const f = await fixture()
+    await f.store.mutate('task-created', ledger => { ledger.tasks.push(task()); return [...ledger.tasks] })
+    const commented = await call(f.service, 'POST', '/tasks/t-api-1/comments', { body: 'Looks good', actor: 'agent-board:1' }, 'secret-token')
+    expect(commented.status).toBe(201)
+    expect(f.store.get('t-api-1')!.comments.at(-1)).toMatchObject({ body: 'Looks good', threadId: 'agent-board:1' })
+    expect((await call(f.service, 'POST', '/tasks/missing/comments', { body: 'x' }, 'secret-token')).status).toBe(404)
+    f.service.dispose()
+  })
+  it('advertises the write feature and keeps done user-only', async () => {
+    const f = await fixture()
+    const meta = await call(f.service, 'GET', '/meta', undefined, 'secret-token')
+    expect(meta.body).toMatchObject({ ok: true, value: { features: { taskWrite: true }, donePolicy: 'user-only' } })
+    f.service.dispose()
+  })
+})
+
 describe('public API events', () => {
   it('emits normalized events and requires a full resync after restart', async () => {
     const f = await fixture()

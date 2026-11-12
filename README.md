@@ -29,7 +29,7 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 - **双向同步为默认**：声明写能力的提供方默认 `direction: "bidirectional"` 并每 15 分钟自动同步；只读提供方与旧连接文件保持 `inbound`。选择「只读」可关闭回写，间隔设为 0 即改为手动。`/external/preview` 在写入前预览新建/关联/更新/冲突/推送。标题、描述、优先级默认三方合并，状态与处理人以本地为准；冲突持久化并阻止该字段推送。
 - **规范外部身份**：`externalRefs` 允许一张卡片关联多个外部条目（系统、实例、类型、项目、ID、URL、修订、状态、来源），`task.external` 仍为同步主来源；旧台账加载时自动补齐。
 - **签名 Webhook**：GitHub/GitLab/Gitea/Forgejo 支持 HMAC/共享密钥校验与 delivery 去重；载荷仅触发一次拉取，重复或乱序投递不会污染状态。
-- **Agent Board 公共 API v1**：`/dsh-taskboard/public/v1` 使用 `DSH_TASKBOARD_PUBLIC_TOKEN` Bearer 认证（未配置则 503），覆盖项目/任务/依赖/执行/事件读取与 claim、幂等键、attempt、fencing handoff、report、complete/interrupt；成功只进入 `in_review`，`done` 仍仅限人工。
+- **Agent Board 公共 API v1**：`/dsh-taskboard/public/v1` 使用 `DSH_TASKBOARD_PUBLIC_TOKEN` Bearer 认证（未配置则 503），覆盖项目/任务/依赖/执行/事件读取与 claim、幂等键、attempt、fencing handoff、report、complete/interrupt，以及 `POST /tasks`、`POST /tasks/:id/update`、`POST /tasks/:id/comments` 三类卡片内容写入（不改 execution/model/preset）；成功只进入 `in_review`，`done` 仍仅限人工。
 - **测试**：适配器契约、多连接、预览、Webhook、公共 API、安全回归与多连接 UI；`npm run build && npm test` 通过。
 
 ## Rwanbt 分支 — v0.10.2

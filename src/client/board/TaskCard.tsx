@@ -78,7 +78,8 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   const subtasks = task.subtaskProgress ?? subtaskProgress(task.id, controller.getSnapshot().ledger.tasks)
   const subtaskTitle = t('hierarchy.badgeTitle', { done: subtasks.done, total: subtasks.total, open: subtasks.open })
   const needsHuman = checkNeedsHuman(task, t)
-  const latestReport = last?.report
+  // Manual claims have no execution envelope: their report lives on the task.
+  const latestReport = last?.report ?? task.report
   const latestWithGit = last
   const targetSessionId = resolveTaskSessionId(task)
   const sessionTitle = controller.getSessionTitle(targetSessionId)

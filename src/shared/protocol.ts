@@ -528,6 +528,12 @@ export interface ExecutionConfig {
   dispatchingRunAt?: number
   /** Last time the scheduler triggered this task (epoch ms). */
   lastTriggeredAt?: number
+  /**
+   * A one-shot run was interrupted AFTER it started (host restart). The host
+   * never replays such a run silently: this marker blocks automatic triggers
+   * until an explicit manual run clears it.
+   */
+  recoveryRequired?: boolean
 }
 
 /**
@@ -543,6 +549,9 @@ export interface ExecutionConfig {
  * @param exec - the execution config to inspect.
  */
 export function isSpentOneShot(exec: ExecutionConfig): boolean {
+  // A recovery marker is NOT a spent trigger: the card keeps its scheduled
+  // identity and stays blocked until an explicit manual run clears it.
+  if (exec.recoveryRequired === true) return false
   return exec.mode === 'scheduled' && exec.cron === undefined
     && exec.runAt === undefined
     && exec.queuedRunAt === undefined
@@ -986,6 +995,13 @@ export type TaskRecord = {
    * Unchecked items highlight at review time; done stays user-only.
    */
   checklist?: ChecklistItem[]
+  /**
+   * Structured report of a MANUAL claim (a session that claimed the card
+   * directly, without an execution envelope). Execution-backed runs store
+   * their report on the execution record instead. Both are shown to the
+   * reviewer; a new run clears this field.
+   */
+  report?: ExecutionReport
   /**
    * The task branch fixed at the FIRST worktree creation. When the user (or
    * an agent tool, issue #98) supplied an explicit branch it is used as-is
@@ -2173,6 +2189,8 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
       ...(typeof e.presetId === 'string' && e.presetId.trim().length > 0 ? { presetId: e.presetId.trim() } : {}),
       ...(typeof e.permission === 'string' ? { permission: asPermission(e.permission) } : {}),
       ...(Array.isArray(e.checklist) ? { checklist: normalizeChecklist(e.checklist) } : {}),
+      // A manual-claim report survives export/import like an execution report.
+      ...(typeof e.report === 'object' && e.report !== null ? { report: normalizeExecutionReport(e.report) } : {}),
       ...(typeof e.branch === 'string' ? { branch: e.branch } : {}),
       ...(branchesMap !== undefined ? { branches: branchesMap } : {}),
       ...(status === 'in_progress' && typeof e.claimedBy === 'string' ? { claimedBy: e.claimedBy } : {}),

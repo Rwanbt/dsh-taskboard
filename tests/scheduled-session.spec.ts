@@ -237,7 +237,13 @@ describe('scheduled session reuse', () => {
       return [task]
     })
     // Resolve the effective preset just as the host adapter does.
-    const service = new ExecutionService({ ...f.deps, composeAgent: async id => id ? { agentPreset: id, setup: () => {} } : undefined })
+    const service = new ExecutionService({
+      ...f.deps,
+      // The permission case declares a NON-default preset: the host must be
+      // able to apply it (fail-closed contract, audit A02).
+      setPermission: () => {},
+      composeAgent: async id => id ? { agentPreset: id, setup: () => {} } : undefined,
+    })
     const second = await f.run('scheduled', service)
     expect(second.sessionId).not.toBe(first.sessionId)
     await f.finish(second.sessionId, service)
