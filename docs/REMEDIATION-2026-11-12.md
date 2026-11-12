@@ -4,6 +4,10 @@ Réponse opérationnelle à [`AUDIT-AUTONOMIE-2026-11-12.md`](AUDIT-AUTONOMIE-20
 Chaque correction est couverte par un test de régression dans la composition réelle
 (routes/services/tools ou hôte Agent Board simulé), avec des ledgers temporaires.
 
+Commits de référence : Taskboard `ee04bfc` (`fix(security,autonomy): close the audit
+P0/P1 gaps`), Agent Board `9cd8d33` (`fix(superagent): enforce readiness, pause, model
+and fallback contracts`, branche `feat/superagent-ux-polish`).
+
 ## 1. État des constats
 
 | ID | Constat | État | Preuve / test |

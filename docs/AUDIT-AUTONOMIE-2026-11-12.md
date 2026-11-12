@@ -1,7 +1,8 @@
 # Audit Taskboard + Agent Board / Super Orchestrator
 
 > **Mise à jour du 12/11/2026** : les corrections sont appliquées et couvertes par des
-> tests de régression. Voir [`REMEDIATION-2026-11-12.md`](REMEDIATION-2026-11-12.md).
+> tests de régression (Taskboard `ee04bfc`, Agent Board `9cd8d33`). Voir
+> [`REMEDIATION-2026-11-12.md`](REMEDIATION-2026-11-12.md).
 > A03 reste partiel (création/modification/commentaire opérationnels ; les autres
 > actions sont honnêtement indisponibles) et A14 reste une décision de contrat.
 
