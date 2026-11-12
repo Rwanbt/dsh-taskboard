@@ -133,7 +133,7 @@ export type ExternalConnection = {
   importStatus?: 'backlog' | 'todo'
   mappingMode?: 'project' | 'execution'
   includeUnmapped?: boolean
-  /** Import only items assigned to the sync account (default: true). */
+  /** Import only items assigned to the sync account (default: false, opt-in). */
   assigneeFilter?: boolean
   /** Reuse an existing card that already references the item instead of creating a duplicate. */
   matchExisting?: boolean

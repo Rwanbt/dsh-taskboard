@@ -62,7 +62,7 @@ describe('external sync HTTP integration', () => {
       return { status: response.status, body: await response.json() }
     }
     const input = { provider: 'tapd', baseUrl: trackerUrl, account: 'alice', authMode: 'basic', credentials: { apiUser: 'api-user', apiPassword: 'private-password' },
-      itemTypes: ['bug', 'story', 'task'], mappings: [{ projectId: '1', workspaceId: 'ws' }], settings: { companyId: '1' } }
+      itemTypes: ['bug', 'story', 'task'], mappings: [{ projectId: '1', workspaceId: 'ws' }], settings: { companyId: '1' }, assigneeFilter: true }
     try {
       expect((await post('/projects', { ...input, mappings: [] })).body.value).toEqual([{ id: '1', name: 'Team project' }])
       expect((await post('/config', input)).status).toBe(200)

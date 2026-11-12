@@ -1,5 +1,15 @@
 # 更新日志 / Changelog
 
+### 0.12.1 — 2026-11-12
+
+- **导入筛选改为默认关闭**：「只导入分配给同步账号的工作项」不再是默认行为——新建连接默认导入仓库全部议题，未分配处理人的仓库（例如 Ravum、Ravum-flow）不会再因为默认筛选而显得是空的。开关仍保留在设置里、可随时按连接开启；插件保存过的连接已经把该字段显式写入配置文件（`true` 或 `false`），行为保持不变，只有手工编写且缺少该字段的连接会按新默认（关闭）加载。
+- **Tests**：`external-dedupe` 同时覆盖「默认不过滤」与「显式开启过滤」两条路径，`external-http` 显式开启过滤；`npm run build && npm test` 通过。
+
+**English:**
+
+- **Assignee import filter is now opt-in**: "Only import items assigned to the sync account" is no longer the default — a new connection imports every issue, so repositories that leave issues unassigned (Ravum, Ravum-flow) no longer look empty. The toggle stays in settings and can be enabled per connection; connections the plugin already saved carry the field explicitly (`true` or `false`) and keep their behaviour, while a hand-written connection without the field now loads as unfiltered.
+- **Tests**: `external-dedupe` covers both the unfiltered default and the explicit opt-in, `external-http` enables the filter explicitly; `npm run build && npm test` passes.
+
 ### 0.12.0 — 2026-11-10
 
 - **Contrat d'adaptateur v1**：每个外部提供方声明 `contractVersion`、`operations`、`directions`、`events`、`webhook` 与限制；`assertProviderContract()` 在实例化时校验「声明的操作必须真实实现、写入能力必须声明」，寄存器拒绝未知版本/未知操作。新增 `docs/ADAPTER-CONTRACT.md`。

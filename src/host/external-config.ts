@@ -69,7 +69,9 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
   if (since && (!/^\d{4}-\d{2}-\d{2}$/.test(since) || !Number.isFinite(Date.parse(since)) || new Date(since).toISOString().slice(0, 10) !== since)) throw new Error('invalid start date')
   const itemTypes: string[] = e.itemTypes === undefined ? [descriptor.capabilities.itemTypes[0]!] : Array.isArray(e.itemTypes) ? e.itemTypes : []
   if (!itemTypes.length || itemTypes.some(type => !descriptor.capabilities.itemTypes.includes(type))) throw new Error('unsupported or empty work item types')
-  const assigneeFilter = e.assigneeFilter === undefined ? true : e.assigneeFilter
+  // Opt-in: the filter stays selectable, but a fresh or legacy connection
+  // imports every item so a repository without assignments never looks empty.
+  const assigneeFilter = e.assigneeFilter === undefined ? false : e.assigneeFilter
   if (typeof assigneeFilter !== 'boolean') throw new Error('invalid assignee filter setting')
   if (e.matchExisting !== undefined && typeof e.matchExisting !== 'boolean') throw new Error('invalid dedupe setting')
   // Adopting existing cards is opt-in per provider: only providers that can

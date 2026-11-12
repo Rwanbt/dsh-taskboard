@@ -496,7 +496,7 @@ export class ExternalSyncService {
         const adopted = config.matchExisting ? this.adoptableTask(ledger, item, workspaceId) : undefined
         if (adopted !== undefined && 'ambiguous' in adopted) { preview.inbound.ignore++; sample({ itemId: item.id, title: item.title, action: 'ignore' }); continue }
         if (adopted !== undefined) { preview.inbound.link++; sample({ itemId: item.id, title: item.title, action: 'link', taskId: adopted.card.id }); continue }
-        if (item.closed || (config.assigneeFilter !== false && !(item.assignees ?? [item.assignedTo]).includes(config.account))) {
+        if (item.closed || (config.assigneeFilter === true && !(item.assignees ?? [item.assignedTo]).includes(config.account))) {
           preview.inbound.ignore++; sample({ itemId: item.id, title: item.title, action: 'ignore' }); continue
         }
         preview.inbound.create++; sample({ itemId: item.id, title: item.title, action: 'create' }); continue
@@ -611,7 +611,7 @@ export class ExternalSyncService {
                 result.linked = (result.linked ?? 0) + 1
                 continue
               }
-              if (item.closed || (config.assigneeFilter !== false && !(item.assignees ?? [item.assignedTo]).includes(config.account))) continue
+              if (item.closed || (config.assigneeFilter === true && !(item.assignees ?? [item.assignedTo]).includes(config.account))) continue
               const created: TaskRecord = { id: newTaskId(), title: item.title, description: item.description, urgency: item.urgency,
                 workspaceId, prompt: '', status: config.importStatus ?? 'backlog', blocked: false, execution: { mode: 'claim' },
                 isolation: defaultIsolationOf(ledger.settings), permission: defaultPermissionOf(ledger.settings),
