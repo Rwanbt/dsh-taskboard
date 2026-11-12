@@ -19,16 +19,35 @@ async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), 'taskboard-preview-')); directories.push(dir)
   const store = new TaskStore({ file: join(dir, 'tasks.json') })
   let items = [issue('1', 'Existing'), issue('2', 'Brand new'), issue('3', 'Closed', { closed: true, status: 'closed' })]
+  const writes: Array<{ id: string; patch: Record<string, unknown> }> = []
   const service = new ExternalSyncService({
     file: join(dir, 'connection.json'), store, workspaceExists: () => true, now: () => 500,
-    registry: createBuiltinProviders(), provider: () => ({ test: async () => {}, getItems: async () => structuredClone(items) }),
+    registry: createBuiltinProviders(),
+    provider: () => ({
+      test: async () => {},
+      getItems: async () => structuredClone(items),
+      updateItem: async (_projectId: string, _type: string, id: string, patch: Record<string, unknown>) => {
+        writes.push({ id, patch })
+        const current = items.find(item => item.id === id)!
+        return structuredClone({
+          ...current,
+          ...(patch.title === undefined ? {} : { title: patch.title }),
+          ...(patch.description === undefined ? {} : { description: patch.description }),
+        })
+      },
+      createItem: async (_projectId: string, fields: { title: string; description: string }) => {
+        const created = issue('99', fields.title, { description: fields.description })
+        items = [created, ...items]
+        return structuredClone(created)
+      },
+    }),
   })
   await service.configure({
     provider: 'github', baseUrl: 'https://api.github.com', account: 'octocat', authMode: 'token',
     credentials: { token: 'private-token' }, itemTypes: ['issue'], mappings: [{ projectId: 'octo/repo', workspaceId: 'ws' }],
     intervalMinutes: 0, assigneeFilter: false,
   })
-  return { service, store, set: (value: ExternalItem[]) => { items = value } }
+  return { service, store, writes, set: (value: ExternalItem[]) => { items = value } }
 }
 
 describe('sync preview', () => {
@@ -38,38 +57,42 @@ describe('sync preview', () => {
     const before = f.store.snapshot()
     f.set([issue('1', 'Existing renamed'), issue('2', 'Brand new'), issue('4', 'Another new')])
     const preview = await f.service.preview()
-    expect(preview.direction).toBe('inbound')
+    // Write-back is the default for a write-capable adapter.
+    expect(preview.direction).toBe('bidirectional')
     expect(preview.inbound).toMatchObject({ update: 1, unchanged: 1, create: 1, ignore: 0, link: 0 })
     expect(preview.inbound.samples.map(sample => sample.action)).toContain('create')
     expect(preview.outbound.push).toBe(0)
     expect(f.store.snapshot()).toEqual(before)
-    // The real round still applies the previewed changes.
+    // The real round still applies the previewed changes — and a remote edit
+    // that was merely adopted is never echoed back as a local push.
     const result = await f.service.sync()
-    expect(result).toMatchObject({ created: 1, updated: 1 })
+    expect(result).toMatchObject({ created: 1, updated: 1, pushed: 0 })
+    expect(f.writes).toEqual([])
     f.service.dispose()
   })
   it('reports conflicts and outbound pushes before enabling write-back', async () => {
     const f = await fixture()
     await f.service.sync()
     await f.store.mutate('task-updated', ledger => {
-      const task = ledger.tasks.find(candidate => candidate.external?.item.id === '1')!
-      task.title = 'Local title'
-      return [task]
+      ledger.tasks.find(candidate => candidate.external?.item.id === '1')!.title = 'Local title'
+      ledger.tasks.find(candidate => candidate.external?.item.id === '2')!.description = 'Local body'
+      return [...ledger.tasks]
     })
-    f.set([issue('1', 'Remote title'), issue('2', 'Another title')])
-    const inbound = await f.service.preview()
-    expect(inbound.inbound.conflicts).toBe(1)
-    expect(inbound.outbound.push).toBe(0)
+    f.set([issue('1', 'Remote title'), issue('2', 'Brand new')])
+    const review = await f.service.preview()
+    expect(review.direction).toBe('bidirectional')
+    expect(review.inbound.conflicts).toBe(1)
+    // The conflicted field is never pushed; the unrelated local edit is planned.
+    expect(review.outbound).toMatchObject({ push: 1, samples: [{ fields: ['description'] }] })
+    // A read-only connection reports the same inbound work and no push at all.
     await f.service.configure({
       provider: 'github', baseUrl: 'https://api.github.com', account: 'octocat', authMode: 'token',
       credentials: { token: 'private-token' }, itemTypes: ['issue'], mappings: [{ projectId: 'octo/repo', workspaceId: 'ws' }],
-      intervalMinutes: 0, assigneeFilter: false, direction: 'bidirectional',
+      intervalMinutes: 0, assigneeFilter: false, direction: 'inbound',
     })
-    const bidirectional = await f.service.preview()
-    expect(bidirectional.direction).toBe('bidirectional')
-    // The local edit is not yet recorded as an unresolved conflict (preview is
-    // read-only), so the planned push is visible with exactly that field.
-    expect(bidirectional.outbound).toMatchObject({ push: 1, samples: [{ fields: ['title'] }] })
+    const inbound = await f.service.preview()
+    expect(inbound.direction).toBe('inbound')
+    expect(inbound.outbound.push).toBe(0)
     f.service.dispose()
   })
   it('never writes when previewing an adapter that cannot discover or read', async () => {

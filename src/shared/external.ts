@@ -47,6 +47,9 @@ export type ExternalField = 'title' | 'description' | 'urgency' | 'status' | 'as
 /** All synchronizable fields, in stable order. */
 export const EXTERNAL_SYNC_FIELDS: readonly ExternalField[] = ['title', 'description', 'urgency', 'status', 'assignees']
 
+/** Default automatic synchronization interval (minutes) for a new connection. */
+export const DEFAULT_SYNC_INTERVAL_MINUTES = 15
+
 /** v1 capabilities. Legacy flags stay for older clients; new fields are additive. */
 export type ProviderCapabilities = {
   itemTypes: string[]
@@ -129,6 +132,7 @@ export type ExternalConnection = {
   enabled?: boolean
   itemTypes: string[]; mappings: Array<{ projectId: string; workspaceId: string }>
   settings: Record<string, string>
+  /** Minutes between automatic rounds; `0` disables them (default 15). */
   since: string; intervalMinutes: number
   importStatus?: 'backlog' | 'todo'
   mappingMode?: 'project' | 'execution'
@@ -138,9 +142,9 @@ export type ExternalConnection = {
   /** Reuse an existing card that already references the item instead of creating a duplicate. */
   matchExisting?: boolean
   /**
-   * Explicit sync direction. `bidirectional` is the ONLY value that authorizes
-   * outbound writes, and it is never inferred: a connection saved without it
-   * stays read-only even when the adapter can write.
+   * Exchange direction. Defaults to `bidirectional` for adapters that declare
+   * outbound writes, `inbound` for read-only ones; an explicit value always
+   * wins, so `inbound` remains the way to keep a connection read-only.
    */
   direction?: 'inbound' | 'bidirectional'
   /** Fields allowed to move in either direction (defaults to the adapter's supported set). */

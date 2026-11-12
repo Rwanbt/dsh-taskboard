@@ -1,5 +1,23 @@
 # 更新日志 / Changelog
 
+### 0.13.0 — 2026-11-12
+
+- **同步开箱即用**：新建连接默认每 **15 分钟**自动同步一次（`DEFAULT_SYNC_INTERVAL_MINUTES`），间隔设为 0 仍为手动；界面默认值同步调整。
+- **双向同步成为默认**：声明 `outbound` + 写操作的提供方（GitHub、GitLab、Gitea/Forgejo、Jira、Linear）默认 `direction: "bidirectional"`；只读提供方（禅道、TAPD）仍默认 `inbound`，把连接改为 `inbound` 依旧是关闭回写的唯一方式。**缺少 `direction` 的旧连接文件仍按 `inbound` 加载**，升级不会悄悄开始写远端。
+- **不再回写导入内容**：从远端采用的字段会推进 `pushBase`，因此一次导入或远端改名不会被下一轮当成本地修改再写回去（此前双向模式下会产生无意义的回声 PATCH）。
+- **预览更准确**：`/external/preview` 不再把必然会冲突的字段计入待推送数量，与真实轮次的 fail-closed 行为一致。
+- **文档**：`docs/ADAPTER-CONTRACT.md` §6 与 README 同步更新默认值、旧配置处理与推送策略。
+- **Tests**：更新连接默认值、预览与写回的回归测试；`npm run build && npm test` 通过（1227 个测试）。
+
+**English:**
+
+- **Sync on by default**: a new connection synchronizes automatically every **15 minutes** (`DEFAULT_SYNC_INTERVAL_MINUTES`); `0` still means manual, and the settings form starts with the same default.
+- **Write-back is the default**: adapters declaring `outbound` + create/update (GitHub, GitLab, Gitea/Forgejo, Jira, Linear) default to `direction: "bidirectional"`; read-only adapters (ZenTao, TAPD) stay `inbound`, and switching a connection to `inbound` remains how you opt out of writes. **Stored connections without a `direction` still load as `inbound`**, so an upgrade never starts writing to the remote tracker behind the operator's back.
+- **Imported content is never echoed back**: a field adopted from the remote advances `pushBase`, so an import or a remote rename is no longer re-sent as a local edit on the next round (previously a spurious PATCH in bidirectional mode).
+- **Accurate preview**: `/external/preview` no longer counts fields that are bound to conflict, matching the fail-closed behaviour of a real round.
+- **Docs**: `docs/ADAPTER-CONTRACT.md` §6 and the README describe the new defaults, legacy handling and push policy.
+- **Tests**: connection-default, preview and write-back regressions updated; `npm run build && npm test` passes (1227 tests).
+
 ### 0.12.1 — 2026-11-12
 
 - **导入筛选改为默认关闭**：「只导入分配给同步账号的工作项」不再是默认行为——新建连接默认导入仓库全部议题，未分配处理人的仓库（例如 Ravum、Ravum-flow）不会再因为默认筛选而显得是空的。开关仍保留在设置里、可随时按连接开启；插件保存过的连接已经把该字段显式写入配置文件（`true` 或 `false`），行为保持不变，只有手工编写且缺少该字段的连接会按新默认（关闭）加载。

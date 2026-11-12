@@ -34,6 +34,8 @@ async function fixture(provider: 'github' | 'gitlab' | 'gitea' = 'github') {
     provider, baseUrl: provider === 'gitlab' ? 'https://gitlab.com/api/v4' : provider === 'gitea' ? 'https://gitea.com/api/v1' : 'https://api.github.com',
     account: 'octocat', authMode: 'token', credentials: { token: 'private-token', webhookSecret: SECRET },
     itemTypes: ['issue'], mappings: [{ projectId: scope, workspaceId: 'ws' }], intervalMinutes: 0,
+    // Webhooks only trigger a pull; the fixture stubs reads only.
+    direction: 'inbound',
   })
   return { dir, store, service, id, reads: () => reads, setItems: (value: ExternalItem[]) => { items = value } }
 }

@@ -26,7 +26,7 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 
 - **适配器契约 v1**：每个提供方声明版本、操作、方向、事件与限制；实例化时校验「声明的操作必须真实实现、写能力必须声明」，寄存器拒绝未知版本/操作。新增 GitLab、Gitea/Forgejo、Jira Cloud、Linear；ZenTao/TAPD 仍为只读；Bitbucket、Azure DevOps、Trello、GitHub Projects、GitLab Boards **未实现，也未宣称支持**。
 - **多连接**：最多 10 条独立连接，旧 `{config}` 文件自动迁移；每条连接独立映射、方向、凭据与同步记录，可按连接同步、启用/停用、编辑或删除。
-- **显式双向同步**：默认只读；只有 `direction: "bidirectional"` 且适配器声明写能力时才回写。`/external/preview` 在写入前预览新建/关联/更新/冲突/推送。标题、描述、优先级默认三方合并，状态与处理人以本地为准；冲突持久化并阻止该字段推送。
+- **双向同步为默认**：声明写能力的提供方默认 `direction: "bidirectional"` 并每 15 分钟自动同步；只读提供方与旧连接文件保持 `inbound`。选择「只读」可关闭回写，间隔设为 0 即改为手动。`/external/preview` 在写入前预览新建/关联/更新/冲突/推送。标题、描述、优先级默认三方合并，状态与处理人以本地为准；冲突持久化并阻止该字段推送。
 - **规范外部身份**：`externalRefs` 允许一张卡片关联多个外部条目（系统、实例、类型、项目、ID、URL、修订、状态、来源），`task.external` 仍为同步主来源；旧台账加载时自动补齐。
 - **签名 Webhook**：GitHub/GitLab/Gitea/Forgejo 支持 HMAC/共享密钥校验与 delivery 去重；载荷仅触发一次拉取，重复或乱序投递不会污染状态。
 - **Agent Board 公共 API v1**：`/dsh-taskboard/public/v1` 使用 `DSH_TASKBOARD_PUBLIC_TOKEN` Bearer 认证（未配置则 503），覆盖项目/任务/依赖/执行/事件读取与 claim、幂等键、attempt、fencing handoff、report、complete/interrupt；成功只进入 `in_review`，`done` 仍仅限人工。
@@ -309,7 +309,7 @@ ZenTao 支持按「关联项目」或「关联执行/迭代」同步缺陷、研
 
 ### 写回、预览与冲突
 
-每条连接默认只读（`inbound`）。只有显式选择「双向同步」且提供方声明写能力时，才会在同步末尾回写已关联卡片：仅推送自上次成功推送后修改的标题/描述；`done` 关闭为 *completed*、`canceled` 关闭为 *not planned*；不自动重开远端，执行中的卡片不推送，冲突字段不推送。`POST /dsh-taskboard/external/preview` 可在启用写回前预览新建/关联/更新/冲突/推送数量与样本，预览不写入任何一侧。
+每条连接默认启用：每 **15 分钟**自动同步一次，并向声明写能力的提供方回写（`bidirectional`）。同步末尾只回写已关联卡片：仅推送自上次成功推送后修改的标题/描述；`done` 关闭为 *completed*、`canceled` 关闭为 *not planned*；不自动重开远端，执行中的卡片不推送，冲突字段不推送。只读提供方（禅道、TAPD）始终保持 `inbound`；选择「只读」即可关闭回写，把同步间隔设为 0 即改为手动。`POST /dsh-taskboard/external/preview` 可在同步前预览新建/关联/更新/冲突/推送数量与样本，预览不写入任何一侧。
 
 **旧配置处理**：缺少新映射方式的旧禅道配置暂停自动同步，保留凭据和已有任务，并提示重新关联项目或执行/迭代。旧产品 ID 不会被自动解释为项目 ID；重新获取清单、关联并保存后恢复。
 

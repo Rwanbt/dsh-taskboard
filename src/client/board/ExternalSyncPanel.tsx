@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n/runtime.ts'
 import { Select } from './Select.tsx'
-import { adapterDirectionsOf, adapterOperationsOf } from '../../shared/external.ts'
+import { adapterDirectionsOf, adapterOperationsOf, DEFAULT_SYNC_INTERVAL_MINUTES } from '../../shared/external.ts'
 import type {
   ExternalConnection,
   ExternalConnectionState,
@@ -126,7 +126,7 @@ export function ExternalSyncPanel() {
   const [projects, setProjects] = useState<ExternalProject[]>([])
   const [projectsLoaded, setProjectsLoaded] = useState(false)
   const [since, setSince] = useState('')
-  const [interval, setIntervalMinutes] = useState('0')
+  const [interval, setIntervalMinutes] = useState(String(DEFAULT_SYNC_INTERVAL_MINUTES))
   const [mappingMode, setMappingMode] = useState<'project' | 'execution'>('project')
   const [includeUnmapped, setIncludeUnmapped] = useState(false)
   const [importStatus, setImportStatus] = useState<'backlog' | 'todo'>('backlog')
@@ -224,12 +224,13 @@ export function ExternalSyncPanel() {
     setAssigneeFilter(false); setMatchExisting(p.capabilities.dedupe === true)
     setCredentials({}); setSettings(Object.fromEntries((p.settingsFields ?? []).map(f => [f.key, f.defaultValue])))
     setItemTypes([p.capabilities.itemTypes[0]!]); setProjects([]); setProjectsLoaded(false); setMappings(p.id === 'zentao' ? [] : [{ projectId: '', workspaceId: '' }])
-    setDirection('inbound')
+    // Write-back is the default for providers that declare it; read-only ones stay inbound.
+    setDirection(canWriteProvider(p) ? 'bidirectional' : 'inbound')
   }
   /** Empty the form and prepare a brand-new connection (first provider). */
   const startNew = () => {
     setEditingId(undefined); setCreateNew(true)
-    setAccount(''); setSince(''); setIntervalMinutes('0'); setImportStatus('backlog'); setDirection('inbound')
+    setAccount(''); setSince(''); setIntervalMinutes(String(DEFAULT_SYNC_INTERVAL_MINUTES)); setImportStatus('backlog'); setDirection('inbound')
     const first = status?.providers?.[0]
     if (first !== undefined) selectProvider(first)
     setSavedDraft(undefined)

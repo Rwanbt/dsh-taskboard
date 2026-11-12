@@ -84,22 +84,26 @@ champ concerné ; il se résout via `/external/resolve` (humain) en conservant o
 valeur distante. Une description ou une note humaine interne n'est jamais effacée par
 un import.
 
-## 6. Synchronisation bidirectionnelle : opt-in explicite
+## 6. Synchronisation bidirectionnelle
 
-Une connexion ne pousse **jamais** par défaut, même si l'adaptateur sait écrire :
+Le sens par défaut dépend de ce que l'adaptateur déclare :
 
-- `direction: "inbound"` (défaut) → lecture seule ;
-- `direction: "bidirectional"` → le push est autorisé, et **seulement** si
-  l'adaptateur déclare `outbound` + `write` + les opérations de création/mise à jour.
+- `direction: "bidirectional"` (**défaut** dès que l'adaptateur déclare `outbound` +
+  `write` + les opérations de création/mise à jour) → le push est autorisé ;
+- `direction: "inbound"` → lecture seule ; c'est le **défaut** des adaptateurs
+  read-only (ZenTao, TAPD) et l'option explicite pour garder une connexion en lecture ;
+- un fichier de connexions **antérieur** à ce contrat (sans `direction` stocké) est chargé
+  en `inbound` : une mise à jour ne déclenche jamais d'écriture à distance à l'insu de
+  l'opérateur.
 
 La conversation de configuration passe par `GET/POST /external/preview` :
 `SyncPreview` compte et échantillonne les créations, adoptions, mises à jour, conflits et
-pushes **sans écrire** dans le ledger ni chez le fournisseur. Un humain peut donc
-inspecter avant d'activer l'écriture.
+pushes **sans écrire** dans le ledger ni chez le fournisseur.
 
 Politique de push (fail-closed) :
 - uniquement les cartes liées, non supprimées, hors exécution en cours ;
-- seuls les champs modifiés depuis `pushBase` sont poussés ;
+- seuls les champs modifiés depuis `pushBase` sont poussés ; un champ adopté depuis le
+  distant avance la base, donc un import n'est jamais ré-écrit en écho ;
 - un conflit non résolu n'est jamais écrasé ;
 - `done` ferme l'item distant (`completed`) et `canceled` (`not_planned`) ; aucune
   réouverture distante automatique ;

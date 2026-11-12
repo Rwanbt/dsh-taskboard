@@ -181,7 +181,7 @@ describe('secrets — statut, exports et ledger', () => {
 
   it('le ledger (tâches, commentaires, rapports) ne contient aucun credential', async () => {
     const f = await syncFixture(() => ({ test: async () => {}, getItems: async () => [issue()] }))
-    await f.service.configure(GITEA)
+    await f.service.configure({ ...GITEA, direction: 'inbound' })
     const result = await f.service.sync()
     expect(result.created).toBe(1)
     expect(JSON.stringify(f.store.snapshot())).not.toContain('GITEA-TOKEN-MARKER')
@@ -269,16 +269,28 @@ describe('write-back opt-in', () => {
     return { writes, provider }
   }
 
-  it('la capacité d’écriture seule ne pousse jamais : direction « inbound » par défaut', async () => {
+  it('une connexion explicitement « inbound » ne pousse jamais, même avec la capacité d’écriture', async () => {
     const stub = writeStub([issue({ projectId: 'octo/repo', url: 'https://api.github.com/repos/octo/repo/issues/7' })])
     const f = await syncFixture(() => stub.provider)
-    await f.service.configure(GITHUB)
+    await f.service.configure({ ...GITHUB, direction: 'inbound' })
     expect((await f.service.status()).config!.direction).toBe('inbound')
     expect(await f.service.sync()).toMatchObject({ created: 1 })
     expect(stub.writes).toEqual([])
-    // Even an explicit push request is refused without the opt-in.
+    // Even an explicit push request is refused without the write opt-in.
     const taskId = f.store.snapshot().tasks[0]!.id
     await expect(f.service.pushTask(taskId)).rejects.toThrow('enable bidirectional')
+    expect(stub.writes).toEqual([])
+    expect((await f.service.preview()).outbound.push).toBe(0)
+  })
+
+  it('la capacité d’écriture seule ne pousse rien tant qu’aucune édition locale n’existe', async () => {
+    const stub = writeStub([issue({ projectId: 'octo/repo', url: 'https://api.github.com/repos/octo/repo/issues/7' })])
+    const f = await syncFixture(() => stub.provider)
+    await f.service.configure(GITHUB)
+    // Write-back is the default for a write-capable adapter…
+    expect((await f.service.status()).config!.direction).toBe('bidirectional')
+    // …but an untouched import is never written back.
+    expect(await f.service.sync()).toMatchObject({ created: 1, pushed: 0 })
     expect(stub.writes).toEqual([])
     expect((await f.service.preview()).outbound.push).toBe(0)
   })
