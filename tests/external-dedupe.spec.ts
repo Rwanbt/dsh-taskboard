@@ -112,7 +112,7 @@ describe('dedupe on sync', () => {
   it('adopts a terminal card without closing an already-open issue', async () => {
     const f = await fixture({ tasks: [card({ id: 't-13', title: 'Fait #13', status: 'done' })] })
     const result = await f.service.sync()
-    expect(result).toMatchObject({ linked: 1, created: 0, pushed: 0 })
+    expect(result).toMatchObject({ linked: 1, created: 2, pushed: 0 })
     expect(f.updates).toEqual([])
     expect(f.store.snapshot().tasks[0]!.status).toBe('done')
     f.service.dispose()
@@ -138,12 +138,16 @@ describe('dedupe on sync', () => {
     expect(f.store.snapshot().tasks).toHaveLength(4)
     f.service.dispose()
   })
-  it('respects the assignee filter for creation but still adopts existing cards', async () => {
+  it('treats the assignee filter as opt-in and still adopts existing cards', async () => {
     const f = await fixture({ tasks: [card({ id: 't-11', title: 'Qualifier #11 — résumé maison' })] })
     const result = await f.service.sync()
-    expect(result).toMatchObject({ linked: 1, created: 0 })
-    // Unassigned issues are not imported while the filter is on…
-    const g = await fixture()
+    expect(result).toMatchObject({ linked: 1, created: 2 })
+    // Default: no filter, so unassigned issues are imported.
+    const open = await fixture()
+    expect((await open.service.sync()).created).toBe(3)
+    open.service.dispose()
+    // Opt-in filter: unassigned issues are skipped while it is on…
+    const g = await fixture({ connect: { assigneeFilter: true } })
     expect((await g.service.sync()).created).toBe(0)
     // …and become importable once it is disabled.
     await g.service.configure({ ...(await g.service.status()).config, credentials: {}, assigneeFilter: false })

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n/runtime.ts'
 import { Select } from './Select.tsx'
-import { adapterDirectionsOf, adapterOperationsOf } from '../../shared/external.ts'
+import { adapterDirectionsOf, adapterOperationsOf, DEFAULT_SYNC_INTERVAL_MINUTES } from '../../shared/external.ts'
 import type {
   ExternalConnection,
   ExternalConnectionState,
@@ -126,11 +126,11 @@ export function ExternalSyncPanel() {
   const [projects, setProjects] = useState<ExternalProject[]>([])
   const [projectsLoaded, setProjectsLoaded] = useState(false)
   const [since, setSince] = useState('')
-  const [interval, setIntervalMinutes] = useState('0')
+  const [interval, setIntervalMinutes] = useState(String(DEFAULT_SYNC_INTERVAL_MINUTES))
   const [mappingMode, setMappingMode] = useState<'project' | 'execution'>('project')
   const [includeUnmapped, setIncludeUnmapped] = useState(false)
   const [importStatus, setImportStatus] = useState<'backlog' | 'todo'>('backlog')
-  const [assigneeFilter, setAssigneeFilter] = useState(true)
+  const [assigneeFilter, setAssigneeFilter] = useState(false)
   const [matchExisting, setMatchExisting] = useState(false)
   const [direction, setDirection] = useState<'inbound' | 'bidirectional'>('inbound')
   const [mappings, setMappings] = useState<Array<{ projectId: string; workspaceId: string }>>([{ projectId: '', workspaceId: '' }])
@@ -210,7 +210,7 @@ export function ExternalSyncPanel() {
     setMappingMode(connection.mappingMode ?? 'project')
     setIncludeUnmapped(connection.includeUnmapped ?? false)
     setImportStatus(connection.importStatus ?? 'backlog')
-    setAssigneeFilter(connection.assigneeFilter ?? true)
+    setAssigneeFilter(connection.assigneeFilter ?? false)
     setMatchExisting(connection.matchExisting ?? provider?.capabilities.dedupe === true)
     setDirection(writable && connection.direction === 'bidirectional' ? 'bidirectional' : 'inbound')
     setReuseLogin(connection.provider !== 'zentao' || (isPrimary && connection.account === (status?.credentialValues?.username ?? '').trim()))
@@ -221,15 +221,16 @@ export function ExternalSyncPanel() {
   const selectProvider = (p: ProviderDescriptor) => {
     setProviderId(p.id); setBaseUrl(p.defaultBaseUrl); setAuthMode(p.authModes[0]!.id)
     setReuseLogin(true); setMappingMode('project'); setIncludeUnmapped(false)
-    setAssigneeFilter(true); setMatchExisting(p.capabilities.dedupe === true)
+    setAssigneeFilter(false); setMatchExisting(p.capabilities.dedupe === true)
     setCredentials({}); setSettings(Object.fromEntries((p.settingsFields ?? []).map(f => [f.key, f.defaultValue])))
     setItemTypes([p.capabilities.itemTypes[0]!]); setProjects([]); setProjectsLoaded(false); setMappings(p.id === 'zentao' ? [] : [{ projectId: '', workspaceId: '' }])
-    setDirection('inbound')
+    // Write-back is the default for providers that declare it; read-only ones stay inbound.
+    setDirection(canWriteProvider(p) ? 'bidirectional' : 'inbound')
   }
   /** Empty the form and prepare a brand-new connection (first provider). */
   const startNew = () => {
     setEditingId(undefined); setCreateNew(true)
-    setAccount(''); setSince(''); setIntervalMinutes('0'); setImportStatus('backlog'); setDirection('inbound')
+    setAccount(''); setSince(''); setIntervalMinutes(String(DEFAULT_SYNC_INTERVAL_MINUTES)); setImportStatus('backlog'); setDirection('inbound')
     const first = status?.providers?.[0]
     if (first !== undefined) selectProvider(first)
     setSavedDraft(undefined)
@@ -247,7 +248,7 @@ export function ExternalSyncPanel() {
         setMappingMode(c.mappingMode ?? 'project')
         setIncludeUnmapped(c.includeUnmapped ?? false)
         setImportStatus(c.importStatus ?? 'backlog')
-        setAssigneeFilter(c.assigneeFilter ?? true)
+        setAssigneeFilter(c.assigneeFilter ?? false)
         setMatchExisting(c.matchExisting ?? (s.providers.find(p => p.id === c.provider)?.capabilities.dedupe === true))
         setReuseLogin(c.provider !== 'zentao' || c.account === (s.credentialValues?.username ?? '').trim())
         setDirection(c.direction === 'bidirectional' && canWriteProvider(s.providers.find(p => p.id === c.provider)) ? 'bidirectional' : 'inbound')

@@ -1,5 +1,6 @@
 import {
   ADAPTER_CONTRACT_VERSION,
+  DEFAULT_SYNC_INTERVAL_MINUTES,
   EXTERNAL_SYNC_FIELDS,
   adapterDirectionsOf,
   adapterSupports,
@@ -61,7 +62,9 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
   })
   if (!allowEmptyMappings && provider !== 'zentao' && !mappings.length) throw new Error('at least one project mapping is required')
   if (new Set(mappings.map(m => m.projectId)).size !== mappings.length) throw new Error('duplicate project mapping')
-  const intervalMinutes = Number(e.intervalMinutes ?? 0)
+  // Automatic synchronization is the default: a connection pulls on its own
+  // every DEFAULT_SYNC_INTERVAL_MINUTES, and 0 still means manual-only.
+  const intervalMinutes = Number(e.intervalMinutes ?? DEFAULT_SYNC_INTERVAL_MINUTES)
   const importStatus = e.importStatus ?? 'backlog'
   if (importStatus !== 'backlog' && importStatus !== 'todo') throw new Error('import status must be backlog or todo')
   if (!Number.isInteger(intervalMinutes) || (intervalMinutes !== 0 && (intervalMinutes < 5 || intervalMinutes > 1440))) throw new Error('sync interval must be 0 or 5–1440 minutes')
@@ -69,7 +72,9 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
   if (since && (!/^\d{4}-\d{2}-\d{2}$/.test(since) || !Number.isFinite(Date.parse(since)) || new Date(since).toISOString().slice(0, 10) !== since)) throw new Error('invalid start date')
   const itemTypes: string[] = e.itemTypes === undefined ? [descriptor.capabilities.itemTypes[0]!] : Array.isArray(e.itemTypes) ? e.itemTypes : []
   if (!itemTypes.length || itemTypes.some(type => !descriptor.capabilities.itemTypes.includes(type))) throw new Error('unsupported or empty work item types')
-  const assigneeFilter = e.assigneeFilter === undefined ? true : e.assigneeFilter
+  // Opt-in: the filter stays selectable, but a fresh or legacy connection
+  // imports every item so a repository without assignments never looks empty.
+  const assigneeFilter = e.assigneeFilter === undefined ? false : e.assigneeFilter
   if (typeof assigneeFilter !== 'boolean') throw new Error('invalid assignee filter setting')
   if (e.matchExisting !== undefined && typeof e.matchExisting !== 'boolean') throw new Error('invalid dedupe setting')
   // Adopting existing cards is opt-in per provider: only providers that can
@@ -82,18 +87,19 @@ export function normalizeConnection(raw: unknown, registry: ExternalProviderRegi
     if (typeof value !== 'string') throw new Error('invalid provider setting')
     settings[field.key] = value.trim()
   }
-  // Contract v1: outbound writes require an explicit `bidirectional` direction.
-  // Omitting it on a fresh or legacy connection keeps the connection read-only,
-  // even for adapters that implement write operations.
+  // Contract v1: write-back is the default whenever the adapter declares it, so
+  // a new connection mirrors local edits without extra setup. Read-only
+  // providers always stay inbound, and an explicit stored direction always
+  // wins over this default.
   const sameProviderPrevious = previous?.provider === provider
-  const directionRaw = e.direction ?? (sameProviderPrevious ? previous.direction : undefined) ?? 'inbound'
+  const canWriteBack = adapterDirectionsOf(descriptor).includes('outbound')
+    && adapterSupports(descriptor, 'createWorkItem') && adapterSupports(descriptor, 'updateWorkItem')
+  const directionRaw = e.direction ?? (sameProviderPrevious ? previous.direction : undefined)
+    ?? (canWriteBack ? 'bidirectional' : 'inbound')
   if (directionRaw !== 'inbound' && directionRaw !== 'bidirectional') throw new Error('invalid sync direction')
   const direction = directionRaw
-  if (direction === 'bidirectional') {
-    if (!adapterDirectionsOf(descriptor).includes('outbound')
-      || !adapterSupports(descriptor, 'createWorkItem') || !adapterSupports(descriptor, 'updateWorkItem')) {
-      throw new Error('this provider does not support write-back')
-    }
+  if (direction === 'bidirectional' && !canWriteBack) {
+    throw new Error('this provider does not support write-back')
   }
   const previousFields = sameProviderPrevious ? previous.syncFields : undefined
   const rawFields = e.syncFields ?? previousFields

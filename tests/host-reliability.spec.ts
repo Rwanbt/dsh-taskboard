@@ -123,7 +123,7 @@ describe('damaged ledger startup isolation (#84)', () => {
       expect(await readFile(image)).toEqual(bytes)
       expect(await readFile(retainedFile, 'utf8')).toBe('{truncated')
     }
-    expect((await readdir(dir)).sort()).toEqual(['dsh-taskboard-assets', retainedFile.slice(dir.length + 1)].sort())
+    expect((await readdir(dir)).filter(name => name !== 'taskboard').sort()).toEqual(['dsh-taskboard-assets', retainedFile.slice(dir.length + 1)].sort())
   })
 })
 

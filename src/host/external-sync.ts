@@ -117,7 +117,10 @@ export class ExternalSyncService {
         if (!candidate || typeof candidate !== 'object') throw new Error('invalid connection entry')
         const value = candidate as Record<string, unknown>
         if (typeof value.id !== 'string' || !value.id) throw new Error('invalid connection identity')
-        const normalized = normalizeConnection(value, this.registry, undefined, false, true)
+        // A stored connection without an explicit direction predates the
+        // write-back default: keep it read-only so an upgrade never silently
+        // starts writing to the remote tracker.
+        const normalized = normalizeConnection({ direction: 'inbound', ...value }, this.registry, undefined, false, true)
         connections.push({ ...normalized, id: value.id })
       }
       if (new Set(connections.map(connection => connection.id)).size !== connections.length) throw new Error('duplicate connection identity')
@@ -483,6 +486,9 @@ export class ExternalSyncService {
     const byKey = new Map(ledger.tasks.filter(task => task.external).map(task => [externalKey(task.external!.connectionId, task.external!.item), task]))
     const seen = new Set<string>()
     const sample = (entry: SyncPreview['inbound']['samples'][number]) => { if (preview.inbound.samples.length < 50) preview.inbound.samples.push(entry) }
+    // Fields an inbound merge will leave in conflict: they are never pushed, so
+    // the outbound preview must not count them either.
+    const conflictedFields = new Map<string, Set<string>>()
     for (const { item: rawItem, workspaceId } of fetched) {
       const item = { ...rawItem, title: normalizeTitle(rawItem.title) }
       const key = externalKey(config.id, item)
@@ -496,7 +502,7 @@ export class ExternalSyncService {
         const adopted = config.matchExisting ? this.adoptableTask(ledger, item, workspaceId) : undefined
         if (adopted !== undefined && 'ambiguous' in adopted) { preview.inbound.ignore++; sample({ itemId: item.id, title: item.title, action: 'ignore' }); continue }
         if (adopted !== undefined) { preview.inbound.link++; sample({ itemId: item.id, title: item.title, action: 'link', taskId: adopted.card.id }); continue }
-        if (item.closed || (config.assigneeFilter !== false && !(item.assignees ?? [item.assignedTo]).includes(config.account))) {
+        if (item.closed || (config.assigneeFilter === true && !(item.assignees ?? [item.assignedTo]).includes(config.account))) {
           preview.inbound.ignore++; sample({ itemId: item.id, title: item.title, action: 'ignore' }); continue
         }
         preview.inbound.create++; sample({ itemId: item.id, title: item.title, action: 'create' }); continue
@@ -513,6 +519,7 @@ export class ExternalSyncService {
       const sameItem = ([...new Set([...Object.keys(task.external!.item), ...Object.keys(item)])] as Array<keyof ExternalItem>)
         .every(field => JSON.stringify(task.external!.item[field]) === JSON.stringify(item[field]))
       if (merged.conflicts.length > 0) {
+        conflictedFields.set(task.id, new Set(merged.conflicts))
         preview.inbound.conflicts++
         preview.inbound.update++
         sample({ itemId: item.id, title: item.title, action: 'conflict', taskId: task.id, fields: merged.conflicts })
@@ -527,8 +534,12 @@ export class ExternalSyncService {
         if (task.external?.connectionId !== config.id || task.trashedAt !== undefined || task.status === 'archived') continue
         const plan = this.planPush(task, config)
         if (plan === undefined) continue
+        const blocked = conflictedFields.get(task.id)
+        const fields = blocked === undefined ? plan.fields
+          : plan.fields.filter(field => field === 'state' || !blocked.has(field))
+        if (fields.length === 0) continue
         preview.outbound.push++
-        if (preview.outbound.samples.length < 50) preview.outbound.samples.push({ taskId: task.id, fields: plan.fields })
+        if (preview.outbound.samples.length < 50) preview.outbound.samples.push({ taskId: task.id, fields })
       }
     }
     return preview
@@ -611,7 +622,7 @@ export class ExternalSyncService {
                 result.linked = (result.linked ?? 0) + 1
                 continue
               }
-              if (item.closed || (config.assigneeFilter !== false && !(item.assignees ?? [item.assignedTo]).includes(config.account))) continue
+              if (item.closed || (config.assigneeFilter === true && !(item.assignees ?? [item.assignedTo]).includes(config.account))) continue
               const created: TaskRecord = { id: newTaskId(), title: item.title, description: item.description, urgency: item.urgency,
                 workspaceId, prompt: '', status: config.importStatus ?? 'backlog', blocked: false, execution: { mode: 'claim' },
                 isolation: defaultIsolationOf(ledger.settings), permission: defaultPermissionOf(ledger.settings),
@@ -643,7 +654,15 @@ export class ExternalSyncService {
                 adapterFieldAuthorityOf(descriptor))
               source.conflicts = merged.conflicts
               const previous = task.external!.item
-              source.pushBase = task.external!.pushBase ?? { title: previous.title, description: previous.description, status: task.status }
+              const baseline = task.external!.pushBase ?? { title: previous.title, description: previous.description, status: task.status }
+              // A field adopted FROM the remote advances the push baseline too:
+              // otherwise the very next push phase would send the remote wording
+              // straight back as if it were a local edit.
+              source.pushBase = {
+                ...baseline,
+                ...(merged.fields.title !== previous.title && !merged.conflicts.includes('title') ? { title: merged.fields.title } : {}),
+                ...(merged.fields.description !== previous.description && !merged.conflicts.includes('description') ? { description: merged.fields.description } : {}),
+              }
               const sameItem = ([...new Set([...Object.keys(previous), ...Object.keys(item)])] as Array<keyof ExternalItem>).every(field => JSON.stringify(previous[field]) === JSON.stringify(item[field]))
               if (!workspaceChanged && sameItem && JSON.stringify(task.external!.conflicts) === JSON.stringify(source.conflicts)) { result.unchanged++; continue }
               Object.assign(task, merged.fields)

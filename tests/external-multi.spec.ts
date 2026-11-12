@@ -30,6 +30,8 @@ async function fixture() {
 const base = {
   provider: 'github', baseUrl: 'https://api.github.com', account: 'octocat', authMode: 'token',
   credentials: { token: 'private-token' }, itemTypes: ['issue'], intervalMinutes: 0, assigneeFilter: false,
+  // These fixtures only stub reads; keep them read-only.
+  direction: 'inbound',
 }
 
 describe('multiple external connections', () => {

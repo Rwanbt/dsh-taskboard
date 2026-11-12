@@ -119,20 +119,25 @@ describe('connection normalization', () => {
     credentials: { token: 'private-token', webhookSecret: 'whsec' }, itemTypes: ['issue'],
     mappings: [{ projectId: 'octo/repo', workspaceId: 'ws' }], intervalMinutes: 0,
   }
-  it('keeps new and legacy connections read-only unless bidirectional is explicit', async () => {
+  it('defaults write-capable adapters to bidirectional and keeps read-only ones inbound', async () => {
     const f = await fixture()
     const id = await f.service.configure(config)
     const status = await f.service.status()
-    expect(status.connections?.[0]).toMatchObject({ direction: 'inbound', enabled: true, conflictPolicy: 'manual' })
+    expect(status.connections?.[0]).toMatchObject({ direction: 'bidirectional', enabled: true, conflictPolicy: 'manual' })
     expect(status.config?.syncFields).toEqual(['title', 'description', 'urgency', 'status'])
-    await expect(f.service.configure({ ...config, direction: 'bidirectional' }, id))
-      .resolves.toBe(id)
-    expect((await f.service.status()).connections?.[0]?.direction).toBe('bidirectional')
+    // An explicit `inbound` always wins: it is the read-only opt-out.
+    await expect(f.service.configure({ ...config, direction: 'inbound' }, id)).resolves.toBe(id)
+    expect((await f.service.status()).connections?.[0]?.direction).toBe('inbound')
     // A read-only adapter can never be made bidirectional.
     await expect(f.service.configure({ provider: 'zentao', mappingMode: 'project', baseUrl: 'https://zentao.test',
       account: 'alice', authMode: 'password', credentials: { username: 'alice', password: 'x' },
       mappings: [{ projectId: 'project:1', workspaceId: 'ws' }], direction: 'bidirectional' }, undefined, true))
       .rejects.toThrow('write-back')
+    // …and it defaults to inbound on its own.
+    const zentaoId = await f.service.configure({ provider: 'zentao', mappingMode: 'project', baseUrl: 'https://zentao.test',
+      account: 'alice', authMode: 'password', credentials: { username: 'alice', password: 'x' },
+      mappings: [{ projectId: 'project:1', workspaceId: 'ws' }] }, undefined, true)
+    expect((await f.service.status()).connections?.find(connection => connection.id === zentaoId)?.direction).toBe('inbound')
     f.service.dispose()
   })
   it('never exposes the webhook secret while reporting its presence', async () => {
@@ -158,6 +163,7 @@ describe('connection normalization', () => {
     const status = await service.status()
     expect(status.connections).toHaveLength(1)
     expect(status.connections?.[0]?.id).toBe('legacy-id')
+    // A legacy file carries no direction: it must stay read-only on upgrade.
     expect(status.connections?.[0]?.direction).toBe('inbound')
     expect(status.lastError).toBe('legacy failure')
     service.dispose()
