@@ -1,10 +1,11 @@
 {
-  "label": "feat/mobile-focus-swipe-v2",
-  "generatedAt": "2026-11-14T20:40:29.691Z",
+  "label": "mobile-tabs-v2",
+  "generatedAt": "2026-11-14T22:00:43.842Z",
   "base": "http://127.0.0.1:64941",
   "browser": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
   "screenshots": [
     "desktop-1440x900.png",
+    "portrait-tabs-390x844.png",
     "portrait-todo-390x844.png",
     "portrait-tab-in-review-390x844.png",
     "portrait-after-scroll-390x844.png",
@@ -132,7 +133,57 @@
     {
       "name": "portrait card title stays readable (WCAG AA)",
       "ok": true,
-      "detail": "contrast=10.46"
+      "detail": "contrast=10.39"
+    },
+    {
+      "name": "mobile tabs expose a label and an integrated counter",
+      "ok": true,
+      "detail": "[\"backlog:Backlog:334\",\"todo:To do:2\",\"in_progress:In progress:2\",\"in_review:In review:1\",\"done:Done:1\"]"
+    },
+    {
+      "name": "mobile tabs carry no dot chip (the top rule is the colour marker)",
+      "ok": true,
+      "detail": "[\"backlog:dot=false\",\"todo:dot=false\",\"in_progress:dot=false\",\"in_review:dot=false\",\"done:dot=false\"]"
+    },
+    {
+      "name": "every tab paints its status rule on the top edge",
+      "ok": true,
+      "detail": "[\"backlog:3px@11px/11px\",\"todo:3px@8px/8px\",\"in_progress:3px@11px/11px\",\"in_review:3px@11px/11px\",\"done:3px@11px/11px\"]"
+    },
+    {
+      "name": "tab accent colours match the desktop column-head rules",
+      "ok": true,
+      "detail": "{\"tabRules\":[\"backlog:{\\\"r\\\":172,\\\"g\\\":179,\\\"b\\\":184}\",\"todo:{\\\"r\\\":123,\\\"g\\\":170,\\\"b\\\":254}\",\"in_progress:{\\\"r\\\":245,\\\"g\\\":159,\\\"b\\\":10}\",\"in_review:{\\\"r\\\":166,\\\"g\\\":138,\\\"b\\\":250}\",\"done:{\\\"r\\\":34,\\\"g\\\":197,\\\"b\\\":94}\"],\"desktopRules\":{\"backlog\":{\"r\":172,\"g\":179,\"b\":184},\"todo\":{\"r\":123,\"g\":170,\"b\":254},\"in_progress\":{\"r\":245,\"g\":159,\"b\":10},\"in_review\":{\"r\":166,\"g\":138,\"b\":250},\"done\":{\"r\":34,\"g\":197,\"b\":94}}}"
+    },
+    {
+      "name": "the five status rules are visually distinct",
+      "ok": true,
+      "detail": "[\"backlog:{\\\"r\\\":172,\\\"g\\\":179,\\\"b\\\":184}\",\"todo:{\\\"r\\\":123,\\\"g\\\":170,\\\"b\\\":254}\",\"in_progress:{\\\"r\\\":245,\\\"g\\\":159,\\\"b\\\":10}\",\"in_review:{\\\"r\\\":166,\\\"g\\\":138,\\\"b\\\":250}\",\"done:{\\\"r\\\":34,\\\"g\\\":197,\\\"b\\\":94}\"]"
+    },
+    {
+      "name": "the active tab shows a stronger, wider rule",
+      "ok": true,
+      "detail": "{\"active\":{\"opacity\":\"1\",\"left\":\"8px\"},\"inactive\":[{\"opacity\":\"0.45\",\"left\":\"11px\"},{\"opacity\":\"0.45\",\"left\":\"11px\"},{\"opacity\":\"0.45\",\"left\":\"11px\"},{\"opacity\":\"0.45\",\"left\":\"11px\"}]}"
+    },
+    {
+      "name": "the active tab raises its surface above the inactive ones",
+      "ok": true,
+      "detail": "{\"active\":{\"r\":35,\"g\":35,\"b\":36},\"inactive\":[{\"r\":28,\"g\":29,\"b\":31},{\"r\":28,\"g\":29,\"b\":31},{\"r\":28,\"g\":29,\"b\":31},{\"r\":28,\"g\":29,\"b\":31}]}"
+    },
+    {
+      "name": "the active tab reinforces the text",
+      "ok": true,
+      "detail": "{\"active\":\"680\",\"inactive\":[\"640\",\"640\",\"640\",\"640\"]}"
+    },
+    {
+      "name": "tabs stay low but touch-friendly",
+      "ok": true,
+      "detail": "[\"backlog:103x34@11px\",\"todo:80x34@11px\",\"in_progress:108x34@11px\",\"in_review:97x34@11px\",\"done:78x34@11px\"]"
+    },
+    {
+      "name": "the tab rail scrolls horizontally rather than squeezing the tabs",
+      "ok": true,
+      "detail": "{\"clientWidth\":317,\"scrollWidth\":497,\"scrollLeft\":2,\"overflowX\":\"auto\",\"scrollSnapType\":\"x\"}"
     },
     {
       "name": "tab click scrolls the rail to that page",
@@ -172,7 +223,7 @@
     {
       "name": "the tallest column has its own vertical scroller",
       "ok": true,
-      "detail": "{\"status\":\"backlog\",\"before\":0,\"after\":1200,\"scrollHeight\":54055,\"clientHeight\":654,\"others\":[0,0,0,0]}"
+      "detail": "{\"status\":\"backlog\",\"before\":0,\"after\":1200,\"scrollHeight\":54055,\"clientHeight\":651,\"others\":[0,0,0,0]}"
     },
     {
       "name": "scrolling one column leaves the others untouched",
@@ -192,7 +243,7 @@
     {
       "name": "a card is tappable in portrait",
       "ok": true,
-      "detail": "{\"x\":195,\"y\":310}"
+      "detail": "{\"x\":195,\"y\":313}"
     },
     {
       "name": "touch events reach the page",
@@ -257,7 +308,7 @@
     {
       "name": "portrait light theme keeps the title readable (WCAG AA)",
       "ok": true,
-      "detail": "contrast=10.28"
+      "detail": "contrast=10.39"
     },
     {
       "name": "landscape switches to the two-up carousel",
@@ -340,8 +391,8 @@
         "touchAction": "auto"
       },
       "cardsScrollTop": 0,
-      "cardsScrollHeight": 660,
-      "cardsClientHeight": 660,
+      "cardsScrollHeight": 696,
+      "cardsClientHeight": 696,
       "tabCount": 5,
       "tabRoles": [
         "tab",
@@ -358,6 +409,200 @@
         "false"
       ],
       "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "3px",
+          "ruleLeft": "8px",
+          "ruleRight": "8px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 0,
+        "scrollWidth": 0,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "scrollSnapType": "none"
+      },
       "pageCounter": "2/5",
       "cueDisplay": "none",
       "mobileHeadDisplay": "none",
@@ -370,17 +615,17 @@
       "pageOverflowX": 0,
       "cardBg": {
         "r": 69,
-        "g": 54,
-        "b": 44
+        "g": 55,
+        "b": 45
       },
       "cardColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "titleColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "distinctCardSurfaces": 12,
@@ -415,8 +660,8 @@
         "touchAction": "auto"
       },
       "cardsScrollTop": 0,
-      "cardsScrollHeight": 654,
-      "cardsClientHeight": 654,
+      "cardsScrollHeight": 651,
+      "cardsClientHeight": 651,
       "tabCount": 5,
       "tabRoles": [
         "tab",
@@ -433,6 +678,200 @@
         "false"
       ],
       "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 103,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 80,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "3px",
+          "ruleLeft": "8px",
+          "ruleRight": "8px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 108,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 97,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 78,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 317,
+        "scrollWidth": 497,
+        "scrollLeft": 2,
+        "overflowX": "auto",
+        "scrollSnapType": "x"
+      },
       "pageCounter": "2/5",
       "cueDisplay": "flex",
       "mobileHeadDisplay": "flex",
@@ -453,17 +892,17 @@
       "pageOverflowX": 0,
       "cardBg": {
         "r": 69,
-        "g": 54,
-        "b": 44
+        "g": 55,
+        "b": 45
       },
       "cardColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "titleColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "distinctCardSurfaces": 12,
@@ -553,8 +992,8 @@
           "touchAction": "auto"
         },
         "cardsScrollTop": 0,
-        "cardsScrollHeight": 654,
-        "cardsClientHeight": 654,
+        "cardsScrollHeight": 651,
+        "cardsClientHeight": 651,
         "tabCount": 5,
         "tabRoles": [
           "tab",
@@ -571,6 +1010,200 @@
           "false"
         ],
         "activeTabLabel": "To do2",
+        "tabChrome": [
+          {
+            "status": "backlog",
+            "active": false,
+            "label": "Backlog",
+            "count": "334",
+            "width": 103,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 128,
+              "g": 132,
+              "b": 140
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 128,
+              "g": 132,
+              "b": 140
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "todo",
+            "active": true,
+            "label": "To do",
+            "count": "2",
+            "width": 80,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "color": {
+              "r": 14,
+              "g": 17,
+              "b": 20
+            },
+            "fontWeight": "680",
+            "ruleColor": {
+              "r": 65,
+              "g": 118,
+              "b": 230
+            },
+            "ruleOpacity": "1",
+            "ruleHeight": "3px",
+            "ruleLeft": "8px",
+            "ruleRight": "8px",
+            "desktopRuleColor": {
+              "r": 65,
+              "g": 118,
+              "b": 230
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "in_progress",
+            "active": false,
+            "label": "In progress",
+            "count": "2",
+            "width": 108,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 245,
+              "g": 159,
+              "b": 10
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 245,
+              "g": 159,
+              "b": 10
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "in_review",
+            "active": false,
+            "label": "In review",
+            "count": "1",
+            "width": 97,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 125,
+              "g": 59,
+              "b": 237
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 125,
+              "g": 59,
+              "b": 237
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "done",
+            "active": false,
+            "label": "Done",
+            "count": "1",
+            "width": 78,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 34,
+              "g": 197,
+              "b": 94
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 34,
+              "g": 197,
+              "b": 94
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          }
+        ],
+        "tabbar": {
+          "clientWidth": 317,
+          "scrollWidth": 497,
+          "scrollLeft": 2,
+          "overflowX": "auto",
+          "scrollSnapType": "x"
+        },
         "pageCounter": "2/5",
         "cueDisplay": "flex",
         "mobileHeadDisplay": "flex",
@@ -596,13 +1229,13 @@
         },
         "cardColor": {
           "r": 34,
-          "g": 39,
-          "b": 59
+          "g": 38,
+          "b": 58
         },
         "titleColor": {
           "r": 34,
-          "g": 39,
-          "b": 59
+          "g": 38,
+          "b": 58
         },
         "distinctCardSurfaces": 12,
         "cardsVisible": 340
@@ -638,7 +1271,7 @@
       },
       "cardsScrollTop": 0,
       "cardsScrollHeight": 394,
-      "cardsClientHeight": 254,
+      "cardsClientHeight": 251,
       "tabCount": 5,
       "tabRoles": [
         "tab",
@@ -655,6 +1288,200 @@
         "false"
       ],
       "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 90,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 69,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "6px",
+          "ruleRight": "6px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 95,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 85,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 67,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 681,
+        "scrollWidth": 681,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "scrollSnapType": "x"
+      },
       "pageCounter": "2/5",
       "cueDisplay": "flex",
       "mobileHeadDisplay": "flex",
@@ -675,17 +1502,17 @@
       "pageOverflowX": 0,
       "cardBg": {
         "r": 69,
-        "g": 54,
-        "b": 44
+        "g": 55,
+        "b": 45
       },
       "cardColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "titleColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "distinctCardSurfaces": 12,
@@ -720,8 +1547,8 @@
         "touchAction": "auto"
       },
       "cardsScrollTop": 0,
-      "cardsScrollHeight": 660,
-      "cardsClientHeight": 660,
+      "cardsScrollHeight": 696,
+      "cardsClientHeight": 696,
       "tabCount": 5,
       "tabRoles": [
         "tab",
@@ -738,6 +1565,200 @@
         "false"
       ],
       "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "3px",
+          "ruleLeft": "8px",
+          "ruleRight": "8px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 0,
+        "scrollWidth": 0,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "scrollSnapType": "none"
+      },
       "pageCounter": "2/5",
       "cueDisplay": "none",
       "mobileHeadDisplay": "none",
@@ -750,17 +1771,17 @@
       "pageOverflowX": 0,
       "cardBg": {
         "r": 69,
-        "g": 54,
-        "b": 44
+        "g": 55,
+        "b": 45
       },
       "cardColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "titleColor": {
-        "r": 245,
-        "g": 242,
+        "r": 244,
+        "g": 243,
         "b": 253
       },
       "distinctCardSurfaces": 12,
@@ -819,7 +1840,7 @@
         "before": 0,
         "after": 1200,
         "scrollHeight": 54055,
-        "clientHeight": 654,
+        "clientHeight": 651,
         "others": [
           0,
           0,
@@ -884,5 +1905,201 @@
   "shellReachable": {
     "reachable": true,
     "hit": "DIV.dsh-atb-card"
+  },
+  "tabs": {
+    "all": [
+      {
+        "status": "backlog",
+        "active": false,
+        "label": "Backlog",
+        "count": "334",
+        "width": 103,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 172,
+          "g": 179,
+          "b": 184
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 172,
+          "g": 179,
+          "b": 184
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "todo",
+        "active": true,
+        "label": "To do",
+        "count": "2",
+        "width": 80,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 35,
+          "g": 35,
+          "b": 36
+        },
+        "color": {
+          "r": 248,
+          "g": 250,
+          "b": 250
+        },
+        "fontWeight": "680",
+        "ruleColor": {
+          "r": 123,
+          "g": 170,
+          "b": 254
+        },
+        "ruleOpacity": "1",
+        "ruleHeight": "3px",
+        "ruleLeft": "8px",
+        "ruleRight": "8px",
+        "desktopRuleColor": {
+          "r": 123,
+          "g": 170,
+          "b": 254
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "in_progress",
+        "active": false,
+        "label": "In progress",
+        "count": "2",
+        "width": 108,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 245,
+          "g": 159,
+          "b": 10
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 245,
+          "g": 159,
+          "b": 10
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "in_review",
+        "active": false,
+        "label": "In review",
+        "count": "1",
+        "width": 97,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 166,
+          "g": 138,
+          "b": 250
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 166,
+          "g": 138,
+          "b": 250
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "done",
+        "active": false,
+        "label": "Done",
+        "count": "1",
+        "width": 78,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 34,
+          "g": 197,
+          "b": 94
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 34,
+          "g": 197,
+          "b": 94
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      }
+    ],
+    "tabbar": {
+      "clientWidth": 317,
+      "scrollWidth": 497,
+      "scrollLeft": 2,
+      "overflowX": "auto",
+      "scrollSnapType": "x"
+    }
   }
 }

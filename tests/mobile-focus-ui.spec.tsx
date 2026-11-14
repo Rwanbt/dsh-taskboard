@@ -190,6 +190,38 @@ describe('status tabs ⇄ carousel', () => {
     expect(board(host).dataset.atbActiveStatus).toBe('done')
   })
 
+  it('renders each tab as a compact column head with an integrated counter', async () => {
+    const { host } = await renderBoard([
+      makeTask({ id: 'a', status: 'todo' }),
+      makeTask({ id: 'b', status: 'todo' }),
+      makeTask({ id: 'c', status: 'done' }),
+    ], 390, 844)
+    for (const status of MAIN_STATUSES) {
+      const tab = tabOf(host, status)
+      // A column head, never a filter chip.
+      expect(tab.classList.contains('dsh-atb-mobilebar-btn'), status).toBe(true)
+      expect(tab.classList.contains('dsh-atb-chip'), status).toBe(false)
+      const label = tab.querySelector('.dsh-atb-mobilebar-label')
+      const count = tab.querySelector('.dsh-atb-mobilebar-count')
+      expect(label?.textContent?.length, status).toBeGreaterThan(0)
+      expect(count, status).not.toBeNull()
+      // The colour marker is the top rule drawn by the stylesheet, so no dot
+      // chip competes with it inside the tab.
+      expect(tab.querySelector('.dsh-atb-dot'), status).toBeNull()
+    }
+    expect(tabOf(host, 'todo').querySelector('.dsh-atb-mobilebar-count')?.textContent).toBe('2')
+    expect(tabOf(host, 'done').querySelector('.dsh-atb-mobilebar-count')?.textContent).toBe('1')
+    expect(tabOf(host, 'backlog').querySelector('.dsh-atb-mobilebar-count')?.textContent).toBe('0')
+    // Exactly one tab wears the active surface, and it follows the carousel.
+    expect(host.querySelectorAll('.dsh-atb-mobilebar-btn[data-active="true"]')).toHaveLength(1)
+    expect(tabOf(host, 'todo').getAttribute('data-active')).toBe('true')
+    const rail = stubRail(host, 390, 390)
+    await rail.settleOn(4)
+    expect(tabOf(host, 'done').getAttribute('data-active')).toBe('true')
+    expect(tabOf(host, 'todo').getAttribute('data-active')).toBeNull()
+    expect(host.querySelectorAll('.dsh-atb-mobilebar-btn[data-active="true"]')).toHaveLength(1)
+  })
+
   it('keeps the tab orientation explicit for assistive technology', async () => {
     const { host } = await renderBoard(THREE_TASKS, 390, 844)
     const rail = host.querySelector<HTMLElement>('.dsh-atb-mobilebar')!

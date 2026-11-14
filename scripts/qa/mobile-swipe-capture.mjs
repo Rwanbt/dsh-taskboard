@@ -271,6 +271,51 @@ async function readFocus(target = page) {
       tabRoles: tabs.map(tab => tab.getAttribute('role')),
       tabSelected: tabs.map(tab => tab.getAttribute('aria-selected')),
       activeTabLabel: active === null ? null : active.textContent,
+      // Mobile column tabs are miniature column heads: measure the chrome that
+      // makes them so (status rule on the top edge, sober surface, low height)
+      // next to the desktop column-head rule they are modelled on.
+      tabChrome: tabs.map(tab => {
+        const tabStyle = getComputedStyle(tab)
+        const rule = getComputedStyle(tab, '::before')
+        const status = tab.getAttribute('data-status')
+        const column = status === null ? null : board.querySelector(`.dsh-atb-column[data-status="${status}"]`)
+        const colheadRule = column === null
+          ? null
+          : getComputedStyle(column.querySelector('.dsh-atb-colhead') ?? column, '::before')
+        const box = tab.getBoundingClientRect()
+        return {
+          status,
+          active: tab.getAttribute('data-active') === 'true',
+          label: tab.querySelector('.dsh-atb-mobilebar-label')?.textContent ?? null,
+          count: tab.querySelector('.dsh-atb-mobilebar-count')?.textContent ?? null,
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+          radius: tabStyle.borderTopLeftRadius,
+          surface: resolve(tabStyle.backgroundColor),
+          color: resolve(tabStyle.color),
+          fontWeight: tabStyle.fontWeight,
+          ruleColor: resolve(rule.backgroundColor),
+          ruleOpacity: rule.opacity,
+          ruleHeight: rule.height,
+          ruleLeft: rule.left,
+          ruleRight: rule.right,
+          desktopRuleColor: colheadRule === null ? null : resolve(colheadRule.backgroundColor),
+          hasDot: tab.querySelector('.dsh-atb-dot') !== null,
+          hasLabel: tab.querySelector('.dsh-atb-mobilebar-label') !== null,
+          hasCount: tab.querySelector('.dsh-atb-mobilebar-count') !== null,
+        }
+      }),
+      tabbar: (() => {
+        const bar = board.querySelector('.dsh-atb-mobilebar')
+        if (bar === null) return null
+        return {
+          clientWidth: bar.clientWidth,
+          scrollWidth: bar.scrollWidth,
+          scrollLeft: Math.round(bar.scrollLeft),
+          overflowX: getComputedStyle(bar).overflowX,
+          scrollSnapType: getComputedStyle(bar).scrollSnapType,
+        }
+      })(),
       pageCounter: board.querySelector('.dsh-atb-swipecue-page')?.textContent ?? null,
       cueDisplay: style(cue)?.display ?? null,
       mobileHeadDisplay: style(board.querySelector('.dsh-atb-mobilehead'))?.display ?? null,
@@ -494,6 +539,55 @@ check('portrait never scrolls the page horizontally', portrait.pageOverflowX <= 
 check('portrait cards keep the pastel surface', portrait.cardBg !== null && portrait.distinctCardSurfaces >= 2, `${portrait.distinctCardSurfaces} distinct surfaces`)
 const portraitTabContrast = contrast(portrait.titleColor, portrait.cardBg)
 check('portrait card title stays readable (WCAG AA)', portraitTabContrast !== null && portraitTabContrast >= 4.5, `contrast=${portraitTabContrast}`)
+
+// ---------------------------------------------------------------------------
+// Mobile column tabs: miniature column heads, not filter chips.
+// ---------------------------------------------------------------------------
+const tabs = portrait.tabChrome ?? []
+const activeTab = tabs.find(tab => tab.active) ?? null
+const inactiveTabs = tabs.filter(tab => !tab.active)
+report.tabs = { all: tabs, tabbar: portrait.tabbar }
+check('mobile tabs expose a label and an integrated counter',
+  tabs.length === 5 && tabs.every(tab => tab.hasLabel && tab.hasCount && (tab.label ?? '').length > 0 && (tab.count ?? '').length > 0),
+  JSON.stringify(tabs.map(tab => `${tab.status}:${tab.label}:${tab.count}`)))
+check('mobile tabs carry no dot chip (the top rule is the colour marker)',
+  tabs.every(tab => tab.hasDot === false),
+  JSON.stringify(tabs.map(tab => `${tab.status}:dot=${tab.hasDot}`)))
+check('every tab paints its status rule on the top edge',
+  tabs.every(tab => tab.ruleColor !== null && tab.ruleHeight !== '0px' && Number.parseInt(tab.ruleHeight, 10) >= 2),
+  JSON.stringify(tabs.map(tab => `${tab.status}:${tab.ruleHeight}@${tab.ruleLeft}/${tab.ruleRight}`)))
+// Same accent as the desktop column head of that status: one palette, two layouts.
+const desktopRules = Object.fromEntries((report.viewports.desktop?.tabChrome ?? [])
+  .map(tab => [tab.status, tab.desktopRuleColor]))
+const paletteMatches = tabs.filter(tab => {
+  const expected = desktopRules[tab.status]
+  return expected !== undefined && expected !== null && JSON.stringify(expected) === JSON.stringify(tab.ruleColor)
+})
+check('tab accent colours match the desktop column-head rules',
+  tabs.length === 5 && paletteMatches.length === 5,
+  JSON.stringify({ tabRules: tabs.map(tab => `${tab.status}:${JSON.stringify(tab.ruleColor)}`), desktopRules }))
+// The five requested colours are distinct: grey / blue / orange / violet / green.
+check('the five status rules are visually distinct',
+  new Set(tabs.map(tab => JSON.stringify(tab.ruleColor))).size === 5,
+  JSON.stringify(tabs.map(tab => `${tab.status}:${JSON.stringify(tab.ruleColor)}`)))
+check('the active tab shows a stronger, wider rule',
+  activeTab !== null && activeTab.ruleOpacity === '1' && Number.parseFloat(activeTab.ruleOpacity) > Math.max(...inactiveTabs.map(tab => Number.parseFloat(tab.ruleOpacity) || 0))
+    && Number.parseFloat(activeTab.ruleLeft) < Number.parseFloat(inactiveTabs[0]?.ruleLeft ?? '0'),
+  JSON.stringify({ active: { opacity: activeTab?.ruleOpacity, left: activeTab?.ruleLeft }, inactive: inactiveTabs.map(tab => ({ opacity: tab.ruleOpacity, left: tab.ruleLeft })) }))
+check('the active tab raises its surface above the inactive ones',
+  activeTab !== null && inactiveTabs.every(tab => JSON.stringify(tab.surface) !== JSON.stringify(activeTab.surface))
+    && inactiveTabs.every(tab => JSON.stringify(tab.surface) === JSON.stringify(inactiveTabs[0]?.surface)),
+  JSON.stringify({ active: activeTab?.surface, inactive: inactiveTabs.map(tab => tab.surface) }))
+check('the active tab reinforces the text',
+  activeTab !== null && Number.parseInt(activeTab.fontWeight, 10) > Math.max(...inactiveTabs.map(tab => Number.parseInt(tab.fontWeight, 10) || 0)),
+  JSON.stringify({ active: activeTab?.fontWeight, inactive: inactiveTabs.map(tab => tab.fontWeight) }))
+check('tabs stay low but touch-friendly',
+  tabs.every(tab => tab.height >= 32 && tab.height <= 38) && tabs.every(tab => Number.parseFloat(tab.radius) >= 9),
+  JSON.stringify(tabs.map(tab => `${tab.status}:${tab.width}x${tab.height}@${tab.radius}`)))
+check('the tab rail scrolls horizontally rather than squeezing the tabs',
+  portrait.tabbar !== null && portrait.tabbar.overflowX === 'auto' && portrait.tabbar.scrollWidth >= portrait.tabbar.clientWidth,
+  JSON.stringify(portrait.tabbar))
+await shot('portrait-tabs-390x844.png')
 await shot('portrait-todo-390x844.png')
 
 // Tab → rail.

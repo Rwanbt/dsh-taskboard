@@ -216,3 +216,50 @@ describe('focus-mode stylesheet contract', () => {
     expect(STYLES).not.toContain(':root {')
   })
 })
+
+describe('mobile column tabs — miniature column heads, not filter chips', () => {
+  it('paints the status rule on the top edge of every tab', () => {
+    // Same idea as the desktop column head: one short coloured rule on the top
+    // edge, rounded at the bottom, driven by the shared --atb-status token.
+    expect(STYLES).toContain('.dsh-atb-mobilebar-btn::before')
+    expect(STYLES).toContain('background: var(--atb-status, var(--atb-text-3))')
+    expect(STYLES).toContain('border-radius: 0 0 5px 5px')
+    // Inactive: present but muted. Active: opaque and wider, with a transition,
+    // which is the subtle change animation.
+    expect(STYLES).toContain('opacity: .45;')
+    expect(STYLES).toContain('.dsh-atb-mobilebar-btn[data-active="true"]::before { opacity: 1; left: 8px; right: 8px; }')
+    expect(STYLES).toContain('transition: opacity .16s ease, left .16s ease, right .16s ease, height .16s ease;')
+  })
+
+  it('shares one status palette with the desktop columns', () => {
+    for (const status of ['backlog', 'todo', 'in_progress', 'in_review', 'done']) {
+      expect(STYLES).toContain(`.dsh-atb-column[data-status="${status}"] { --atb-status:`)
+      expect(STYLES).toContain(`.dsh-atb-mobilebar-btn[data-status="${status}"] { --atb-status:`)
+    }
+    // A second colour vocabulary for the same statuses is exactly the drift the
+    // shared token prevents.
+    expect(STYLES).not.toContain('--atb-tab:')
+  })
+
+  it('stays light: no pill geometry and no chip borrowings', () => {
+    const tabRules = STYLES
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('.dsh-atb-mobilebar-btn') && line.includes('{'))
+    expect(tabRules.length).toBeGreaterThanOrEqual(4)
+    for (const rule of tabRules) expect(rule).not.toContain('999px')
+    expect(tabRules.join('\n')).not.toContain('.dsh-atb-chip')
+    // Sober surface, low height: the tab is a card head, not a filled button.
+    expect(STYLES).toContain('background: var(--atb-surface-sunken)')
+    expect(STYLES).toContain('height: 34px; padding: 0 11px')
+  })
+
+  it('keeps a comfortable touch target, a pressed state and a scrollable rail', () => {
+    expect(STYLES).toContain('.dsh-atb-mobilebar-btn:active { transform: translateY(1px); background: var(--atb-hover); }')
+    expect(STYLES).toContain('.dsh-atb-mobilebar-btn:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 2px; }')
+    expect(STYLES).toContain('scroll-snap-align: start;')
+    expect(STYLES).toContain('overflow-x: auto; scrollbar-width: none; padding: 2px 2px 1px;')
+    // Landscape keeps the same language, only tighter.
+    expect(STYLES).toContain('.dsh-atb-mobilebar-btn { height: 30px; padding: 0 9px; gap: 5px; font-size: 11px; border-radius: 9px; }')
+  })
+})

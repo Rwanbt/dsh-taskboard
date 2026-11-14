@@ -41,6 +41,7 @@ import {
   useFocusMode,
 } from './mobile.ts'
 import { useToolbarDensity } from './compact.ts'
+import { MobileStatusTabs } from './MobileStatusTabs.tsx'
 
 /** Urgency sort rank (urgent first). */
 const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, normal: 1, relaxed: 2 }
@@ -694,48 +695,12 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
         : (
           <div className="dsh-atb-board-body">
             <div className="dsh-atb-mobilehead">
-              <nav
-                className="dsh-atb-mobilebar"
-                role="tablist"
-                aria-label={t('board.columns.nav')}
-                ref={tabbarRef}
-              >
-                {MAIN_STATUSES.map((status, index) => {
-                  const selected = status === activeStatus
-                  return (
-                    <button
-                      key={status}
-                      id={`dsh-atb-tab-${status}`}
-                      type="button"
-                      role="tab"
-                      className="dsh-atb-mobilebar-btn"
-                      data-status={status}
-                      data-active={selected ? 'true' : undefined}
-                      aria-selected={selected}
-                      aria-controls={`dsh-atb-col-${status}`}
-                      tabIndex={selected ? 0 : -1}
-                      title={t(COLUMN_KEYS[status])}
-                      onClick={() => selectStatus(status)}
-                      onKeyDown={event => {
-                        const next = stepTabIndex(index, event.key)
-                        if (next === undefined || next === index) return
-                        event.preventDefault()
-                        const nextStatus = statusAt(next)
-                        selectStatus(nextStatus)
-                        tabbarRef.current
-                          ?.querySelector<HTMLElement>(`.dsh-atb-mobilebar-btn[data-status="${nextStatus}"]`)
-                          ?.focus()
-                      }}
-                    >
-                      <span className="dsh-atb-dot" data-status={status} aria-hidden="true" />
-                      <span className="dsh-atb-mobilebar-label">{t(COLUMN_KEYS[status])}</span>
-                      <span className="dsh-atb-mobilebar-count">
-                        {live.filter(task => task.status === status).length}
-                      </span>
-                    </button>
-                  )
-                })}
-              </nav>
+              <MobileStatusTabs
+                active={activeStatus}
+                countOf={status => live.filter(task => task.status === status).length}
+                onSelect={selectStatus}
+                tabbarRef={tabbarRef}
+              />
               <span className="dsh-atb-swipecue" aria-hidden="true">
                 <span className="dsh-atb-swipecue-arrow">←</span>
                 <span className="dsh-atb-swipecue-label">{t('board.swipe.cue')}</span>

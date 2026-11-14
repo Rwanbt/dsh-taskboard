@@ -1,12 +1,9 @@
 # Mobile focus mode — real-host validation
 
-- Label: `feat/mobile-focus-swipe-v2`
-- Generated: 2026-11-14T20:40:29.691Z
+- Label: `mobile-tabs-v2`
+- Generated: 2026-11-14T22:00:43.842Z
 - Host: http://127.0.0.1:64941 (isolated DSH home, production client bundle from this working tree)
 - Browser: C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe
-
-Implementation notes, decisions and known limits: `docs/design/MOBILE-FOCUS-SWIPE-IMPLEMENTATION.md`.
-Screenshots: `docs/design/mobile-swipe/captures/`.
 
 ## Viewports exercised
 
@@ -28,7 +25,7 @@ Screenshots: `docs/design/mobile-swipe/captures/`.
 
 ## Checks
 
-Total: 58 — passed: 58 — failed: 0
+Total: 68 — passed: 68 — failed: 0
 
 - ✅ **desktop keeps five side-by-side columns** — {"focus":"none","columns":5,"widths":[236,236,236,236,236]}
 - ✅ **desktop columns are narrower than the rail (no carousel)** — [236,236,236,236,236]
@@ -52,7 +49,17 @@ Total: 58 — passed: 58 — failed: 0
 - ✅ **portrait offers a thumb-reachable create button** — {"display":"grid","rect":{"x":320,"y":774,"width":54,"height":54}}
 - ✅ **portrait never scrolls the page horizontally** — overflow=0px
 - ✅ **portrait cards keep the pastel surface** — 12 distinct surfaces
-- ✅ **portrait card title stays readable (WCAG AA)** — contrast=10.46
+- ✅ **portrait card title stays readable (WCAG AA)** — contrast=10.39
+- ✅ **mobile tabs expose a label and an integrated counter** — ["backlog:Backlog:334","todo:To do:2","in_progress:In progress:2","in_review:In review:1","done:Done:1"]
+- ✅ **mobile tabs carry no dot chip (the top rule is the colour marker)** — ["backlog:dot=false","todo:dot=false","in_progress:dot=false","in_review:dot=false","done:dot=false"]
+- ✅ **every tab paints its status rule on the top edge** — ["backlog:3px@11px/11px","todo:3px@8px/8px","in_progress:3px@11px/11px","in_review:3px@11px/11px","done:3px@11px/11px"]
+- ✅ **tab accent colours match the desktop column-head rules** — {"tabRules":["backlog:{\"r\":172,\"g\":179,\"b\":184}","todo:{\"r\":123,\"g\":170,\"b\":254}","in_progress:{\"r\":245,\"g\":159,\"b\":10}","in_review:{\"r\":166,\"g\":138,\"b\":250}","done:{\"r\":34,\"g\":197,\"b\":94}"],"desktopRules":{"backlog":{"r":172,"g":179,"b":184},"todo":{"r":123,"g":170,"b":254},"in_progress":{"r":245,"g":159,"b":10},"in_review":{"r":166,"g":138,"b":250},"done":{"r":34,"g":197,"b":94}}}
+- ✅ **the five status rules are visually distinct** — ["backlog:{\"r\":172,\"g\":179,\"b\":184}","todo:{\"r\":123,\"g\":170,\"b\":254}","in_progress:{\"r\":245,\"g\":159,\"b\":10}","in_review:{\"r\":166,\"g\":138,\"b\":250}","done:{\"r\":34,\"g\":197,\"b\":94}"]
+- ✅ **the active tab shows a stronger, wider rule** — {"active":{"opacity":"1","left":"8px"},"inactive":[{"opacity":"0.45","left":"11px"},{"opacity":"0.45","left":"11px"},{"opacity":"0.45","left":"11px"},{"opacity":"0.45","left":"11px"}]}
+- ✅ **the active tab raises its surface above the inactive ones** — {"active":{"r":35,"g":35,"b":36},"inactive":[{"r":28,"g":29,"b":31},{"r":28,"g":29,"b":31},{"r":28,"g":29,"b":31},{"r":28,"g":29,"b":31}]}
+- ✅ **the active tab reinforces the text** — {"active":"680","inactive":["640","640","640","640"]}
+- ✅ **tabs stay low but touch-friendly** — ["backlog:103x34@11px","todo:80x34@11px","in_progress:108x34@11px","in_review:97x34@11px","done:78x34@11px"]
+- ✅ **the tab rail scrolls horizontally rather than squeezing the tabs** — {"clientWidth":317,"scrollWidth":497,"scrollLeft":2,"overflowX":"auto","scrollSnapType":"x"}
 - ✅ **tab click scrolls the rail to that page** — {"scrollLeft":1110,"expected":1110}
 - ✅ **tab click selects the tab** — {"active":"in_review","counter":"4/5"}
 - ✅ **the carousel moves by whole pages** — {"mechanism":"scrollBy (settled-swipe position)","movedBy":370,"pageWidth":370,"attempts":[{"mechanism":"scrollBy","direction":1,"before":370,"after":740}]}
@@ -60,11 +67,11 @@ Total: 58 — passed: 58 — failed: 0
 - ✅ **the carousel rests on a snap page** — scrollLeft=740 page=370
 - ✅ **CSS scroll-snap re-settles an off-page offset** — {"requested":888,"settled":740}
 - ✅ **the tab follows the snapped position** — {"settled":740,"active":"in_progress"}
-- ✅ **the tallest column has its own vertical scroller** — {"status":"backlog","before":0,"after":1200,"scrollHeight":54055,"clientHeight":654,"others":[0,0,0,0]}
+- ✅ **the tallest column has its own vertical scroller** — {"status":"backlog","before":0,"after":1200,"scrollHeight":54055,"clientHeight":651,"others":[0,0,0,0]}
 - ✅ **scrolling one column leaves the others untouched** — [0,0,0,0]
 - ✅ **vertical column scroll never flips the carousel page** — {"before":0,"after":0}
 - ✅ **board survived every gesture** — board still mounted
-- ✅ **a card is tappable in portrait** — {"x":195,"y":310}
+- ✅ **a card is tappable in portrait** — {"x":195,"y":313}
 - ✅ **touch events reach the page** — {"start":1,"move":16,"end":1}
 - ✅ **a horizontal touch pan on a card never opens it** — null
 - ✅ **tap opens the detail pane** — {"position":"fixed","zIndex":"70","width":390,"height":732,"bottom":0,"left":0,"radius":"18px"}
@@ -77,7 +84,7 @@ Total: 58 — passed: 58 — failed: 0
 - ✅ **host light theme applied without a plugin override** — {"dark":false,"scheme":"light"}
 - ✅ **portrait light theme keeps the carousel** — {"focus":"portrait","widths":[370,370,370,370,370]}
 - ✅ **portrait light theme paints light card surfaces** — luminance=0.681
-- ✅ **portrait light theme keeps the title readable (WCAG AA)** — contrast=10.28
+- ✅ **portrait light theme keeps the title readable (WCAG AA)** — contrast=10.39
 - ✅ **landscape switches to the two-up carousel** — landscape
 - ✅ **landscape shows two columns per page** — {"widths":[380,380,380,380,380],"expected":379.5}
 - ✅ **landscape rail snaps horizontally** — {"clientWidth":768,"scrollWidth":1934,"scrollLeft":389,"snapType":"x mandatory","overscrollX":"contain","touchAction":"auto"}
@@ -92,6 +99,7 @@ Total: 58 — passed: 58 — failed: 0
 ## Screenshots
 
 - `desktop-1440x900.png`
+- `portrait-tabs-390x844.png`
 - `portrait-todo-390x844.png`
 - `portrait-tab-in-review-390x844.png`
 - `portrait-after-scroll-390x844.png`

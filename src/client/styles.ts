@@ -246,33 +246,58 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
 /* The focus-mode header (status tab rail + swipe cue) is a zero-cost box on
    desktop: hidden entirely, so the board body keeps its exact previous layout. */
 .dsh-atb-mobilehead { display: none; align-items: center; gap: 8px; min-width: 0; }
-/* Narrow-viewport column navigation: hidden until the five columns stop fitting. */
-.dsh-atb-mobilebar { display: none; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.dsh-atb-mobilebar::-webkit-scrollbar { display: none; }
-.dsh-atb-mobilebar-btn {
-  flex: none; display: inline-flex; align-items: center; gap: 6px;
-  height: 30px; padding: 0 10px; border-radius: 8px; cursor: pointer;
-  border: 1px solid var(--atb-border-2); background: var(--atb-hover); color: var(--atb-text-2);
-  font: inherit; font-size: 11.5px; white-space: nowrap;
-  scroll-snap-align: start;
+/* Narrow-viewport column navigation: hidden until the five columns stop fitting.
+   The rail is a horizontal scroller, so a long label set scrolls instead of
+   being squeezed. */
+.dsh-atb-mobilebar {
+  display: none; gap: 6px; flex: 1; min-width: 0;
+  overflow-x: auto; scrollbar-width: none; padding: 2px 2px 1px;
 }
-.dsh-atb-mobilebar-btn:hover { color: var(--atb-text); border-color: var(--atb-accent); }
+.dsh-atb-mobilebar::-webkit-scrollbar { display: none; }
+/* Mobile column tabs are miniature column heads, not filter chips: the same
+   sober surface as a desktop column, one short status rule on the top edge
+   (see .dsh-atb-colhead::before), a plain label and an integrated counter.
+   Height stays low (34 px) while the padding keeps a comfortable touch target. */
+.dsh-atb-mobilebar-btn {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 11px; border-radius: 11px; cursor: pointer;
+  border: 1px solid var(--atb-border); background: var(--atb-surface-sunken);
+  color: var(--atb-text-2); font: inherit;
+  font-size: 12px; font-weight: 640; letter-spacing: -.1px; white-space: nowrap;
+  scroll-snap-align: start;
+  transition: background .16s ease, color .16s ease, border-color .16s ease,
+    box-shadow .16s ease, transform .12s ease;
+}
+/* The status rule: a short coloured bar inset on the top edge. Inactive tabs
+   keep it visible but muted; the active one widens it and turns it opaque. */
+.dsh-atb-mobilebar-btn::before {
+  content: ""; position: absolute; top: 0; left: 11px; right: 11px; height: 3px;
+  border-radius: 0 0 5px 5px; background: var(--atb-status, var(--atb-text-3));
+  opacity: .45;
+  transition: opacity .16s ease, left .16s ease, right .16s ease, height .16s ease;
+}
+.dsh-atb-mobilebar-btn:hover { color: var(--atb-text); }
+.dsh-atb-mobilebar-btn:active { transform: translateY(1px); background: var(--atb-hover); }
 .dsh-atb-mobilebar-btn:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 2px; }
 .dsh-atb-mobilebar-btn[data-active="true"] {
-  color: var(--atb-text); background: var(--atb-bg-1);
-  border-color: color-mix(in srgb, var(--atb-tab, var(--atb-accent)) 45%, var(--atb-border-2));
-  box-shadow: inset 0 2px 0 var(--atb-tab, var(--atb-accent));
+  color: var(--atb-text); background: var(--atb-bg-1); font-weight: 680;
+  border-color: color-mix(in srgb, var(--atb-status, var(--atb-accent)) 40%, var(--atb-border));
+  box-shadow: 0 1px 2px light-dark(#0f172a0f, #00000040), 0 5px 14px -8px light-dark(#0f172a26, #00000066);
 }
-.dsh-atb-mobilebar-btn[data-status="backlog"] { --atb-tab: var(--atb-text-3); }
-.dsh-atb-mobilebar-btn[data-status="todo"] { --atb-tab: var(--atb-accent); }
-.dsh-atb-mobilebar-btn[data-status="in_progress"] { --atb-tab: var(--atb-warn); }
-.dsh-atb-mobilebar-btn[data-status="in_review"] { --atb-tab: var(--dsw-alias-state-done-primary, #7c3aed); }
-.dsh-atb-mobilebar-btn[data-status="done"] { --atb-tab: var(--atb-success); }
+.dsh-atb-mobilebar-btn[data-active="true"]::before { opacity: 1; left: 8px; right: 8px; }
+/* Same status palette as the desktop columns (single source of truth). */
+.dsh-atb-mobilebar-btn[data-status="backlog"] { --atb-status: var(--atb-text-3); }
+.dsh-atb-mobilebar-btn[data-status="todo"] { --atb-status: var(--atb-accent); }
+.dsh-atb-mobilebar-btn[data-status="in_progress"] { --atb-status: var(--atb-warn); }
+.dsh-atb-mobilebar-btn[data-status="in_review"] { --atb-status: var(--dsw-alias-state-done-primary, #7c3aed); }
+.dsh-atb-mobilebar-btn[data-status="done"] { --atb-status: var(--atb-success); }
 .dsh-atb-mobilebar-label { white-space: nowrap; }
 .dsh-atb-mobilebar-count {
-  font-size: 10.5px; padding: 1px 6px; border-radius: 6px;
+  font-size: 10.5px; font-weight: 500; padding: 1px 6px; border-radius: 6px;
   background: var(--atb-hover); color: var(--atb-text-3);
   font-variant-numeric: tabular-nums;
+  transition: background .16s ease, color .16s ease;
 }
 .dsh-atb-mobilebar-btn[data-active="true"] .dsh-atb-mobilebar-count { background: var(--atb-active, var(--atb-hover)); color: var(--atb-text-2); }
 .dsh-atb-swipecue {
@@ -2045,9 +2070,8 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
   .dsh-atb-mobilehead { display: flex; gap: 6px; }
   .dsh-atb-mobilebar {
     display: flex; gap: 7px; scroll-snap-type: x proximity;
-    overscroll-behavior-x: contain; padding-bottom: 2px;
+    overscroll-behavior-x: contain; padding-bottom: 3px;
   }
-  .dsh-atb-mobilebar-btn { height: 34px; padding: 0 11px; gap: 7px; font-size: 12px; border-radius: 11px; }
   .dsh-atb-mobilebar-count { font-size: 10.5px; padding: 2px 6px; }
   .dsh-atb-swipecue { display: inline-flex; }
   .dsh-atb-swipecue-label { display: none; }
@@ -2128,6 +2152,8 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
   .dsh-atb-mobilehead { display: flex; gap: 7px; }
   .dsh-atb-mobilebar { display: flex; gap: 5px; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
   .dsh-atb-mobilebar-btn { height: 30px; padding: 0 9px; gap: 5px; font-size: 11px; border-radius: 9px; }
+  .dsh-atb-mobilebar-btn::before { left: 9px; right: 9px; height: 2.5px; }
+  .dsh-atb-mobilebar-btn[data-active="true"]::before { left: 6px; right: 6px; }
   .dsh-atb-mobilebar-count { font-size: 10px; padding: 1px 5px; }
   .dsh-atb-swipecue { display: inline-flex; }
 

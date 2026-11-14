@@ -110,24 +110,56 @@ above 760 px — no desktop regression by construction.
 
 ---
 
+### Column tabs: miniature column heads
+
+The status rail above the carousel is not a row of filter chips. Each tab is a
+compact copy of the desktop column head (`.dsh-atb-colhead`), so the two layouts
+speak the same visual language:
+
+| Element | Desktop column head | Mobile column tab |
+| --- | --- | --- |
+| Surface | `--atb-surface-sunken`, 1 px `--atb-border` | same (raised to `--atb-bg-1` when active) |
+| Status marker | short 3 px rule on the top edge (`::before`, `--atb-status`) | same rule, inset 11 px (8 px when active) |
+| Label | 12.5 px / 680 | 12 px / 640 (680 active) |
+| Counter | pill, 10.5 px, `--atb-hover` | same |
+| Height | 54 px (a full header) | 34 px portrait, 30 px landscape |
+
+Both layouts read the **same** `--atb-status` token per status, so the rule
+colours cannot drift: grey `backlog`, blue `todo`, amber `in_progress`, violet
+`in_review`, green `done` (verified pixel by pixel against the desktop heads).
+
+States: the inactive rule sits at `opacity: .45`; the active tab widens it
+(11 → 8 px inset), turns it opaque, raises the surface, strengthens the text and
+transitions all three over 160 ms — the subtle change animation. `:active` adds a
+1 px press translate, and the row is a horizontal scroller (`overflow-x: auto`),
+so five tabs never squeeze: measured 497 px of tabs in a 317 px rail, with the
+selected tab auto-centred. The component is dedicated
+(`src/client/board/MobileStatusTabs.tsx`) and owns only the visuals and the
+`tablist`/`tab` semantics — the swipe sync stays in the board.
+
+---
+
 ## 4. Validation
 
 ### 4.1 Automated tests
 
-* `tests/mobile-focus.spec.ts` — 16 tests: the exported media queries match the
+* `tests/mobile-focus.spec.ts` — 20 tests: the exported media queries match the
   stylesheet verbatim, focus-shape derivation (including the overlap and the
   matchMedia-less fallback), snap geometry (nearest page, ties, end-of-rail,
   clamping, NaN), page labels, roving tab indexes, and the CSS contract
   (mandatory snapping, `scroll-snap-stop`, one/two-up widths, safe areas,
-  bottom sheets, no host-element styling).
-* `tests/mobile-focus-ui.spec.tsx` — 18 tests on the real components: swipe →
+  bottom sheets, no host-element styling) plus the column-tab contract (top
+  status rule, shared palette with the desktop heads, no pill geometry, touch
+  height, pressed state, scrollable rail).
+* `tests/mobile-focus-ui.spec.tsx` — 19 tests on the real components: swipe →
   tab, tab → rail with lock, `role="tab"`/`aria-controls`/`tabpanel` wiring,
   arrow/Home/End, two-up end-of-rail, resize into focus mode, compact toolbar,
-  filters sheet reset, actions sheet (grouping + all actions), FAB → new-task
-  sheet, Escape/backdrop close, folded columns expanded, drag disabled on touch,
-  desktop unchanged, touch-pan never opens a card, tap and stale-touch-window
-  behaviour, colour modes in focus mode.
-* Full suite: **1323 tests / 97 files, all green**; `npm run typecheck` and
+  the tabs rendered as column heads (label + counter, no dot chip, one active
+  tab that follows the carousel), filters sheet reset, actions sheet (grouping +
+  all actions), FAB → new-task sheet, Escape/backdrop close, folded columns
+  expanded, drag disabled on touch, desktop unchanged, touch-pan never opens a
+  card, tap and stale-touch-window behaviour, colour modes in focus mode.
+* Full suite: **1338 tests / 98 files, all green**; `npm run typecheck` and
   `npm run build` clean.
 
 ### 4.2 Real host
@@ -135,9 +167,9 @@ above 760 px — no desktop regression by construction.
 `scripts/qa/pastel-visual-host.ps1 -CaptureScript mobile-swipe-capture.mjs` boots
 an **isolated** DSH home, links this working tree, seeds 340 categorised tasks
 and drives the production bundle in Chromium. `scripts/qa/mobile-swipe-capture.mjs`
-writes `metrics-mobile.json` + `visual-report-mobile.md` and 13 screenshots.
+writes `metrics-mobile.json` + `visual-report-mobile.md` and 14 screenshots.
 
-Result: **58/58 checks passed** (see `docs/design/mobile-swipe/visual-report.md`).
+Result: **68/68 checks passed** (see `docs/design/mobile-swipe/visual-report.md`).
 Highlights:
 
 * desktop 1440×900: five columns (236 px each), drag enabled, no FAB, filter
@@ -146,6 +178,13 @@ Highlights:
   on `todo` (2/5), toolbar compacted, FAB 54×54 at (320, 774), zero overflow,
   title contrast 10.5:1;
 * tab click → rail exactly 1110 px (page 4) and the tab selected;
+* mobile column tabs measured as column heads: 34 px high, label + counter on
+  every tab, **no dot chip**, a 3 px status rule on the top edge matching the
+  desktop column-head colour of that status pixel for pixel
+  (grey 172/179/184, blue 123/170/254, amber 245/159/10, violet 166/138/250,
+  green 34/197/94), active rule opaque and wider (8 px vs 11 px inset) on a
+  raised surface (35/35/36 vs 28/29/31) with a stronger text weight, and a rail
+  that scrolls (497 px of tabs in 317 px) instead of squeezing;
 * carousel scroll → tab `in_progress` and counter 3/5; the CSS snap engine
   re-settles an off-page offset (888 → 740 px);
 * the tallest column scrolls independently (0 → 1200 px) while the carousel and
@@ -184,15 +223,21 @@ Highlights:
 ```
 src/client/board/mobile.ts                  (new)
 src/client/board/MobileSheets.tsx           (new)
+src/client/board/MobileStatusTabs.tsx        (new — column tabs as column heads)
+src/client/board/compact.ts                  (new — measured desktop toolbar density)
 src/client/board/TaskBoard.tsx              (focus mode, sync, toolbar, FAB, sheets)
 src/client/board/TaskCard.tsx               (swipe-vs-tap guard)
-src/client/board/Icon.tsx                   (filter, menu glyphs)
-src/client/styles.ts                        (focus blocks, sheets, FAB, cue)
+src/client/board/Icon.tsx                   (filter, menu, cog glyphs)
+src/client/styles.ts                        (focus blocks, column tabs, sheets, FAB, cue)
 src/client/i18n/{zh,en,ru}.ts               (mobile keys, parity kept)
 tests/mobile-focus.spec.ts                  (new)
 tests/mobile-focus-ui.spec.tsx              (new)
+tests/toolbar-compact.spec.tsx               (new)
 scripts/qa/mobile-swipe-capture.mjs         (new)
+scripts/qa/desktop-header-capture.mjs        (new)
 scripts/qa/pastel-visual-host.ps1           (-CaptureScript)
 docs/design/mobile-swipe/**                 (captures, metrics, report)
+docs/design/desktop-header/**                (captures, metrics, report)
 docs/design/MOBILE-FOCUS-SWIPE-IMPLEMENTATION.md (this file)
+docs/design/DESKTOP-HEADER-COMPACTION.md     (header two-row contract)
 ```
