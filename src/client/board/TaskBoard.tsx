@@ -40,6 +40,7 @@ import {
   stepTabIndex,
   useFocusMode,
 } from './mobile.ts'
+import { useToolbarDensity } from './compact.ts'
 
 /** Urgency sort rank (urgent first). */
 const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, normal: 1, relaxed: 2 }
@@ -268,6 +269,11 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  /* Desktop header compaction: the toolbar measures itself and publishes its
+     density on the board root, so the header stays on two rows even when the
+     host sidebar narrows the panel. See board/compact.ts. */
+  const toolbarRef = useRef<HTMLDivElement | null>(null)
+  const barDensity = useToolbarDensity(toolbarRef)
 
   useEffect(() => {
     activeStatusRef.current = activeStatus
@@ -370,6 +376,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
       data-atb-color-mode={appearance.colorMode}
       data-atb-intensity={appearance.intensity}
       data-atb-focus={focus.focus ? (focus.twoUp ? 'landscape' : 'portrait') : 'none'}
+      data-atb-bar={barDensity}
       data-atb-search={searchVisible ? 'true' : 'false'}
       data-atb-active-status={activeStatus}
       data-atb-filters={filtersActive ? 'true' : 'false'}
@@ -419,10 +426,101 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             <Icon name="menu" />
           </button>
         </div>
+        {/* Desktop action cluster, mirrored by the mobile actions sheet.
+            It sits on the title row: a view command belongs next to the view
+            name, and it keeps the filter row free to stay single-line. */}
+        <div className="dsh-atb-toolbar-actions">
+        <a
+          className="dsh-atb-ver"
+          href="https://github.com/cloader/dsh-taskboard"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          V{PLUGIN_VERSION}
+        </a>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="secondary"
+          aria-label={state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
+          title={state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
+          onClick={() => controller.toggleSecondary()}
+        >
+          <Icon name="checklist" />
+          <span className="dsh-atb-btn-label">{state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}</span>
+        </button>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="appearance"
+          aria-label={t('board.action.settings')}
+          title={t('board.action.settingsTitle')}
+          onClick={() => controller.openSettings()}
+        >
+          <Icon name="settings" /> <span className="dsh-atb-btn-label">{t('board.action.settings')}</span>
+        </button>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="diagnostics"
+          aria-label={t('board.action.diag')}
+          title={t('board.action.diagTitle')}
+          onClick={() => controller.openDiagnostics()}
+        >
+          <Icon name="diagnostics" /> <span className="dsh-atb-btn-label">{t('board.action.diag')}</span>
+        </button>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="import"
+          aria-label={t('board.action.import')}
+          title={t('board.action.importTitle')}
+          onClick={() => controller.openImport()}
+        >
+          <Icon name="import" /> <span className="dsh-atb-btn-label">{t('board.action.import')}</span>
+        </button>
+        <div className="dsh-atb-newmenu">
+          <button
+            type="button"
+            className="dsh-atb-btn"
+            data-action="export"
+            aria-label={t('board.action.export')}
+            title={t('board.action.exportTitle')}
+            onClick={() => setExportOpen(!exportOpen)}
+          >
+            <Icon name="export" /> <span className="dsh-atb-btn-label">{t('board.action.export')}</span>
+            <span className="dsh-atb-newmenu-caret"><Icon name="chevronDown" /></span>
+          </button>
+          {exportOpen && (
+            <>
+              <div className="dsh-atb-newmenu-backdrop" onClick={closeExport} />
+              <div className="dsh-atb-newmenu-list">
+                <button
+                  type="button"
+                  className="dsh-atb-newmenu-opt"
+                  title={t('board.export.jsonTitle')}
+                  onClick={() => { closeExport(); void controller.exportJson() }}
+                >
+                  {t('board.export.json')}
+                </button>
+                <button
+                  type="button"
+                  className="dsh-atb-newmenu-opt"
+                  title={t('board.export.csvTitle')}
+                  onClick={() => { closeExport(); void controller.exportCsv() }}
+                >
+                  {t('board.export.csv')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        </div>
         <button
           type="button"
           className="dsh-atb-btn dsh-atb-grouptoggle"
           aria-pressed={appearance.group}
+          aria-label={t('appearance.group')}
           title={t('appearance.group.title')}
           onClick={() => setAppearance({ group: !appearance.group })}
         >
@@ -477,7 +575,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
         </div>
       </div>
 
-      <div className="dsh-atb-toolbar">
+      <div className="dsh-atb-toolbar" ref={toolbarRef}>
         <label className="dsh-atb-searchfield">
           <Icon name="search" />
           <input
@@ -533,10 +631,12 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             className="dsh-atb-chip"
             data-urgency={u}
             data-on={state.filters.urgencies.includes(u)}
+            aria-label={t(URGENCY_KEYS[u])}
+            title={t(URGENCY_KEYS[u])}
             onClick={() => controller.toggleUrgency(u)}
           >
             <span className="dsh-atb-dot" data-urgency={u} />
-            {t(URGENCY_KEYS[u])}
+            <span className="dsh-atb-chip-label">{t(URGENCY_KEYS[u])}</span>
           </button>
         ))}
         <button
@@ -545,6 +645,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
           data-kind="needs-human-filter"
           data-on={onlyNeedsHuman}
           aria-pressed={onlyNeedsHuman}
+          aria-label={t("board.filter.needsHuman")}
           style={onlyNeedsHuman ? { background: "#f59e0b", color: "#fff", borderColor: "#d97706", fontWeight: 600 } : undefined}
           title={t("board.filter.needsHumanTitle")}
           onClick={() => {
@@ -552,60 +653,12 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             setOnlyNeedsHuman(!onlyNeedsHuman)
           }}
         >
-          <Icon name="hand" /> {t("board.filter.needsHuman")} {needsHumanCount > 0 ? `(${needsHumanCount})` : ""}
+          <Icon name="hand" />
+          <span className="dsh-atb-chip-label">{t("board.filter.needsHuman")}</span>
+          {needsHumanCount > 0 ? <span className="dsh-atb-chip-count">{`(${needsHumanCount})`}</span> : null}
         </button>
         </div>
         <div className="dsh-atb-spacer" />
-        {/* Desktop action cluster, mirrored by the mobile actions sheet. */}
-        <div className="dsh-atb-toolbar-actions">
-        <button type="button" className="dsh-atb-btn" onClick={() => controller.toggleSecondary()}>
-          {state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
-        </button>
-        <button type="button" className="dsh-atb-btn" data-action="appearance" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}><Icon name="settings" /> {t('board.action.settings')}</button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.diagTitle')} onClick={() => controller.openDiagnostics()}><Icon name="diagnostics" /> {t('board.action.diag')}</button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.importTitle')} onClick={() => controller.openImport()}><Icon name="import" /> {t('board.action.import')}</button>
-        <div className="dsh-atb-newmenu">
-          <button
-            type="button"
-            className="dsh-atb-btn"
-            title={t('board.action.exportTitle')}
-            onClick={() => setExportOpen(!exportOpen)}
-          >
-            <Icon name="export" /> {t('board.action.export')} <Icon name="chevronDown" />
-          </button>
-          {exportOpen && (
-            <>
-              <div className="dsh-atb-newmenu-backdrop" onClick={closeExport} />
-              <div className="dsh-atb-newmenu-list">
-                <button
-                  type="button"
-                  className="dsh-atb-newmenu-opt"
-                  title={t('board.export.jsonTitle')}
-                  onClick={() => { closeExport(); void controller.exportJson() }}
-                >
-                  {t('board.export.json')}
-                </button>
-                <button
-                  type="button"
-                  className="dsh-atb-newmenu-opt"
-                  title={t('board.export.csvTitle')}
-                  onClick={() => { closeExport(); void controller.exportCsv() }}
-                >
-                  {t('board.export.csv')}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-        <a
-          className="dsh-atb-ver"
-          href="https://github.com/cloader/dsh-taskboard"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          V{PLUGIN_VERSION}
-        </a>
-        </div>
       </div>
 
       {state.error !== undefined && <div className="dsh-atb-error">{state.error}</div>}

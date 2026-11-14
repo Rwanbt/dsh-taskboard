@@ -1,0 +1,1375 @@
+{
+  "label": "after-compaction",
+  "generatedAt": "2026-11-14T21:10:10.104Z",
+  "base": "http://127.0.0.1:64941",
+  "browser": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+  "screenshots": [
+    "desktop-1920.png",
+    "desktop-1440.png",
+    "desktop-1280.png"
+  ],
+  "checks": [
+    {
+      "name": "1920x900 header rows ≤ 2",
+      "ok": true,
+      "detail": "head=1 toolbar=1 total=2 (board 1640px)"
+    },
+    {
+      "name": "1920x900 toolbar does not overflow",
+      "ok": true,
+      "detail": "scrollWidth=1600 clientWidth=1600"
+    },
+    {
+      "name": "1920x900 no page horizontal overflow",
+      "ok": true,
+      "detail": "overflowX=0"
+    },
+    {
+      "name": "1920x900 actions live on the title row",
+      "ok": true,
+      "detail": "inHead=true inToolbar=false"
+    },
+    {
+      "name": "1920x900 keeps every label",
+      "ok": true,
+      "detail": "action=block chip=block"
+    },
+    {
+      "name": "1680x900 header rows ≤ 2",
+      "ok": true,
+      "detail": "head=1 toolbar=1 total=2 (board 1400px)"
+    },
+    {
+      "name": "1680x900 toolbar does not overflow",
+      "ok": true,
+      "detail": "scrollWidth=1360 clientWidth=1360"
+    },
+    {
+      "name": "1680x900 no page horizontal overflow",
+      "ok": true,
+      "detail": "overflowX=0"
+    },
+    {
+      "name": "1680x900 actions live on the title row",
+      "ok": true,
+      "detail": "inHead=true inToolbar=false"
+    },
+    {
+      "name": "1680x900 keeps every label",
+      "ok": true,
+      "detail": "action=block chip=block"
+    },
+    {
+      "name": "1512x900 header rows ≤ 2",
+      "ok": true,
+      "detail": "head=1 toolbar=1 total=2 (board 1232px)"
+    },
+    {
+      "name": "1512x900 toolbar does not overflow",
+      "ok": true,
+      "detail": "scrollWidth=1192 clientWidth=1192"
+    },
+    {
+      "name": "1512x900 no page horizontal overflow",
+      "ok": true,
+      "detail": "overflowX=0"
+    },
+    {
+      "name": "1512x900 actions live on the title row",
+      "ok": true,
+      "detail": "inHead=true inToolbar=false"
+    },
+    {
+      "name": "1512x900 keeps every label",
+      "ok": true,
+      "detail": "action=block chip=block"
+    },
+    {
+      "name": "1440x900 header rows ≤ 2",
+      "ok": true,
+      "detail": "head=1 toolbar=1 total=2 (board 1160px)"
+    },
+    {
+      "name": "1440x900 toolbar does not overflow",
+      "ok": true,
+      "detail": "scrollWidth=1120 clientWidth=1120"
+    },
+    {
+      "name": "1440x900 no page horizontal overflow",
+      "ok": true,
+      "detail": "overflowX=0"
+    },
+    {
+      "name": "1440x900 actions live on the title row",
+      "ok": true,
+      "detail": "inHead=true inToolbar=false"
+    },
+    {
+      "name": "1440x900 keeps every label",
+      "ok": true,
+      "detail": "action=block chip=block"
+    },
+    {
+      "name": "1280x860 header rows ≤ 2",
+      "ok": true,
+      "detail": "head=1 toolbar=1 total=2 (board 1000px)"
+    },
+    {
+      "name": "1280x860 toolbar does not overflow",
+      "ok": true,
+      "detail": "scrollWidth=960 clientWidth=960"
+    },
+    {
+      "name": "1280x860 no page horizontal overflow",
+      "ok": true,
+      "detail": "overflowX=0"
+    },
+    {
+      "name": "1280x860 actions live on the title row",
+      "ok": true,
+      "detail": "inHead=true inToolbar=false"
+    },
+    {
+      "name": "1280x860 drops action words, keeps chip words",
+      "ok": true,
+      "detail": "action=none chip=block"
+    },
+    {
+      "name": "1120x860 header rows ≤ 2",
+      "ok": true,
+      "detail": "head=1 toolbar=1 total=2 (board 840px)"
+    },
+    {
+      "name": "1120x860 toolbar does not overflow",
+      "ok": true,
+      "detail": "scrollWidth=812 clientWidth=812"
+    },
+    {
+      "name": "1120x860 no page horizontal overflow",
+      "ok": true,
+      "detail": "overflowX=0"
+    },
+    {
+      "name": "1120x860 actions live on the title row",
+      "ok": true,
+      "detail": "inHead=true inToolbar=false"
+    },
+    {
+      "name": "1120x860 drops action and chip words",
+      "ok": true,
+      "detail": "action=none chip=none"
+    },
+    {
+      "name": "settings action is a real gear/sliders glyph with a name",
+      "ok": true,
+      "detail": "{\"size\":{\"width\":14,\"height\":14},\"aria\":\"Settings\",\"label\":\"Settings\"}"
+    }
+  ],
+  "viewports": {
+    "1920x900": {
+      "board": true,
+      "focus": "none",
+      "bar": "wide",
+      "boardWidth": 1640,
+      "boardRect": {
+        "tag": "div",
+        "cls": "dsh-atb-board",
+        "text": "Agent Task Board340 tasks · ",
+        "aria": null,
+        "x": 280,
+        "y": 0,
+        "top": 0,
+        "width": 1640,
+        "height": 900,
+        "display": "flex"
+      },
+      "headRows": [
+        {
+          "top": 16,
+          "height": 28,
+          "items": [
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Other tasks",
+              "aria": "Other tasks",
+              "x": 1163,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Settings",
+              "aria": "Settings",
+              "x": 1277,
+              "width": 87
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Diagnostics",
+              "aria": "Diagnostics",
+              "x": 1372,
+              "width": 107
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Import",
+              "aria": "Import",
+              "x": 1487,
+              "width": 80
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "Export",
+              "aria": null,
+              "x": 1575,
+              "width": 97
+            },
+            {
+              "cls": "dsh-atb-btn.dsh-atb-grouptoggle",
+              "text": "By project",
+              "aria": "By project",
+              "x": 1680,
+              "width": 98
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "New Task",
+              "aria": null,
+              "x": 1787,
+              "width": 113
+            },
+            {
+              "cls": "dsh-atb-title",
+              "text": "Agent Task Board",
+              "aria": null,
+              "x": 300,
+              "width": 149
+            },
+            {
+              "cls": "dsh-atb-count",
+              "text": "340 tasks · rev 57",
+              "aria": null,
+              "x": 457,
+              "width": 101
+            },
+            {
+              "cls": "dsh-atb-ver",
+              "text": "V0.13.0",
+              "aria": null,
+              "x": 1100,
+              "width": 55
+            }
+          ]
+        }
+      ],
+      "toolbarRows": [
+        {
+          "top": 56,
+          "height": 34,
+          "items": [
+            {
+              "cls": "dsh-atb-searchfield",
+              "text": "",
+              "aria": null,
+              "x": 300,
+              "width": 280
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All projects",
+              "aria": "All projects",
+              "x": 588,
+              "width": 93
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All categories",
+              "aria": "All categories",
+              "x": 689,
+              "width": 106
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "Default order",
+              "aria": "Sort within columns",
+              "x": 804,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-toolbar-divider",
+              "text": "",
+              "aria": null,
+              "x": 920,
+              "width": 1
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Urgent",
+              "aria": "Urgent",
+              "x": 932,
+              "width": 70
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Normal",
+              "aria": "Normal",
+              "x": 1010,
+              "width": 73
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Relaxed",
+              "aria": "Relaxed",
+              "x": 1090,
+              "width": 74
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Waiting for Me(31)",
+              "aria": "Waiting for Me",
+              "x": 1172,
+              "width": 143
+            }
+          ]
+        }
+      ],
+      "headRowCount": 1,
+      "toolbarRowCount": 1,
+      "toolbar": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "8px",
+        "clientWidth": 1600,
+        "scrollWidth": 1600,
+        "height": 34
+      },
+      "searchfield": {
+        "width": 280,
+        "flex": "1 1 190px"
+      },
+      "settings": {
+        "width": 87,
+        "height": 28,
+        "label": "Settings",
+        "ariaLabel": "Settings",
+        "title": "Board settings: default execution isolation for new tasks, etc.",
+        "hasIcon": true,
+        "iconSize": {
+          "width": 14,
+          "height": 14
+        },
+        "iconMarkup": "<g transform=\"scale(.66667)\" stroke-width=\"2.25\"><path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></g>"
+      },
+      "actionsInHead": true,
+      "actionsInToolbar": false,
+      "actionLabelDisplay": "block",
+      "chipLabelDisplay": "block",
+      "headRect": {
+        "width": 1600,
+        "height": 28
+      },
+      "overflowX": 0
+    },
+    "1680x900": {
+      "board": true,
+      "focus": "none",
+      "bar": "wide",
+      "boardWidth": 1400,
+      "boardRect": {
+        "tag": "div",
+        "cls": "dsh-atb-board",
+        "text": "Agent Task Board340 tasks · ",
+        "aria": null,
+        "x": 280,
+        "y": 0,
+        "top": 0,
+        "width": 1400,
+        "height": 900,
+        "display": "flex"
+      },
+      "headRows": [
+        {
+          "top": 16,
+          "height": 28,
+          "items": [
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Other tasks",
+              "aria": "Other tasks",
+              "x": 923,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Settings",
+              "aria": "Settings",
+              "x": 1037,
+              "width": 87
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Diagnostics",
+              "aria": "Diagnostics",
+              "x": 1132,
+              "width": 107
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Import",
+              "aria": "Import",
+              "x": 1247,
+              "width": 80
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "Export",
+              "aria": null,
+              "x": 1335,
+              "width": 97
+            },
+            {
+              "cls": "dsh-atb-btn.dsh-atb-grouptoggle",
+              "text": "By project",
+              "aria": "By project",
+              "x": 1440,
+              "width": 98
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "New Task",
+              "aria": null,
+              "x": 1547,
+              "width": 113
+            },
+            {
+              "cls": "dsh-atb-title",
+              "text": "Agent Task Board",
+              "aria": null,
+              "x": 300,
+              "width": 149
+            },
+            {
+              "cls": "dsh-atb-count",
+              "text": "340 tasks · rev 57",
+              "aria": null,
+              "x": 457,
+              "width": 101
+            },
+            {
+              "cls": "dsh-atb-ver",
+              "text": "V0.13.0",
+              "aria": null,
+              "x": 860,
+              "width": 55
+            }
+          ]
+        }
+      ],
+      "toolbarRows": [
+        {
+          "top": 56,
+          "height": 34,
+          "items": [
+            {
+              "cls": "dsh-atb-searchfield",
+              "text": "",
+              "aria": null,
+              "x": 300,
+              "width": 280
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All projects",
+              "aria": "All projects",
+              "x": 588,
+              "width": 93
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All categories",
+              "aria": "All categories",
+              "x": 689,
+              "width": 106
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "Default order",
+              "aria": "Sort within columns",
+              "x": 804,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-toolbar-divider",
+              "text": "",
+              "aria": null,
+              "x": 920,
+              "width": 1
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Urgent",
+              "aria": "Urgent",
+              "x": 932,
+              "width": 70
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Normal",
+              "aria": "Normal",
+              "x": 1010,
+              "width": 73
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Relaxed",
+              "aria": "Relaxed",
+              "x": 1090,
+              "width": 74
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Waiting for Me(31)",
+              "aria": "Waiting for Me",
+              "x": 1172,
+              "width": 143
+            }
+          ]
+        }
+      ],
+      "headRowCount": 1,
+      "toolbarRowCount": 1,
+      "toolbar": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "8px",
+        "clientWidth": 1360,
+        "scrollWidth": 1360,
+        "height": 34
+      },
+      "searchfield": {
+        "width": 280,
+        "flex": "1 1 190px"
+      },
+      "settings": {
+        "width": 87,
+        "height": 28,
+        "label": "Settings",
+        "ariaLabel": "Settings",
+        "title": "Board settings: default execution isolation for new tasks, etc.",
+        "hasIcon": true,
+        "iconSize": {
+          "width": 14,
+          "height": 14
+        },
+        "iconMarkup": "<g transform=\"scale(.66667)\" stroke-width=\"2.25\"><path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></g>"
+      },
+      "actionsInHead": true,
+      "actionsInToolbar": false,
+      "actionLabelDisplay": "block",
+      "chipLabelDisplay": "block",
+      "headRect": {
+        "width": 1360,
+        "height": 28
+      },
+      "overflowX": 0
+    },
+    "1512x900": {
+      "board": true,
+      "focus": "none",
+      "bar": "wide",
+      "boardWidth": 1232,
+      "boardRect": {
+        "tag": "div",
+        "cls": "dsh-atb-board",
+        "text": "Agent Task Board340 tasks · ",
+        "aria": null,
+        "x": 280,
+        "y": 0,
+        "top": 0,
+        "width": 1232,
+        "height": 900,
+        "display": "flex"
+      },
+      "headRows": [
+        {
+          "top": 16,
+          "height": 28,
+          "items": [
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Other tasks",
+              "aria": "Other tasks",
+              "x": 755,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Settings",
+              "aria": "Settings",
+              "x": 869,
+              "width": 87
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Diagnostics",
+              "aria": "Diagnostics",
+              "x": 964,
+              "width": 107
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Import",
+              "aria": "Import",
+              "x": 1079,
+              "width": 80
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "Export",
+              "aria": null,
+              "x": 1167,
+              "width": 97
+            },
+            {
+              "cls": "dsh-atb-btn.dsh-atb-grouptoggle",
+              "text": "By project",
+              "aria": "By project",
+              "x": 1272,
+              "width": 98
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "New Task",
+              "aria": null,
+              "x": 1379,
+              "width": 113
+            },
+            {
+              "cls": "dsh-atb-title",
+              "text": "Agent Task Board",
+              "aria": null,
+              "x": 300,
+              "width": 149
+            },
+            {
+              "cls": "dsh-atb-count",
+              "text": "340 tasks · rev 57",
+              "aria": null,
+              "x": 457,
+              "width": 101
+            },
+            {
+              "cls": "dsh-atb-ver",
+              "text": "V0.13.0",
+              "aria": null,
+              "x": 692,
+              "width": 55
+            }
+          ]
+        }
+      ],
+      "toolbarRows": [
+        {
+          "top": 56,
+          "height": 34,
+          "items": [
+            {
+              "cls": "dsh-atb-searchfield",
+              "text": "",
+              "aria": null,
+              "x": 300,
+              "width": 280
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All projects",
+              "aria": "All projects",
+              "x": 588,
+              "width": 93
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All categories",
+              "aria": "All categories",
+              "x": 689,
+              "width": 106
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "Default order",
+              "aria": "Sort within columns",
+              "x": 804,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-toolbar-divider",
+              "text": "",
+              "aria": null,
+              "x": 920,
+              "width": 1
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Urgent",
+              "aria": "Urgent",
+              "x": 932,
+              "width": 70
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Normal",
+              "aria": "Normal",
+              "x": 1010,
+              "width": 73
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Relaxed",
+              "aria": "Relaxed",
+              "x": 1090,
+              "width": 74
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Waiting for Me(31)",
+              "aria": "Waiting for Me",
+              "x": 1172,
+              "width": 143
+            }
+          ]
+        }
+      ],
+      "headRowCount": 1,
+      "toolbarRowCount": 1,
+      "toolbar": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "8px",
+        "clientWidth": 1192,
+        "scrollWidth": 1192,
+        "height": 34
+      },
+      "searchfield": {
+        "width": 280,
+        "flex": "1 1 190px"
+      },
+      "settings": {
+        "width": 87,
+        "height": 28,
+        "label": "Settings",
+        "ariaLabel": "Settings",
+        "title": "Board settings: default execution isolation for new tasks, etc.",
+        "hasIcon": true,
+        "iconSize": {
+          "width": 14,
+          "height": 14
+        },
+        "iconMarkup": "<g transform=\"scale(.66667)\" stroke-width=\"2.25\"><path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></g>"
+      },
+      "actionsInHead": true,
+      "actionsInToolbar": false,
+      "actionLabelDisplay": "block",
+      "chipLabelDisplay": "block",
+      "headRect": {
+        "width": 1192,
+        "height": 28
+      },
+      "overflowX": 0
+    },
+    "1440x900": {
+      "board": true,
+      "focus": "none",
+      "bar": "wide",
+      "boardWidth": 1160,
+      "boardRect": {
+        "tag": "div",
+        "cls": "dsh-atb-board",
+        "text": "Agent Task Board340 tasks · ",
+        "aria": null,
+        "x": 280,
+        "y": 0,
+        "top": 0,
+        "width": 1160,
+        "height": 900,
+        "display": "flex"
+      },
+      "headRows": [
+        {
+          "top": 16,
+          "height": 28,
+          "items": [
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Other tasks",
+              "aria": "Other tasks",
+              "x": 683,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Settings",
+              "aria": "Settings",
+              "x": 797,
+              "width": 87
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Diagnostics",
+              "aria": "Diagnostics",
+              "x": 892,
+              "width": 107
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Import",
+              "aria": "Import",
+              "x": 1007,
+              "width": 80
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "Export",
+              "aria": null,
+              "x": 1095,
+              "width": 97
+            },
+            {
+              "cls": "dsh-atb-btn.dsh-atb-grouptoggle",
+              "text": "By project",
+              "aria": "By project",
+              "x": 1200,
+              "width": 98
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "New Task",
+              "aria": null,
+              "x": 1307,
+              "width": 113
+            },
+            {
+              "cls": "dsh-atb-title",
+              "text": "Agent Task Board",
+              "aria": null,
+              "x": 300,
+              "width": 149
+            },
+            {
+              "cls": "dsh-atb-count",
+              "text": "340 tasks · rev 57",
+              "aria": null,
+              "x": 457,
+              "width": 101
+            },
+            {
+              "cls": "dsh-atb-ver",
+              "text": "V0.13.0",
+              "aria": null,
+              "x": 620,
+              "width": 55
+            }
+          ]
+        }
+      ],
+      "toolbarRows": [
+        {
+          "top": 56,
+          "height": 34,
+          "items": [
+            {
+              "cls": "dsh-atb-searchfield",
+              "text": "",
+              "aria": null,
+              "x": 300,
+              "width": 280
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All projects",
+              "aria": "All projects",
+              "x": 588,
+              "width": 93
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All categories",
+              "aria": "All categories",
+              "x": 689,
+              "width": 106
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "Default order",
+              "aria": "Sort within columns",
+              "x": 804,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-toolbar-divider",
+              "text": "",
+              "aria": null,
+              "x": 920,
+              "width": 1
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Urgent",
+              "aria": "Urgent",
+              "x": 932,
+              "width": 70
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Normal",
+              "aria": "Normal",
+              "x": 1010,
+              "width": 73
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Relaxed",
+              "aria": "Relaxed",
+              "x": 1090,
+              "width": 74
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Waiting for Me(31)",
+              "aria": "Waiting for Me",
+              "x": 1172,
+              "width": 143
+            }
+          ]
+        }
+      ],
+      "headRowCount": 1,
+      "toolbarRowCount": 1,
+      "toolbar": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "8px",
+        "clientWidth": 1120,
+        "scrollWidth": 1120,
+        "height": 34
+      },
+      "searchfield": {
+        "width": 280,
+        "flex": "1 1 190px"
+      },
+      "settings": {
+        "width": 87,
+        "height": 28,
+        "label": "Settings",
+        "ariaLabel": "Settings",
+        "title": "Board settings: default execution isolation for new tasks, etc.",
+        "hasIcon": true,
+        "iconSize": {
+          "width": 14,
+          "height": 14
+        },
+        "iconMarkup": "<g transform=\"scale(.66667)\" stroke-width=\"2.25\"><path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></g>"
+      },
+      "actionsInHead": true,
+      "actionsInToolbar": false,
+      "actionLabelDisplay": "block",
+      "chipLabelDisplay": "block",
+      "headRect": {
+        "width": 1120,
+        "height": 28
+      },
+      "overflowX": 0
+    },
+    "1280x860": {
+      "board": true,
+      "focus": "none",
+      "bar": "compact",
+      "boardWidth": 1000,
+      "boardRect": {
+        "tag": "div",
+        "cls": "dsh-atb-board",
+        "text": "Agent Task Board340 tasks · ",
+        "aria": null,
+        "x": 280,
+        "y": 0,
+        "top": 0,
+        "width": 1000,
+        "height": 860,
+        "display": "flex"
+      },
+      "headRows": [
+        {
+          "top": 16,
+          "height": 30,
+          "items": [
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Other tasks",
+              "aria": "Other tasks",
+              "x": 830,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Settings",
+              "aria": "Settings",
+              "x": 872,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Diagnostics",
+              "aria": "Diagnostics",
+              "x": 914,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Import",
+              "aria": "Import",
+              "x": 956,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "Export",
+              "aria": null,
+              "x": 998,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn.dsh-atb-grouptoggle",
+              "text": "By project",
+              "aria": "By project",
+              "x": 1040,
+              "width": 98
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "New Task",
+              "aria": null,
+              "x": 1147,
+              "width": 113
+            },
+            {
+              "cls": "dsh-atb-title",
+              "text": "Agent Task Board",
+              "aria": null,
+              "x": 300,
+              "width": 149
+            },
+            {
+              "cls": "dsh-atb-count",
+              "text": "340 tasks · rev 57",
+              "aria": null,
+              "x": 457,
+              "width": 101
+            },
+            {
+              "cls": "dsh-atb-ver",
+              "text": "V0.13.0",
+              "aria": null,
+              "x": 767,
+              "width": 55
+            }
+          ]
+        }
+      ],
+      "toolbarRows": [
+        {
+          "top": 58,
+          "height": 34,
+          "items": [
+            {
+              "cls": "dsh-atb-searchfield",
+              "text": "",
+              "aria": null,
+              "x": 300,
+              "width": 200
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All projects",
+              "aria": "All projects",
+              "x": 508,
+              "width": 93
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All categories",
+              "aria": "All categories",
+              "x": 609,
+              "width": 106
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "Default order",
+              "aria": "Sort within columns",
+              "x": 724,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-toolbar-divider",
+              "text": "",
+              "aria": null,
+              "x": 840,
+              "width": 1
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Urgent",
+              "aria": "Urgent",
+              "x": 852,
+              "width": 70
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Normal",
+              "aria": "Normal",
+              "x": 930,
+              "width": 73
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Relaxed",
+              "aria": "Relaxed",
+              "x": 1010,
+              "width": 74
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Waiting for Me(31)",
+              "aria": "Waiting for Me",
+              "x": 1092,
+              "width": 143
+            }
+          ]
+        }
+      ],
+      "headRowCount": 1,
+      "toolbarRowCount": 1,
+      "toolbar": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "8px",
+        "clientWidth": 960,
+        "scrollWidth": 960,
+        "height": 34
+      },
+      "searchfield": {
+        "width": 200,
+        "flex": "0 1 180px"
+      },
+      "settings": {
+        "width": 34,
+        "height": 30,
+        "label": "Settings",
+        "ariaLabel": "Settings",
+        "title": "Board settings: default execution isolation for new tasks, etc.",
+        "hasIcon": true,
+        "iconSize": {
+          "width": 14,
+          "height": 14
+        },
+        "iconMarkup": "<g transform=\"scale(.66667)\" stroke-width=\"2.25\"><path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></g>"
+      },
+      "actionsInHead": true,
+      "actionsInToolbar": false,
+      "actionLabelDisplay": "none",
+      "chipLabelDisplay": "block",
+      "headRect": {
+        "width": 960,
+        "height": 30
+      },
+      "overflowX": 0
+    },
+    "1120x860": {
+      "board": true,
+      "focus": "none",
+      "bar": "tight",
+      "boardWidth": 840,
+      "boardRect": {
+        "tag": "div",
+        "cls": "dsh-atb-board",
+        "text": "Agent Task Board340 tasks · ",
+        "aria": null,
+        "x": 280,
+        "y": 0,
+        "top": 0,
+        "width": 840,
+        "height": 860,
+        "display": "flex"
+      },
+      "headRows": [
+        {
+          "top": 14,
+          "height": 30,
+          "items": [
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Other tasks",
+              "aria": "Other tasks",
+              "x": 741,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Settings",
+              "aria": "Settings",
+              "x": 783,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Diagnostics",
+              "aria": "Diagnostics",
+              "x": 825,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn",
+              "text": "Import",
+              "aria": "Import",
+              "x": 867,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "Export",
+              "aria": null,
+              "x": 909,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-btn.dsh-atb-grouptoggle",
+              "text": "By project",
+              "aria": "By project",
+              "x": 951,
+              "width": 34
+            },
+            {
+              "cls": "dsh-atb-newmenu",
+              "text": "New Task",
+              "aria": null,
+              "x": 993,
+              "width": 113
+            },
+            {
+              "cls": "dsh-atb-title",
+              "text": "Agent Task Board",
+              "aria": null,
+              "x": 294,
+              "width": 149
+            },
+            {
+              "cls": "dsh-atb-count",
+              "text": "340 tasks · rev 57",
+              "aria": null,
+              "x": 451,
+              "width": 101
+            }
+          ]
+        }
+      ],
+      "toolbarRows": [
+        {
+          "top": 56,
+          "height": 34,
+          "items": [
+            {
+              "cls": "dsh-atb-searchfield",
+              "text": "",
+              "aria": null,
+              "x": 294,
+              "width": 170
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All projects",
+              "aria": "All projects",
+              "x": 468,
+              "width": 93
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "All categories",
+              "aria": "All categories",
+              "x": 565,
+              "width": 106
+            },
+            {
+              "cls": "dsh-atb-sel",
+              "text": "Default order",
+              "aria": "Sort within columns",
+              "x": 676,
+              "width": 105
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Urgent",
+              "aria": "Urgent",
+              "x": 785,
+              "width": 24
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Normal",
+              "aria": "Normal",
+              "x": 813,
+              "width": 24
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Relaxed",
+              "aria": "Relaxed",
+              "x": 841,
+              "width": 24
+            },
+            {
+              "cls": "dsh-atb-chip",
+              "text": "Waiting for Me(31)",
+              "aria": "Waiting for Me",
+              "x": 869,
+              "width": 55
+            }
+          ]
+        }
+      ],
+      "headRowCount": 1,
+      "toolbarRowCount": 1,
+      "toolbar": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "4px",
+        "clientWidth": 812,
+        "scrollWidth": 812,
+        "height": 34
+      },
+      "searchfield": {
+        "width": 170,
+        "flex": "0 1 150px"
+      },
+      "settings": {
+        "width": 34,
+        "height": 30,
+        "label": "Settings",
+        "ariaLabel": "Settings",
+        "title": "Board settings: default execution isolation for new tasks, etc.",
+        "hasIcon": true,
+        "iconSize": {
+          "width": 14,
+          "height": 14
+        },
+        "iconMarkup": "<g transform=\"scale(.66667)\" stroke-width=\"2.25\"><path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></g>"
+      },
+      "actionsInHead": true,
+      "actionsInToolbar": false,
+      "actionLabelDisplay": "none",
+      "chipLabelDisplay": "none",
+      "headRect": {
+        "width": 812,
+        "height": 30
+      },
+      "overflowX": 0
+    }
+  },
+  "settingsIconMarkup": "<g transform=\"scale(.66667)\" stroke-width=\"2.25\"><path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></g>"
+}

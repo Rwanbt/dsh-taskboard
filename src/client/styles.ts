@@ -211,6 +211,38 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
 /* The two clusters are transparent wrappers on desktop: their children stay
    direct flex items of the toolbar (no layout change at all). */
 .dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: contents; }
+/* ---------------------------------------------------------------------
+   Desktop toolbar densities. The board measures its own toolbar and
+   publishes data-atb-bar (board/compact.ts); the header must stay on two
+   rows, so the row sheds its labels before it is allowed to wrap onto a
+   third line. Every control keeps its icon, its accessible name and its
+   tooltip: only the visible text is dropped.
+   --------------------------------------------------------------------- */
+.dsh-atb-chip-count { font-variant-numeric: tabular-nums; }
+.dsh-atb-head { gap: 8px; }
+/* Title row: the action cluster drops its words first (icon + tooltip + name). */
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-btn-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-btn-label { display: none; }
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-btn,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-btn {
+  width: 34px; height: 30px; padding: 0; gap: 0; justify-content: center;
+}
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-newmenu-caret,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-newmenu-caret { display: none; }
+/* Filter row: the urgency chips keep their words as long as any laptop fits. */
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar .dsh-atb-searchfield { flex: 0 1 180px; min-width: 130px; max-width: 200px; }
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar .dsh-atb-sel { max-width: 168px; }
+/* Tight: colour dots + icon-only counters, and the title row loses the version
+   pill and the grouping label. Everything keeps its tooltip and accessible name. */
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar { gap: 4px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-searchfield { flex: 0 1 150px; min-width: 104px; max-width: 170px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-sel { max-width: 128px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-chip-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-toolbar-divider { display: none; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-chip { padding: 3px 7px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-grouptoggle { width: 34px; padding: 0; gap: 0; justify-content: center; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-grouptoggle-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-ver { display: none; }
 /* The focus-mode header (status tab rail + swipe cue) is a zero-cost box on
    desktop: hidden entirely, so the board body keeps its exact previous layout. */
 .dsh-atb-mobilehead { display: none; align-items: center; gap: 8px; min-width: 0; }

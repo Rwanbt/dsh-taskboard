@@ -23,7 +23,16 @@ export type IconName =
 
 /** Hand-drawn 16×16 line paths (stroke only). */
 const PATHS: Record<IconName, ReactNode> = {
-  settings: <><circle cx="8" cy="8" r="2.2" /><path d="M8 2.2v1.4M8 12.4v1.4M2.2 8h1.4M12.4 8h1.4M3.9 3.9l1 1M11.1 11.1l1 1M12.1 3.9l-1 1M4.9 11.1l-1 1" /></>,
+  // A cog, not a sun: the previous glyph (a ring with eight detached rays) read
+  // as a brightness toggle. The outline is drawn on a 24-unit grid and scaled
+  // to the 16-unit box, with the stroke compensated so it stays on the charte's
+  // thin 1.5 px line.
+  settings: (
+    <g transform="scale(.66667)" strokeWidth="2.25">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </g>
+  ),
   diagnostics: <><path d="M2 8h2l1.6-3.4 2.2 6.8L9.4 8H14" /></>,
   import: <><path d="M8 2.5v7" /><path d="m5 6.5 3 3 3-3" /><path d="M2.5 12.5h11" /></>,
   export: <><path d="M8 13.5v-7" /><path d="m5 9.5 3-3 3 3" /><path d="M2.5 3.5h11" /></>,
