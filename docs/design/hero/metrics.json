@@ -1,0 +1,80 @@
+{
+  "seed": true,
+  "shots": {
+    "hero-desktop-1440x900": {
+      "x": 280,
+      "y": 0,
+      "width": 1160,
+      "height": 900,
+      "cards": 30,
+      "groups": [
+        "Atelier Lumen4",
+        "Nova Labs4",
+        "Studio Kestrel4",
+        "Atelier Lumen2",
+        "Nova Labs3",
+        "Studio Kestrel1",
+        "Atelier Lumen1",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Studio Kestrel2",
+        "Nova Labs1"
+      ],
+      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-003440\\hero-desktop-1440x900.png"
+    },
+    "hero-mobile-390x844": {
+      "x": 0,
+      "y": 48,
+      "width": 390,
+      "height": 796,
+      "cards": 30,
+      "groups": [
+        "Atelier Lumen4",
+        "Nova Labs4",
+        "Studio Kestrel4",
+        "Atelier Lumen2",
+        "Nova Labs3",
+        "Studio Kestrel1",
+        "Atelier Lumen1",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Studio Kestrel2",
+        "Nova Labs1"
+      ],
+      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-003440\\hero-mobile-390x844.png"
+    },
+    "hero-landscape-844x390": {
+      "x": 56,
+      "y": 0,
+      "width": 788,
+      "height": 390,
+      "cards": 30,
+      "groups": [
+        "Atelier Lumen4",
+        "Nova Labs4",
+        "Studio Kestrel4",
+        "Atelier Lumen2",
+        "Nova Labs3",
+        "Studio Kestrel1",
+        "Atelier Lumen1",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Studio Kestrel2",
+        "Nova Labs1"
+      ],
+      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-003440\\hero-landscape-844x390.png"
+    }
+  }
+}
