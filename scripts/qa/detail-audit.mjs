@@ -143,20 +143,72 @@ if (cardPoint.status !== null && cardPoint.status !== undefined) {
   await page.evaluate(status => document.querySelector(`.dsh-atb-mobilebar-btn[data-status="${status}"]`)?.click(), cardPoint.status)
   await sleep(1000)
 }
-if (cardPoint.error === undefined) {
-  await page.mouse.click(cardPoint.x, cardPoint.y)
-  await sleep(1400)
-}
-if ((await page.$('.dsh-atb-detailpanel')) === null) {
-  console.log('mouse click did not open the drawer, trying a synthetic click')
-  await page.evaluate(() => {
-    const cards = [...document.querySelectorAll('.dsh-atb-card')]
-    const card = cards.find(c => (c.querySelector('.dsh-atb-card-title')?.textContent ?? '').includes('Audit checklist'))
-      ?? cards.find(c => c.querySelector('[data-kind="checklist"]') !== null)
-    card?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+
+/**
+ * Open candidate cards until one shows a checklist block in the drawer.
+ * A click can miss (overlay, animation, wrong card) so the audit never assumes
+ * the first attempt worked: it verifies what the drawer actually contains.
+ */
+async function openChecklistDrawer() {
+  const candidates = await page.evaluate(() => {
+    const board = document.querySelector('.dsh-atb-board')
+    return [...(board?.querySelectorAll('.dsh-atb-card') ?? [])].map((card, index) => {
+      const box = card.getBoundingClientRect()
+      return {
+        index,
+        title: (card.querySelector('.dsh-atb-card-title')?.textContent ?? '').slice(0, 60),
+        checklist: card.querySelector('[data-kind="checklist"]') !== null,
+        x: Math.round(box.x + box.width / 2),
+        y: Math.round(box.y + Math.min(30, Math.max(12, box.height / 2))),
+      }
+    })
   })
-  await sleep(1400)
+  const ranked = [
+    ...candidates.filter(c => /contr[oô]le checklist/i.test(c.title)),
+    ...candidates.filter(c => c.checklist && !/contr[oô]le checklist/i.test(c.title)),
+    ...candidates.filter(c => !c.checklist),
+  ].slice(0, 10)
+  for (const candidate of ranked) {
+    await page.evaluate(() => {
+      const close = document.querySelector('.dsh-atb-detail-close')
+      if (close !== null) close.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+    })
+    await sleep(400)
+    await page.mouse.click(candidate.x, candidate.y)
+    await sleep(1200)
+    let check = await page.evaluate(() => {
+      const panel = document.querySelector('.dsh-atb-detailpanel')
+      const heading = panel?.querySelector('.dsh-atb-detail-titlebar h3')?.textContent ?? null
+      return { open: panel !== null, heading: heading?.slice(0, 60) ?? null, hasChecklist: panel?.querySelector('.dsh-atb-fieldcard[data-kind="checklist"]') !== null }
+    })
+    if (!check.open) {
+      // Fall back to a synthetic click on that very card.
+      await page.evaluate(title => {
+        const card = [...document.querySelectorAll('.dsh-atb-card')]
+          .find(el => (el.querySelector('.dsh-atb-card-title')?.textContent ?? '').slice(0, 60) === title)
+        card?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+      }, candidate.title)
+      await sleep(1200)
+      check = await page.evaluate(() => {
+        const panel = document.querySelector('.dsh-atb-detailpanel')
+        return {
+          open: panel !== null,
+          heading: panel?.querySelector('.dsh-atb-detail-titlebar h3')?.textContent?.slice(0, 60) ?? null,
+          hasChecklist: panel?.querySelector('.dsh-atb-fieldcard[data-kind="checklist"]') !== null,
+        }
+      })
+    }
+    console.log('try', candidate.index, JSON.stringify(candidate.title), '→', JSON.stringify(check))
+    if (check.open && check.hasChecklist) return { candidate, check }
+  }
+  return null
 }
+
+const opened = await openChecklistDrawer()
+console.log('opened:', JSON.stringify(opened))
+const drawerOpen = (await page.$('.dsh-atb-detailpanel')) !== null
+if (!drawerOpen) console.log('no detail panel at all')
+
 
 const measure = () => page.evaluate(() => {
   const rect = el => {

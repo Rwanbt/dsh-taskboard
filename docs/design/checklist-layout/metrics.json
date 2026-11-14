@@ -16,7 +16,7 @@
     "checklist": {
       "rect": {
         "x": 17,
-        "y": 609,
+        "y": 684,
         "w": 356,
         "h": 165
       },
@@ -35,20 +35,20 @@
         "overflowWrap": "normal",
         "position": "static"
       },
-      "label": "Acceptance checklist (DoD) 1/2"
+      "label": "Liste de contrôle d’acceptation (DoD) 1/"
     },
     "items": [
       {
         "rect": {
           "x": 32,
-          "y": 642,
+          "y": 717,
           "w": 326,
           "h": 65
         },
         "text": {
           "rect": {
             "x": 71,
-            "y": 652,
+            "y": 727,
             "w": 139,
             "h": 48
           },
@@ -72,7 +72,7 @@
         "meta": {
           "rect": {
             "x": 219,
-            "y": 653,
+            "y": 728,
             "w": 129,
             "h": 44
           },
@@ -91,7 +91,7 @@
             "overflowWrap": "normal",
             "position": "static"
           },
-          "content": " agent-01 · Evidence: preuve très longue qui décrit en détail la vérification effectuée su"
+          "content": " agent-01 · Preuve : preuve très longue qui décrit en détail la vérification effectuée sur"
         },
         "lines": 3,
         "charsPerLine": 20.3
@@ -99,20 +99,20 @@
       {
         "rect": {
           "x": 32,
-          "y": 712,
+          "y": 787,
           "w": 326,
           "h": 49
         },
         "text": {
           "rect": {
             "x": 71,
-            "y": 722,
-            "w": 217,
+            "y": 797,
+            "w": 218,
             "h": 32
           },
           "style": {
             "display": "block",
-            "width": "216.812px",
+            "width": "217.875px",
             "minWidth": "0px",
             "maxWidth": "none",
             "flex": "1 1 140px",
@@ -129,14 +129,14 @@
         },
         "meta": {
           "rect": {
-            "x": 297,
-            "y": 724,
-            "w": 51,
+            "x": 298,
+            "y": 799,
+            "w": 50,
             "h": 14
           },
           "style": {
             "display": "flex",
-            "width": "51.1875px",
+            "width": "50.125px",
             "minWidth": "0px",
             "maxWidth": "42%",
             "flex": "0 1 auto",
@@ -149,7 +149,7 @@
             "overflowWrap": "normal",
             "position": "static"
           },
-          "content": "Unchecked"
+          "content": "Non coché"
         },
         "lines": 2,
         "charsPerLine": 21.5
@@ -178,7 +178,7 @@
     "checklist": {
       "rect": {
         "x": 321,
-        "y": 704,
+        "y": 711,
         "w": 1078,
         "h": 146
       },
@@ -197,20 +197,20 @@
         "overflowWrap": "normal",
         "position": "static"
       },
-      "label": "Acceptance checklist (DoD) 1/2"
+      "label": "Liste de contrôle d’acceptation (DoD) 1/"
     },
     "items": [
       {
         "rect": {
           "x": 336,
-          "y": 737,
+          "y": 744,
           "w": 1048,
           "h": 62
         },
         "text": {
           "rect": {
             "x": 375,
-            "y": 747,
+            "y": 754,
             "w": 710,
             "h": 16
           },
@@ -234,7 +234,7 @@
         "meta": {
           "rect": {
             "x": 1094,
-            "y": 748,
+            "y": 755,
             "w": 280,
             "h": 44
           },
@@ -253,7 +253,7 @@
             "overflowWrap": "normal",
             "position": "static"
           },
-          "content": " agent-01 · Evidence: preuve très longue qui décrit en détail la vérification effectuée su"
+          "content": " agent-01 · Preuve : preuve très longue qui décrit en détail la vérification effectuée sur"
         },
         "lines": 1,
         "charsPerLine": 61
@@ -261,20 +261,20 @@
       {
         "rect": {
           "x": 336,
-          "y": 804,
+          "y": 811,
           "w": 1048,
           "h": 33
         },
         "text": {
           "rect": {
             "x": 375,
-            "y": 814,
-            "w": 939,
+            "y": 821,
+            "w": 940,
             "h": 16
           },
           "style": {
             "display": "block",
-            "width": "938.812px",
+            "width": "939.875px",
             "minWidth": "0px",
             "maxWidth": "none",
             "flex": "1 1 140px",
@@ -291,14 +291,14 @@
         },
         "meta": {
           "rect": {
-            "x": 1323,
-            "y": 816,
-            "w": 51,
+            "x": 1324,
+            "y": 823,
+            "w": 50,
             "h": 14
           },
           "style": {
             "display": "flex",
-            "width": "51.1875px",
+            "width": "50.125px",
             "minWidth": "0px",
             "maxWidth": "42%",
             "flex": "0 1 auto",
@@ -311,7 +311,7 @@
             "overflowWrap": "normal",
             "position": "static"
           },
-          "content": "Unchecked"
+          "content": "Non coché"
         },
         "lines": 1,
         "charsPerLine": 43
