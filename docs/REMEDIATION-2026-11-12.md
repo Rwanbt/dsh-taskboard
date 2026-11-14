@@ -6,7 +6,8 @@ Chaque correction est couverte par un test de régression dans la composition r�
 
 Commits de référence : Taskboard `ee04bfc` (`fix(security,autonomy): close the audit
 P0/P1 gaps`), Agent Board `9cd8d33` (`fix(superagent): enforce readiness, pause, model
-and fallback contracts`, branche `feat/superagent-ux-polish`).
+and fallback contracts`), intégré depuis sur `dev` en `c4f1d2a` (la branche
+`feat/superagent-ux-polish` a été fusionnée puis supprimée).
 
 ## 1. État des constats
 
