@@ -370,26 +370,6 @@ async function railRect() {
   })
 }
 
-/** Rect of the active column's card list. */
-async function activeCardsRect() {
-  return page.evaluate(() => {
-    const board = document.querySelector('.dsh-atb-board')
-    const status = board?.getAttribute('data-atb-active-status')
-    const column = status === null || status === undefined ? null : board.querySelector(`.dsh-atb-column[data-status="${status}"]`)
-    const cards = column === null ? null : column.querySelector('.dsh-atb-cards')
-    if (cards === null || cards === undefined) return null
-    const box = cards.getBoundingClientRect()
-    return { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) }
-  })
-}
-
-/** Wheel scroll at a point (real Chromium input pipeline, compositor + snap). */
-async function wheelAt(x, y, delta) {
-  await page.mouse.move(x, y)
-  await page.mouse.wheel(delta)
-  await settle(page, 900)
-}
-
 /**
  * Move the carousel one page and report how it was done.
  *
@@ -419,22 +399,9 @@ async function scrollCarouselPage(pageWidth) {
   }
 }
 
-/** Dispatch a genuine tap through CDP. */
-async function touchTap(x, y) {
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
-  await sleep(60)
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-  await sleep(500)
-}
-
 /**
- * The host shell owns the left edge (its mobile drawer). Every simulated
- * gesture therefore stays inside a safe band: a plugin gesture must never be
- * confused with a shell drawer gesture in this validation.
+ * Workflow order, used to label a rail offset (the plugin's own order).
  */
-const SAFE_X = { min: 110, max: 340 }
-
-/** Workflow order, used to label a rail offset. */
 const STATUSES = ['backlog', 'todo', 'in_progress', 'in_review', 'done']
 
 /** Status of a rail scroll offset (page index = offset / page width). */

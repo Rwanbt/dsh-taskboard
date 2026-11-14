@@ -1,7 +1,7 @@
 # Mobile focus mode — real-host validation
 
 - Label: `feat/mobile-focus-swipe-v2`
-- Generated: 2026-11-14T20:32:36.759Z
+- Generated: 2026-11-14T20:37:47.378Z
 - Host: http://127.0.0.1:64941 (isolated DSH home, production client bundle from this working tree)
 - Browser: C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe
 
@@ -19,7 +19,7 @@ Screenshots: `docs/design/mobile-swipe/captures/`.
 
 ## Scroll, snap and touch evidence (real Chromium input)
 
-- Horizontal scroll (scrollBy — settled-swipe position): rail `370 → 740 px`, tab `in_progress`, counter `3/5`
+- Horizontal scroll (scrollBy (settled-swipe position)): rail `370 → 740 px`, tab `in_progress`, counter `3/5`
 - CSS snap engine: requested `888 px` → settled `740 px`
 - Vertical scroll: cards `0 → 1200 px`, rail unchanged (`0 → 0`)
 - Touch events on a card: `{"start":1,"move":16,"end":1}`, detail opened: `false`
@@ -50,7 +50,7 @@ Total: 56 — passed: 56 — failed: 0
 - ✅ **portrait offers a thumb-reachable create button** — {"display":"grid","rect":{"x":320,"y":774,"width":54,"height":54}}
 - ✅ **portrait never scrolls the page horizontally** — overflow=0px
 - ✅ **portrait cards keep the pastel surface** — 12 distinct surfaces
-- ✅ **portrait card title stays readable (WCAG AA)** — contrast=10.43
+- ✅ **portrait card title stays readable (WCAG AA)** — contrast=10.52
 - ✅ **tab click scrolls the rail to that page** — {"scrollLeft":1110,"expected":1110}
 - ✅ **tab click selects the tab** — {"active":"in_review","counter":"4/5"}
 - ✅ **the carousel moves by whole pages** — {"mechanism":"scrollBy (settled-swipe position)","movedBy":370,"pageWidth":370,"attempts":[{"mechanism":"scrollBy","direction":1,"before":370,"after":740}]}
@@ -75,7 +75,7 @@ Total: 56 — passed: 56 — failed: 0
 - ✅ **host light theme applied without a plugin override** — {"dark":false,"scheme":"light"}
 - ✅ **portrait light theme keeps the carousel** — {"focus":"portrait","widths":[370,370,370,370,370]}
 - ✅ **portrait light theme paints light card surfaces** — luminance=0.688
-- ✅ **portrait light theme keeps the title readable (WCAG AA)** — contrast=10.38
+- ✅ **portrait light theme keeps the title readable (WCAG AA)** — contrast=10.45
 - ✅ **landscape switches to the two-up carousel** — landscape
 - ✅ **landscape shows two columns per page** — {"widths":[380,380,380,380,380],"expected":379.5}
 - ✅ **landscape rail snaps horizontally** — {"clientWidth":768,"scrollWidth":1934,"scrollLeft":389,"snapType":"x mandatory","overscrollX":"contain","touchAction":"auto"}

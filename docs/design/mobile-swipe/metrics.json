@@ -1,6 +1,6 @@
 {
-  "label": "feat/mobile-focus-swipe-v2",
-  "generatedAt": "2026-11-14T20:32:36.759Z",
+  "label": "feat/mobile-focus-swipe-v2 (final)",
+  "generatedAt": "2026-11-14T20:37:47.378Z",
   "base": "http://127.0.0.1:64941",
   "browser": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
   "screenshots": [
@@ -122,7 +122,7 @@
     {
       "name": "portrait card title stays readable (WCAG AA)",
       "ok": true,
-      "detail": "contrast=10.43"
+      "detail": "contrast=10.52"
     },
     {
       "name": "tab click scrolls the rail to that page",
@@ -247,7 +247,7 @@
     {
       "name": "portrait light theme keeps the title readable (WCAG AA)",
       "ok": true,
-      "detail": "contrast=10.38"
+      "detail": "contrast=10.45"
     },
     {
       "name": "landscape switches to the two-up carousel",
@@ -363,13 +363,13 @@
         "b": 44
       },
       "cardColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "titleColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "distinctCardSurfaces": 12,
@@ -445,13 +445,13 @@
         "b": 44
       },
       "cardColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "titleColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "distinctCardSurfaces": 12,
@@ -582,13 +582,13 @@
           "b": 182
         },
         "cardColor": {
-          "r": 34,
-          "g": 39,
+          "r": 35,
+          "g": 38,
           "b": 59
         },
         "titleColor": {
-          "r": 34,
-          "g": 39,
+          "r": 35,
+          "g": 38,
           "b": 59
         },
         "distinctCardSurfaces": 12,
@@ -665,13 +665,13 @@
         "b": 44
       },
       "cardColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "titleColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "distinctCardSurfaces": 12,
@@ -739,13 +739,13 @@
         "b": 44
       },
       "cardColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "titleColor": {
-        "r": 244,
-        "g": 242,
+        "r": 245,
+        "g": 243,
         "b": 252
       },
       "distinctCardSurfaces": 12,
