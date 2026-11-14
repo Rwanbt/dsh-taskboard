@@ -2126,6 +2126,16 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
   .dsh-atb-modal-foot { padding-bottom: calc(13px + env(safe-area-inset-bottom)); }
 
   .dsh-atb-toolbar-divider { display: none; }
+  /* Comment composer: the drawer's writing area used to be a sliver squeezed
+     between the send buttons (its flex basis is 0). On a phone it now takes the
+     full width on its own line, with the buttons sharing the row below it. The
+     16px font is not cosmetic: iOS zooms the whole page when a focused field is
+     smaller than 16px, which alone makes the field unusable. */
+  .dsh-atb-composer { flex-wrap: wrap; gap: 8px; align-items: stretch; }
+  .dsh-atb-composer-input { flex: 1 1 100%; min-height: 88px; font-size: 16px; line-height: 1.45; padding: 9px 11px; }
+  .dsh-atb-composer-send { flex: 0 1 auto; min-width: 0; justify-content: center; padding: 9px 12px; font-size: 13px; }
+  .dsh-atb-composer-deliver { flex: 1 1 auto; white-space: normal; text-align: center; }
+  .dsh-atb-image-add { flex: 0 0 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; }
   .dsh-atb-colormodes { grid-template-columns: 1fr; }
   .dsh-atb-preview-grid { grid-template-columns: 1fr 1fr; }
   .dsh-atb-cat-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
@@ -2177,6 +2187,10 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
   .dsh-atb-colhead::before { left: 8px; width: 12px; height: 2px; }
   .dsh-atb-cards { padding: 2px 7px calc(10px + env(safe-area-inset-bottom)); overscroll-behavior-y: contain; }
   .dsh-atb-fab { display: none; }
+  /* Landscape keeps the composer on one row (the inline panel is wide enough),
+     but the field must still be 16px so iOS does not zoom on focus. */
+  .dsh-atb-composer-input { font-size: 16px; }
+  .dsh-atb-composer-deliver { white-space: normal; }
 
   /* Landscape keeps the centred dialog: a full-width sheet would cover the
      two columns the user is comparing. */

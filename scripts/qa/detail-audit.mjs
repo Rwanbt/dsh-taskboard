@@ -239,8 +239,29 @@ const measure = () => page.evaluate(() => {
     if (Number.isFinite(lh)) return lh
     return parseFloat(getComputedStyle(text).fontSize) * 1.4
   }
+  // The comment composer: writing area + its buttons.
+  const composer = document.querySelector('.dsh-atb-composer')
+  const composerInput = document.querySelector('.dsh-atb-composer-input')
+  const composerButtons = composer === null
+    ? []
+    : [...composer.querySelectorAll('button')].map(button => {
+      const box = button.getBoundingClientRect()
+      return { text: (button.textContent ?? '').trim().slice(0, 30), w: Math.round(box.width), h: Math.round(box.height), x: Math.round(box.x) }
+    })
   return {
     status: document.querySelector('.dsh-atb-badge[data-kind="status"], .dsh-atb-card[data-selected]') !== null ? 'selected' : null,
+    composer: composer === null ? null : {
+      rect: rect(composer),
+      style: box(composer),
+      input: composerInput === null ? null : {
+        rect: rect(composerInput),
+        fontSize: getComputedStyle(composerInput).fontSize,
+        minHeight: getComputedStyle(composerInput).minHeight,
+        flex: getComputedStyle(composerInput).flex,
+      },
+      buttons: composerButtons,
+      overflowRight: Math.round(composer.getBoundingClientRect().right - (composer.closest('.dsh-atb-detailpanel') ?? composer).getBoundingClientRect().right),
+    },
     panel: rect(panel), detail: rect(detail),
     checklist: { rect: rect(checklist), style: box(checklist), label: checklist?.querySelector('.dsh-atb-fieldcard-label')?.textContent?.slice(0, 40) ?? null },
     drawer: detail === null ? null : {
@@ -291,6 +312,11 @@ await sleep(600)
 audit.portraitScrolled = await measure()
 console.log('scrolled:', JSON.stringify(audit.portraitScrolled.checklist.rect), JSON.stringify(audit.portraitScrolled.drawer))
 await shoot('portrait-scrolled')
+// Dedicated composer shot: scroll the writing area into view first.
+await page.evaluate(() => document.querySelector('.dsh-atb-composer')?.scrollIntoView({ block: 'end' }))
+await sleep(500)
+const composerPanel = await page.$('.dsh-atb-detailpanel')
+if (composerPanel !== null) await composerPanel.screenshot({ path: join(outDir, 'portrait-composer.png') })
 console.log('portrait:', JSON.stringify(audit.portrait.items.map(item => ({ text: item.text.rect, meta: item.meta.rect, lines: item.lines, chars: item.charsPerLine }))))
 
 // Phone shapes: is the checklist visible without scrolling on each one?
@@ -316,6 +342,7 @@ for (const shape of [
     panel,
     drawer,
     checklistRect: measured.checklist.rect,
+    composer: measured.composer,
     // Positive = the block starts below the drawer's visible area.
     belowFoldBy: panel === null || measured.checklist.rect === null
       ? null

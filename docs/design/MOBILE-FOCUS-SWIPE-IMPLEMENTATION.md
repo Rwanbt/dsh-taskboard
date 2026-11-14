@@ -245,7 +245,30 @@ checklist now comes before the execution report** — it is the gate the reader
 opens the task for, and the report can be long. Nothing is hidden or collapsed:
 the sheet still scrolls, the block is simply on screen in every phone shape.
 
-### 4.4 Honest limits
+### 4.5 Fixed on the way: the comment composer on a phone
+
+Report: the writing area at the bottom of the drawer was "a tiny text field on
+the left, unusable on a smartphone".
+
+Mechanism: `.dsh-atb-composer` is a single row — `textarea (flex: 1; basis 0)`,
+image button, *Publier*, and in review *Envoyer et laisser l'agent traiter*.
+On a 360–390 px sheet the two labelled buttons took the row, so the textarea
+collapsed to a sliver at the left; and its 12.5 px font makes iOS zoom the whole
+page as soon as it gets focus, which alone makes it unusable.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| textarea at 390×844 | sliver (basis 0, row shared with 3 buttons) | **356 × 108 px**, full width |
+| textarea at 360×640 | sliver | **326 × 108 px** |
+| font size | 12.5 px (iOS auto-zoom on focus) | **16 px** |
+| buttons | squeezed beside the field | own row below, `Publier` 66 px, deliver 236 px (wraps to a full line at 360 px) |
+| landscape 844×390 | row layout | row kept, field 385 × 64 px, font 16 px |
+
+The desktop composer is untouched (still one flex row). Pinned by
+`tests/mobile-composer.spec.ts` and measured by `scripts/qa/detail-audit.mjs`
+(`composer` block of `docs/design/checklist-layout/metrics.json`).
+
+### 4.6 Honest limits
 
 * Synthetic touch **scrolling** cannot be produced in this headless Chromium
   build (no GPU compositor): `Input.dispatchTouchEvent` delivers touch events but

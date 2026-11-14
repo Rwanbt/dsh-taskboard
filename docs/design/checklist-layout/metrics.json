@@ -1,6 +1,61 @@
 {
   "portrait": {
     "status": null,
+    "composer": {
+      "rect": {
+        "x": 17,
+        "y": 1303,
+        "w": 356,
+        "h": 154
+      },
+      "style": {
+        "display": "flex",
+        "width": "356px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "wrap",
+        "alignItems": "stretch",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "input": {
+        "rect": {
+          "x": 17,
+          "y": 1303,
+          "w": 356,
+          "h": 108
+        },
+        "fontSize": "16px",
+        "minHeight": "88px",
+        "flex": "1 1 100%"
+      },
+      "buttons": [
+        {
+          "text": "",
+          "w": 38,
+          "h": 38,
+          "x": 17
+        },
+        {
+          "text": "Publier",
+          "w": 66,
+          "h": 38,
+          "x": 63
+        },
+        {
+          "text": "Envoyer et laisser l’agent tra",
+          "w": 236,
+          "h": 38,
+          "x": 137
+        }
+      ],
+      "overflowRight": -17
+    },
     "panel": {
       "x": 0,
       "y": 112,
@@ -39,7 +94,7 @@
     },
     "drawer": {
       "clientHeight": 709,
-      "scrollHeight": 1284,
+      "scrollHeight": 1384,
       "scrollTop": 0,
       "scrollable": true,
       "checklistTopInView": 266,
@@ -171,6 +226,61 @@
   },
   "portraitScrolled": {
     "status": null,
+    "composer": {
+      "rect": {
+        "x": 17,
+        "y": 628,
+        "w": 356,
+        "h": 154
+      },
+      "style": {
+        "display": "flex",
+        "width": "356px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "wrap",
+        "alignItems": "stretch",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "input": {
+        "rect": {
+          "x": 17,
+          "y": 628,
+          "w": 356,
+          "h": 108
+        },
+        "fontSize": "16px",
+        "minHeight": "88px",
+        "flex": "1 1 100%"
+      },
+      "buttons": [
+        {
+          "text": "",
+          "w": 38,
+          "h": 38,
+          "x": 17
+        },
+        {
+          "text": "Publier",
+          "w": 66,
+          "h": 38,
+          "x": 63
+        },
+        {
+          "text": "Envoyer et laisser l’agent tra",
+          "w": 236,
+          "h": 38,
+          "x": 137
+        }
+      ],
+      "overflowRight": -17
+    },
     "panel": {
       "x": 0,
       "y": 112,
@@ -186,7 +296,7 @@
     "checklist": {
       "rect": {
         "x": 17,
-        "y": -186,
+        "y": -286,
         "w": 356,
         "h": 180
       },
@@ -209,24 +319,24 @@
     },
     "drawer": {
       "clientHeight": 709,
-      "scrollHeight": 1284,
-      "scrollTop": 575,
+      "scrollHeight": 1384,
+      "scrollTop": 675,
       "scrollable": true,
-      "checklistTopInView": -309,
+      "checklistTopInView": -409,
       "blockCount": 9
     },
     "items": [
       {
         "rect": {
           "x": 32,
-          "y": -138,
+          "y": -238,
           "w": 326,
           "h": 65
         },
         "text": {
           "rect": {
             "x": 71,
-            "y": -128,
+            "y": -228,
             "w": 139,
             "h": 48
           },
@@ -250,7 +360,7 @@
         "meta": {
           "rect": {
             "x": 219,
-            "y": -127,
+            "y": -227,
             "w": 129,
             "h": 44
           },
@@ -277,14 +387,14 @@
       {
         "rect": {
           "x": 32,
-          "y": -68,
+          "y": -168,
           "w": 326,
           "h": 49
         },
         "text": {
           "rect": {
             "x": 71,
-            "y": -58,
+            "y": -158,
             "w": 218,
             "h": 32
           },
@@ -308,7 +418,7 @@
         "meta": {
           "rect": {
             "x": 298,
-            "y": -56,
+            "y": -156,
             "w": 50,
             "h": 14
           },
@@ -350,7 +460,7 @@
       },
       "drawer": {
         "clientHeight": 709,
-        "scrollHeight": 1284,
+        "scrollHeight": 1384,
         "scrollTop": 0,
         "scrollable": true,
         "checklistTopInView": 266,
@@ -361,6 +471,61 @@
         "y": 389,
         "w": 356,
         "h": 180
+      },
+      "composer": {
+        "rect": {
+          "x": 17,
+          "y": 1303,
+          "w": 356,
+          "h": 154
+        },
+        "style": {
+          "display": "flex",
+          "width": "356px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "wrap",
+          "alignItems": "stretch",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 17,
+            "y": 1303,
+            "w": 356,
+            "h": 108
+          },
+          "fontSize": "16px",
+          "minHeight": "88px",
+          "flex": "1 1 100%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 38,
+            "h": 38,
+            "x": 17
+          },
+          {
+            "text": "Publier",
+            "w": 66,
+            "h": 38,
+            "x": 63
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 236,
+            "h": 38,
+            "x": 137
+          }
+        ],
+        "overflowRight": -17
       },
       "belowFoldBy": -432
     },
@@ -374,7 +539,7 @@
       },
       "drawer": {
         "clientHeight": 538,
-        "scrollHeight": 1323,
+        "scrollHeight": 1468,
         "scrollTop": 0,
         "scrollable": true,
         "checklistTopInView": 289,
@@ -385,6 +550,61 @@
         "y": 380,
         "w": 326,
         "h": 196
+      },
+      "composer": {
+        "rect": {
+          "x": 17,
+          "y": 1309,
+          "w": 326,
+          "h": 199
+        },
+        "style": {
+          "display": "flex",
+          "width": "326px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "wrap",
+          "alignItems": "stretch",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 17,
+            "y": 1309,
+            "w": 326,
+            "h": 108
+          },
+          "fontSize": "16px",
+          "minHeight": "88px",
+          "flex": "1 1 100%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 38,
+            "h": 38,
+            "x": 17
+          },
+          {
+            "text": "Publier",
+            "w": 66,
+            "h": 38,
+            "x": 63
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 326,
+            "h": 37,
+            "x": 17
+          }
+        ],
+        "overflowRight": -17
       },
       "belowFoldBy": -237
     },
@@ -398,7 +618,7 @@
       },
       "drawer": {
         "clientHeight": 769,
-        "scrollHeight": 1240,
+        "scrollHeight": 1340,
         "scrollTop": 0,
         "scrollable": true,
         "checklistTopInView": 238,
@@ -409,6 +629,61 @@
         "y": 373,
         "w": 378,
         "h": 164
+      },
+      "composer": {
+        "rect": {
+          "x": 17,
+          "y": 1270,
+          "w": 378,
+          "h": 154
+        },
+        "style": {
+          "display": "flex",
+          "width": "378px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "wrap",
+          "alignItems": "stretch",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 17,
+            "y": 1270,
+            "w": 378,
+            "h": 108
+          },
+          "fontSize": "16px",
+          "minHeight": "88px",
+          "flex": "1 1 100%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 38,
+            "h": 38,
+            "x": 17
+          },
+          {
+            "text": "Publier",
+            "w": 66,
+            "h": 38,
+            "x": 63
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 258,
+            "h": 38,
+            "x": 137
+          }
+        ],
+        "overflowRight": -17
       },
       "belowFoldBy": -519
     },
@@ -422,7 +697,7 @@
       },
       "drawer": {
         "clientHeight": 269,
-        "scrollHeight": 972,
+        "scrollHeight": 982,
         "scrollTop": 0,
         "scrollable": true,
         "checklistTopInView": 167,
@@ -434,11 +709,121 @@
         "w": 726,
         "h": 146
       },
+      "composer": {
+        "rect": {
+          "x": 87,
+          "y": 974,
+          "w": 726,
+          "h": 64
+        },
+        "style": {
+          "display": "flex",
+          "width": "726px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "nowrap",
+          "alignItems": "flex-end",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 87,
+            "y": 974,
+            "w": 385,
+            "h": 64
+          },
+          "fontSize": "16px",
+          "minHeight": "38px",
+          "flex": "1 1 0%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 32,
+            "h": 26,
+            "x": 479
+          },
+          {
+            "text": "Publier",
+            "w": 68,
+            "h": 32,
+            "x": 518
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 220,
+            "h": 32,
+            "x": 593
+          }
+        ],
+        "overflowRight": -21
+      },
       "belowFoldBy": -86
     }
   },
   "desktop": {
     "status": null,
+    "composer": {
+      "rect": {
+        "x": 321,
+        "y": 1171,
+        "w": 1078,
+        "h": 54
+      },
+      "style": {
+        "display": "flex",
+        "width": "1078px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "flex-end",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "input": {
+        "rect": {
+          "x": 321,
+          "y": 1171,
+          "w": 737,
+          "h": 54
+        },
+        "fontSize": "12.5px",
+        "minHeight": "38px",
+        "flex": "1 1 0%"
+      },
+      "buttons": [
+        {
+          "text": "",
+          "w": 32,
+          "h": 26,
+          "x": 1065
+        },
+        {
+          "text": "Publier",
+          "w": 68,
+          "h": 32,
+          "x": 1104
+        },
+        {
+          "text": "Envoyer et laisser l’agent tra",
+          "w": 220,
+          "h": 32,
+          "x": 1179
+        }
+      ],
+      "overflowRight": -21
+    },
     "panel": {
       "x": 300,
       "y": 349,
