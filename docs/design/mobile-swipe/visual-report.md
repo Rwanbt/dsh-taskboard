@@ -1,7 +1,7 @@
 # Mobile focus mode — real-host validation
 
 - Label: `feat/mobile-focus-swipe-v2`
-- Generated: 2026-11-14T20:37:47.378Z
+- Generated: 2026-11-14T20:40:29.691Z
 - Host: http://127.0.0.1:64941 (isolated DSH home, production client bundle from this working tree)
 - Browser: C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe
 
@@ -28,13 +28,14 @@ Screenshots: `docs/design/mobile-swipe/captures/`.
 
 ## Checks
 
-Total: 56 — passed: 56 — failed: 0
+Total: 58 — passed: 58 — failed: 0
 
 - ✅ **desktop keeps five side-by-side columns** — {"focus":"none","columns":5,"widths":[236,236,236,236,236]}
 - ✅ **desktop columns are narrower than the rail (no carousel)** — [236,236,236,236,236]
 - ✅ **desktop keeps HTML5 drag on cards** — true
 - ✅ **desktop has no floating create button** — null
 - ✅ **desktop shows the inline filter cluster** — contents
+- ✅ **desktop hides the focus-mode header entirely** — none
 - ✅ **desktop has no page-level horizontal overflow** — overflow=0px
 - ✅ **desktop colour modes still colour cards by category** — 12 distinct surfaces over 340 cards
 - ✅ **host shell leaves the board reachable (no overlay)** — {"reachable":true,"hit":"DIV.dsh-atb-card"}
@@ -46,11 +47,12 @@ Total: 56 — passed: 56 — failed: 0
 - ✅ **portrait opens on the "To do" page** — {"active":"todo","counter":"2/5"}
 - ✅ **portrait compacts the toolbar into icon buttons** — {"actions":"flex","filters":"none","toolbarActions":"none"}
 - ✅ **portrait hides the search field until asked** — none
+- ✅ **portrait shows the focus-mode header** — flex
 - ✅ **portrait shows the swipe cue and page counter** — {"cue":"flex","counter":"2/5"}
 - ✅ **portrait offers a thumb-reachable create button** — {"display":"grid","rect":{"x":320,"y":774,"width":54,"height":54}}
 - ✅ **portrait never scrolls the page horizontally** — overflow=0px
 - ✅ **portrait cards keep the pastel surface** — 12 distinct surfaces
-- ✅ **portrait card title stays readable (WCAG AA)** — contrast=10.52
+- ✅ **portrait card title stays readable (WCAG AA)** — contrast=10.46
 - ✅ **tab click scrolls the rail to that page** — {"scrollLeft":1110,"expected":1110}
 - ✅ **tab click selects the tab** — {"active":"in_review","counter":"4/5"}
 - ✅ **the carousel moves by whole pages** — {"mechanism":"scrollBy (settled-swipe position)","movedBy":370,"pageWidth":370,"attempts":[{"mechanism":"scrollBy","direction":1,"before":370,"after":740}]}
@@ -74,8 +76,8 @@ Total: 56 — passed: 56 — failed: 0
 - ✅ **create button opens the task sheet with the templates** — {"sheet":true,"templates":6,"labels":["Blank task","New feature","Bug fix","Release check"]}
 - ✅ **host light theme applied without a plugin override** — {"dark":false,"scheme":"light"}
 - ✅ **portrait light theme keeps the carousel** — {"focus":"portrait","widths":[370,370,370,370,370]}
-- ✅ **portrait light theme paints light card surfaces** — luminance=0.688
-- ✅ **portrait light theme keeps the title readable (WCAG AA)** — contrast=10.45
+- ✅ **portrait light theme paints light card surfaces** — luminance=0.681
+- ✅ **portrait light theme keeps the title readable (WCAG AA)** — contrast=10.28
 - ✅ **landscape switches to the two-up carousel** — landscape
 - ✅ **landscape shows two columns per page** — {"widths":[380,380,380,380,380],"expected":379.5}
 - ✅ **landscape rail snaps horizontally** — {"clientWidth":768,"scrollWidth":1934,"scrollLeft":389,"snapType":"x mandatory","overscrollX":"contain","touchAction":"auto"}

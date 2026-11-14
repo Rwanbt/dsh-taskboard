@@ -273,6 +273,7 @@ async function readFocus(target = page) {
       activeTabLabel: active === null ? null : active.textContent,
       pageCounter: board.querySelector('.dsh-atb-swipecue-page')?.textContent ?? null,
       cueDisplay: style(cue)?.display ?? null,
+      mobileHeadDisplay: style(board.querySelector('.dsh-atb-mobilehead'))?.display ?? null,
       fab: fab === null ? null : { display: style(fab).display, rect: rect(fab) },
       searchfieldDisplay: style(searchfield)?.display ?? null,
       mobileActionsDisplay: style(actions)?.display ?? null,
@@ -450,6 +451,7 @@ check('desktop columns are narrower than the rail (no carousel)', desktop.rail !
 check('desktop keeps HTML5 drag on cards', desktop.draggable === 'true', String(desktop.draggable))
 check('desktop has no floating create button', desktop.fab === null || desktop.fab.display === 'none', JSON.stringify(desktop.fab))
 check('desktop shows the inline filter cluster', desktop.toolbarFiltersDisplay === 'contents', String(desktop.toolbarFiltersDisplay))
+check('desktop hides the focus-mode header entirely', desktop.mobileHeadDisplay === 'none', String(desktop.mobileHeadDisplay))
 check('desktop has no page-level horizontal overflow', desktop.pageOverflowX <= 0, `overflow=${desktop.pageOverflowX}px`)
 check('desktop colour modes still colour cards by category', desktop.distinctCardSurfaces >= 3, `${desktop.distinctCardSurfaces} distinct surfaces over ${desktop.cardsVisible} cards`)
 await shot('desktop-1440x900.png')
@@ -485,6 +487,7 @@ check('portrait status rail exposes five synchronised tabs', portrait.tabCount =
 check('portrait opens on the "To do" page', portrait.activeStatus === 'todo' && portrait.pageCounter === '2/5', JSON.stringify({ active: portrait.activeStatus, counter: portrait.pageCounter }))
 check('portrait compacts the toolbar into icon buttons', portrait.mobileActionsDisplay === 'flex' && portrait.toolbarFiltersDisplay === 'none' && portrait.toolbarActionsDisplay === 'none', JSON.stringify({ actions: portrait.mobileActionsDisplay, filters: portrait.toolbarFiltersDisplay, toolbarActions: portrait.toolbarActionsDisplay }))
 check('portrait hides the search field until asked', portrait.searchfieldDisplay === 'none', String(portrait.searchfieldDisplay))
+check('portrait shows the focus-mode header', portrait.mobileHeadDisplay === 'flex', String(portrait.mobileHeadDisplay))
 check('portrait shows the swipe cue and page counter', /flex/.test(portrait.cueDisplay ?? '') && portrait.pageCounter !== null, JSON.stringify({ cue: portrait.cueDisplay, counter: portrait.pageCounter }))
 check('portrait offers a thumb-reachable create button', portrait.fab !== null && portrait.fab.display === 'grid' && portrait.fab.rect.width >= 48 && portrait.fab.rect.y + portrait.fab.rect.height <= 844 - 8, JSON.stringify(portrait.fab))
 check('portrait never scrolls the page horizontally', portrait.pageOverflowX <= 0, `overflow=${portrait.pageOverflowX}px`)

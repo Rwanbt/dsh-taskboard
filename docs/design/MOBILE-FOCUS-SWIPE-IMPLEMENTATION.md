@@ -137,7 +137,7 @@ an **isolated** DSH home, links this working tree, seeds 340 categorised tasks
 and drives the production bundle in Chromium. `scripts/qa/mobile-swipe-capture.mjs`
 writes `metrics-mobile.json` + `visual-report-mobile.md` and 13 screenshots.
 
-Result: **56/56 checks passed** (see `docs/design/mobile-swipe/visual-report.md`).
+Result: **58/58 checks passed** (see `docs/design/mobile-swipe/visual-report.md`).
 Highlights:
 
 * desktop 1440×900: five columns (236 px each), drag enabled, no FAB, filter

@@ -211,7 +211,9 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
 /* The two clusters are transparent wrappers on desktop: their children stay
    direct flex items of the toolbar (no layout change at all). */
 .dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: contents; }
-.dsh-atb-mobilehead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* The focus-mode header (status tab rail + swipe cue) is a zero-cost box on
+   desktop: hidden entirely, so the board body keeps its exact previous layout. */
+.dsh-atb-mobilehead { display: none; align-items: center; gap: 8px; min-width: 0; }
 /* Narrow-viewport column navigation: hidden until the five columns stop fitting. */
 .dsh-atb-mobilebar { display: none; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .dsh-atb-mobilebar::-webkit-scrollbar { display: none; }
@@ -2008,7 +2010,7 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
   .dsh-atb-searchfield { display: none; }
   .dsh-atb-board[data-atb-search="true"] .dsh-atb-searchfield { display: inline-flex; flex: 1 1 100%; min-width: 0; max-width: none; }
 
-  .dsh-atb-mobilehead { gap: 6px; }
+  .dsh-atb-mobilehead { display: flex; gap: 6px; }
   .dsh-atb-mobilebar {
     display: flex; gap: 7px; scroll-snap-type: x proximity;
     overscroll-behavior-x: contain; padding-bottom: 2px;
@@ -2091,7 +2093,7 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
   .dsh-atb-searchfield { display: none; }
   .dsh-atb-board[data-atb-search="true"] .dsh-atb-searchfield { display: inline-flex; flex: 1 1 220px; min-width: 0; max-width: none; height: 30px; }
 
-  .dsh-atb-mobilehead { gap: 7px; }
+  .dsh-atb-mobilehead { display: flex; gap: 7px; }
   .dsh-atb-mobilebar { display: flex; gap: 5px; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
   .dsh-atb-mobilebar-btn { height: 30px; padding: 0 9px; gap: 5px; font-size: 11px; border-radius: 9px; }
   .dsh-atb-mobilebar-count { font-size: 10px; padding: 1px 5px; }

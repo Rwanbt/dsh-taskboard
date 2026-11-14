@@ -1,6 +1,6 @@
 {
-  "label": "feat/mobile-focus-swipe-v2 (final)",
-  "generatedAt": "2026-11-14T20:37:47.378Z",
+  "label": "feat/mobile-focus-swipe-v2",
+  "generatedAt": "2026-11-14T20:40:29.691Z",
   "base": "http://127.0.0.1:64941",
   "browser": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
   "screenshots": [
@@ -43,6 +43,11 @@
       "name": "desktop shows the inline filter cluster",
       "ok": true,
       "detail": "contents"
+    },
+    {
+      "name": "desktop hides the focus-mode header entirely",
+      "ok": true,
+      "detail": "none"
     },
     {
       "name": "desktop has no page-level horizontal overflow",
@@ -100,6 +105,11 @@
       "detail": "none"
     },
     {
+      "name": "portrait shows the focus-mode header",
+      "ok": true,
+      "detail": "flex"
+    },
+    {
       "name": "portrait shows the swipe cue and page counter",
       "ok": true,
       "detail": "{\"cue\":\"flex\",\"counter\":\"2/5\"}"
@@ -122,7 +132,7 @@
     {
       "name": "portrait card title stays readable (WCAG AA)",
       "ok": true,
-      "detail": "contrast=10.52"
+      "detail": "contrast=10.46"
     },
     {
       "name": "tab click scrolls the rail to that page",
@@ -242,12 +252,12 @@
     {
       "name": "portrait light theme paints light card surfaces",
       "ok": true,
-      "detail": "luminance=0.688"
+      "detail": "luminance=0.681"
     },
     {
       "name": "portrait light theme keeps the title readable (WCAG AA)",
       "ok": true,
-      "detail": "contrast=10.45"
+      "detail": "contrast=10.28"
     },
     {
       "name": "landscape switches to the two-up carousel",
@@ -330,8 +340,8 @@
         "touchAction": "auto"
       },
       "cardsScrollTop": 0,
-      "cardsScrollHeight": 650,
-      "cardsClientHeight": 650,
+      "cardsScrollHeight": 660,
+      "cardsClientHeight": 660,
       "tabCount": 5,
       "tabRoles": [
         "tab",
@@ -350,6 +360,7 @@
       "activeTabLabel": "To do2",
       "pageCounter": "2/5",
       "cueDisplay": "none",
+      "mobileHeadDisplay": "none",
       "fab": null,
       "searchfieldDisplay": "flex",
       "mobileActionsDisplay": "none",
@@ -364,13 +375,13 @@
       },
       "cardColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "titleColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "distinctCardSurfaces": 12,
       "cardsVisible": 340
@@ -424,6 +435,7 @@
       "activeTabLabel": "To do2",
       "pageCounter": "2/5",
       "cueDisplay": "flex",
+      "mobileHeadDisplay": "flex",
       "fab": {
         "display": "grid",
         "rect": {
@@ -446,13 +458,13 @@
       },
       "cardColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "titleColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "distinctCardSurfaces": 12,
       "cardsVisible": 340
@@ -561,6 +573,7 @@
         "activeTabLabel": "To do2",
         "pageCounter": "2/5",
         "cueDisplay": "flex",
+        "mobileHeadDisplay": "flex",
         "fab": {
           "display": "grid",
           "rect": {
@@ -577,18 +590,18 @@
         "draggable": "false",
         "pageOverflowX": 0,
         "cardBg": {
-          "r": 247,
-          "g": 209,
+          "r": 246,
+          "g": 208,
           "b": 182
         },
         "cardColor": {
-          "r": 35,
-          "g": 38,
+          "r": 34,
+          "g": 39,
           "b": 59
         },
         "titleColor": {
-          "r": 35,
-          "g": 38,
+          "r": 34,
+          "g": 39,
           "b": 59
         },
         "distinctCardSurfaces": 12,
@@ -644,6 +657,7 @@
       "activeTabLabel": "To do2",
       "pageCounter": "2/5",
       "cueDisplay": "flex",
+      "mobileHeadDisplay": "flex",
       "fab": {
         "display": "none",
         "rect": {
@@ -666,13 +680,13 @@
       },
       "cardColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "titleColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "distinctCardSurfaces": 12,
       "cardsVisible": 340
@@ -706,8 +720,8 @@
         "touchAction": "auto"
       },
       "cardsScrollTop": 0,
-      "cardsScrollHeight": 650,
-      "cardsClientHeight": 650,
+      "cardsScrollHeight": 660,
+      "cardsClientHeight": 660,
       "tabCount": 5,
       "tabRoles": [
         "tab",
@@ -726,6 +740,7 @@
       "activeTabLabel": "To do2",
       "pageCounter": "2/5",
       "cueDisplay": "none",
+      "mobileHeadDisplay": "none",
       "fab": null,
       "searchfieldDisplay": "flex",
       "mobileActionsDisplay": "none",
@@ -740,13 +755,13 @@
       },
       "cardColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "titleColor": {
         "r": 245,
-        "g": 243,
-        "b": 252
+        "g": 242,
+        "b": 253
       },
       "distinctCardSurfaces": 12,
       "cardsVisible": 340
