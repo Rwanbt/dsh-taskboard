@@ -18,7 +18,7 @@
  *
  * @module dsh-taskboard/client/board/TaskCard
  */
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import type { BoardController } from '../controller.ts'
 import { taskSessionId, type TaskRecord } from '../../shared/protocol.ts'
 import { dependencyState } from '../../shared/dependencies.ts'
@@ -29,7 +29,9 @@ import { Icon } from './Icon.tsx'
 import { useT } from '../i18n/runtime.ts'
 import { externalTypeLabel } from '../external-api.ts'
 import { resolveWorkspaceName } from './project-label.ts'
-import { toneForTask, useAppearance } from './appearance.ts'
+import { resolveTaskColor } from './coloring.ts'
+import { useAppearance } from './appearance.ts'
+import { categoriesOf } from '../../shared/protocol.ts'
 
 /** dataTransfer type carrying the dragged task id. */
 export const DRAG_TYPE = 'application/x-dsh-atb-task'
@@ -94,7 +96,14 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   const targetSessionId = resolveTaskSessionId(task)
   const sessionTitle = controller.getSessionTitle(targetSessionId)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const tone = toneForTask(task.id, appearance)
+  // One resolver for the four colour modes (never duplicated here). The result
+  // is a pair of CSS custom properties, so a theme switch needs no re-render.
+  const cardColor = resolveTaskColor({
+    task,
+    categories: categoriesOf(controller.getSnapshot().ledger.settings),
+    preferences: appearance,
+  })
+  const categoryLabel = cardColor.unclassified ? t('category.unclassified') : cardColor.category.name
   const projectName = resolveWorkspaceName(
     task.workspaceId,
     controller.getSnapshot().workspaces,
@@ -175,8 +184,12 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
       tabIndex={0}
       className="dsh-atb-card"
       data-urgency={task.urgency}
-      data-tone={tone}
+      data-tone={cardColor.tone}
+      data-color-mode={cardColor.mode}
+      data-workspace={task.workspaceId}
+      data-category={cardColor.unclassified ? undefined : cardColor.category.id}
       data-needs-human={needsHuman.needs ? 'true' : undefined}
+      style={{ '--atb-card-bg': cardColor.background, '--atb-tone-accent': cardColor.accent } as CSSProperties}
       draggable={draggable && !rejectOpen}
       onDragStart={(e) => {
         // Block drag if a session is still executing this task
@@ -381,8 +394,14 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
       <div className="dsh-atb-card-divider" aria-hidden="true" />
 
       <div className="dsh-atb-card-bottom">
-        <span className="dsh-atb-card-priority" data-urgency={task.urgency}>
-          <span className="dsh-atb-dot" data-urgency={task.urgency} aria-hidden="true" />
+        <span className="dsh-atb-card-category" title={t('card.category.title', { name: categoryLabel })}>
+          <span className="dsh-atb-card-category-dot" aria-hidden="true" />
+          <span className="dsh-atb-card-category-name">{categoryLabel}</span>
+        </span>
+        <span className="dsh-atb-card-priority" data-urgency={task.urgency} data-urgent={task.urgency === 'urgent' ? 'true' : undefined}>
+          {task.urgency === 'urgent'
+            ? <Icon name="warning" size={11} />
+            : <span className="dsh-atb-dot" data-urgency={task.urgency} aria-hidden="true" />}
           {t(URGENCY_KEYS[task.urgency])}
         </span>
         <span className="dsh-atb-card-time">{fmtTime(task.updatedAt)}</span>

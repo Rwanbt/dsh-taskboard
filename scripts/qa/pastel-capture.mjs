@@ -56,6 +56,7 @@ function check(name, ok, detail) {
 const browser = await puppeteer.launch({
   executablePath,
   headless: true,
+  protocolTimeout: 180_000,
   args: ['--no-sandbox', '--disable-gpu', '--force-color-profile=srgb', '--lang=fr-FR', '--disable-extensions'],
   defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 1 },
 })
@@ -201,6 +202,7 @@ async function captureBoardMetrics(target, selectors = PLUGIN_SELECTORS) {
   const priority = await measure(target, selectors.priority, ['font-size', 'color'])
   const divider = await measure(target, selectors.divider, ['height', 'background-color'])
   const badge = await measure(target, selectors.badge, ['background-color', 'color', 'font-size', 'border-radius', 'padding'])
+  const badgeKind = await target.evaluate((badgeSelector) => document.querySelector(badgeSelector)?.getAttribute('data-kind') ?? 'default', selectors.badge)
   const column = await measure(target, selectors.column, ['background-color', 'border-radius', 'border-top-width', 'border-top-color', 'padding'])
   const columns = await measure(target, selectors.columns, ['gap', 'display', 'overflow-x'])
   const head = await measure(target, selectors.head, ['height', 'font-size', 'font-weight'])
@@ -226,7 +228,7 @@ async function captureBoardMetrics(target, selectors = PLUGIN_SELECTORS) {
   }, selectors.badge, selectors.card)
 
   return {
-    card, cardBefore, title, project, desc, priority, divider, badge, badgeBg, column, columns, head, titleEl, board, groupHead,
+    card, cardBefore, title, project, desc, priority, divider, badge, badgeKind, badgeBg, column, columns, head, titleEl, board, groupHead,
     contrast: {
       titleOnCard: cardBg !== null && title?.rgbColor ? contrast(title.rgbColor, cardBg) : null,
       descriptionOnCard: cardBg !== null && desc?.rgbColor ? contrast(desc.rgbColor, cardBg) : null,
@@ -323,6 +325,226 @@ await page.evaluate(() => {
 await settle(page, 400)
 
 // ---------------------------------------------------------------------------
+// 2b. The four colour modes, driven through the REAL Settings UI.
+// ---------------------------------------------------------------------------
+/** Read a batch of rendered cards, spread across columns and projects. */
+async function sampleCards(target = page, limit = 40) {
+  return target.evaluate((max) => {
+    const resolve = (value) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1; canvas.height = 1
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = value
+      ctx.fillRect(0, 0, 1, 1)
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+      return { r, g, b }
+    }
+    // Round-robin across the five columns so a project that only appears in a
+    // later column is still sampled (project mode must be verifiable).
+    const columns = [...document.querySelectorAll('.dsh-atb-column')]
+    const picked = []
+    const perColumn = Math.max(1, Math.ceil(max / Math.max(1, columns.length)))
+    for (const column of columns) {
+      picked.push(...[...column.querySelectorAll('.dsh-atb-card')].slice(0, perColumn))
+    }
+    const cards = [...new Set(picked)].slice(0, max)
+    return cards.map((card) => {
+      const style = getComputedStyle(card)
+      const index = [...document.querySelectorAll('.dsh-atb-card')].indexOf(card)
+      return {
+        id: `card-${index}`,
+        mode: card.getAttribute('data-color-mode'),
+        urgency: card.getAttribute('data-urgency'),
+        category: card.getAttribute('data-category'),
+        workspace: card.getAttribute('data-workspace'),
+        bg: resolve(style.backgroundColor),
+        title: resolve(getComputedStyle(card.querySelector('.dsh-atb-card-title') ?? card).color),
+      }
+    })
+  }, limit)
+}
+
+/** Drive Settings → Appearance to one mode (and the nuance switch when asked). */
+async function applyColorMode(mode, options = {}) {
+  await page.evaluate(() => {
+    document.querySelector('.dsh-atb-toolbar [data-action="appearance"]')?.click()
+  })
+  await page.waitForSelector('#dsh-atb-settings-tab-appearance', { timeout: 15_000 })
+  await page.evaluate(() => document.querySelector('#dsh-atb-settings-tab-appearance')?.click())
+  await page.waitForSelector(`.dsh-atb-colormode[data-mode="${mode}"]`, { timeout: 15_000 })
+  await page.evaluate((nextMode) => {
+    document.querySelector(`.dsh-atb-colormode[data-mode="${nextMode}"]`)?.click()
+  }, mode)
+  await new Promise(resolve => setTimeout(resolve, 200))
+  if (mode === 'priority' && options.nuance !== undefined) {
+    const switched = await page.evaluate((wanted) => {
+      const panel = document.querySelector('#dsh-atb-settings-panel-appearance')
+      const box = panel?.querySelector('.dsh-atb-switch input[type=checkbox]')
+      if (!box) return null
+      if (box.checked !== wanted) box.click()
+      return box.checked
+    }, options.nuance)
+    if (switched === null) throw new Error('priority nuance switch not found')
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  if (options.intensity !== undefined) {
+    await page.evaluate((wanted) => {
+      const button = document.querySelector(`[data-picker="intensity"] .dsh-atb-mode-opt[data-intensity="${wanted}"]`)
+      button?.click()
+    }, options.intensity)
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  await page.evaluate(() => document.querySelector('.dsh-atb-modal .dsh-atb-modal-close')?.click())
+  await settle(page, 500)
+}
+
+/** HSL hue of an {r,g,b} colour (used to verify the priority families). */
+function hueOf({ r, g, b }) {
+  const max = Math.max(r, g, b) / 255
+  const min = Math.min(r, g, b) / 255
+  const delta = max - min
+  if (delta === 0) return 0
+  const channels = [r / 255, g / 255, b / 255]
+  let h = 0
+  if (max === channels[0]) h = ((channels[1] - channels[2]) / delta) % 6
+  else if (max === channels[1]) h = (channels[2] - channels[0]) / delta + 2
+  else h = (channels[0] - channels[1]) / delta + 4
+  return ((h * 60) % 360 + 360) % 360
+}
+
+/** The three documented hue families (coral / violet / blue). */
+function familyOfColor(color) {
+  const hue = hueOf(color)
+  if (hue >= 335 || hue < 20) return 'urgent'
+  if (hue >= 235 && hue < 290) return 'normal'
+  if (hue >= 190 && hue < 235) return 'relaxed'
+  return 'other'
+}
+
+const rgbKey = color => `${color.r},${color.g},${color.b}`
+const modeSample = {}
+let cardModeTones = {}
+let cardModeViolet = null
+
+for (const mode of ['category', 'priority', 'project', 'card']) {
+  await applyColorMode(mode)
+  modeSample[mode] = await sampleCards()
+  if (mode === 'card') {
+    // Palette fidelity + distribution are only meaningful in "by card" mode.
+    cardModeTones = await page.evaluate(() => {
+      const resolve = (value) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 1; canvas.height = 1
+        const ctx = canvas.getContext('2d')
+        ctx.fillStyle = value
+        ctx.fillRect(0, 0, 1, 1)
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+        return `rgb(${r}, ${g}, ${b})`
+      }
+      const counts = {}
+      let violet = null
+      for (const card of document.querySelectorAll('.dsh-atb-card[data-tone]')) {
+        const tone = card.getAttribute('data-tone')
+        counts[tone] = (counts[tone] ?? 0) + 1
+        if (tone === 'violet' && violet === null) violet = resolve(getComputedStyle(card).backgroundColor)
+      }
+      return { counts, violet }
+    })
+    cardModeViolet = cardModeTones.violet
+  }
+  const file = `mode-${mode}-dark-1440x900.png`
+  await page.screenshot({ path: join(outDir, file) })
+  report.screenshots.push(file)
+}
+
+// Category mode: one surface per category, neutral bucket for unclassified.
+const categoryGroups = new Map()
+for (const card of modeSample.category) {
+  const key = card.category ?? '__unclassified'
+  if (!categoryGroups.has(key)) categoryGroups.set(key, new Set())
+  categoryGroups.get(key).add(rgbKey(card.bg))
+}
+const categoryStable = [...categoryGroups.values()].every(set => set.size === 1)
+check('category mode: one surface per category (unclassified included)', categoryStable && categoryGroups.size > 3, `${categoryGroups.size} categories sampled`)
+
+// Priority mode: every card in its urgency family, with the nuance on.
+const priorityFamilies = modeSample.priority.map(card => familyOfColor(card.bg) === card.urgency)
+check('priority mode: every card stays in its urgency family', priorityFamilies.every(Boolean), `${priorityFamilies.filter(Boolean).length}/${priorityFamilies.length} cards`)
+const nuancedSurfaces = new Set(modeSample.priority.filter(card => card.urgency === 'urgent').map(card => rgbKey(card.bg))).size
+check('priority mode: the category nuance varies the urgent family', nuancedSurfaces > 1, `${nuancedSurfaces} urgent surfaces`)
+
+// Nuance off: exactly one surface per urgency.
+await applyColorMode('priority', { nuance: false })
+const withoutNuance = await sampleCards()
+const urgentSurfaces = new Set(withoutNuance.filter(card => card.urgency === 'urgent').map(card => rgbKey(card.bg)))
+const normalSurfaces = new Set(withoutNuance.filter(card => card.urgency === 'normal').map(card => rgbKey(card.bg)))
+const relaxedSurfaces = new Set(withoutNuance.filter(card => card.urgency === 'relaxed').map(card => rgbKey(card.bg)))
+check('priority mode without nuance: exactly one surface per urgency',
+  urgentSurfaces.size === 1 && normalSurfaces.size === 1 && relaxedSurfaces.size === 1 && withoutNuance.every(card => familyOfColor(card.bg) === card.urgency),
+  `urgent=${urgentSurfaces.size} normal=${normalSurfaces.size} relaxed=${relaxedSurfaces.size}`)
+const nuanceFile = 'mode-priority-no-nuance-dark-1440x900.png'
+await page.screenshot({ path: join(outDir, nuanceFile) })
+report.screenshots.push(nuanceFile)
+
+// Settings → Appearance itself (category manager + live preview, then the
+// priority palette with the nuance switch).
+for (const [mode, file] of [['category', 'settings-appearance-category.png'], ['priority', 'settings-appearance-priority.png']]) {
+  await page.evaluate(() => document.querySelector('.dsh-atb-toolbar [data-action="appearance"]')?.click())
+  await page.waitForSelector('#dsh-atb-settings-tab-appearance', { timeout: 15_000 })
+  await page.evaluate(() => document.querySelector('#dsh-atb-settings-tab-appearance')?.click())
+  await page.waitForSelector(`.dsh-atb-colormode[data-mode="${mode}"]`, { timeout: 15_000 })
+  await page.evaluate(m => document.querySelector(`.dsh-atb-colormode[data-mode="${m}"]`)?.click(), mode)
+  await settle(page, 350)
+  await page.screenshot({ path: join(outDir, file) })
+  report.screenshots.push(file)
+  await page.evaluate(() => document.querySelector('.dsh-atb-modal .dsh-atb-modal-close')?.click())
+  await settle(page, 300)
+}
+
+// Project mode: one surface per project.
+const projectGroups = new Map()
+for (const card of modeSample.project) {
+  if (!projectGroups.has(card.workspace)) projectGroups.set(card.workspace, new Set())
+  projectGroups.get(card.workspace).add(rgbKey(card.bg))
+}
+check('project mode: one surface per project', [...projectGroups.values()].every(set => set.size === 1) && projectGroups.size >= 2, `${projectGroups.size} projects`)
+
+// Card mode: the same task keeps its surface across re-renders.
+await applyColorMode('card')
+const cardOnce = await sampleCards(page, 12)
+await applyColorMode('card')
+const cardTwice = await sampleCards(page, 12)
+check('card mode: colours are stable across re-renders', cardOnce.every((card, index) => rgbKey(card.bg) === rgbKey(cardTwice[index].bg)), `${cardOnce.length} cards compared`)
+
+// Back to the default mode for the remaining captures.
+await applyColorMode('category')
+modeSample.category = await sampleCards()
+
+// Palette fidelity is measured at FULL intensity (the mockup's pastel surfaces
+// are full-strength); the default "balanced" intensity mixes them with the host
+// surface by design.
+await applyColorMode('card', { intensity: 'strong' })
+cardModeViolet = await page.evaluate(() => {
+  const card = document.querySelector('.dsh-atb-card[data-tone="violet"]')
+  if (card === null) return null
+  const canvas = document.createElement('canvas')
+  canvas.width = 1; canvas.height = 1
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = getComputedStyle(card).backgroundColor
+  ctx.fillRect(0, 0, 1, 1)
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+  return `rgb(${r}, ${g}, ${b})`
+})
+await applyColorMode('category', { intensity: 'balanced' })
+report.dsh.colorModes = {
+  samples: modeSample.category.length,
+  categoryGroups: [...categoryGroups.keys()],
+  priorityFamilies: [...new Set(modeSample.priority.map(card => familyOfColor(card.bg)))],
+  withoutNuance: { urgent: urgentSurfaces.size, normal: normalSurfaces.size, relaxed: relaxedSurfaces.size },
+  projects: [...projectGroups.keys()],
+}
+
+// ---------------------------------------------------------------------------
 // 3. Light theme: emulate the OS scheme the host presenter listens to; reload
 //    so the presenter resolves at boot, then verify it really switched.
 // ---------------------------------------------------------------------------
@@ -338,6 +560,13 @@ if (lightApplied) {
   await page.screenshot({ path: join(outDir, 'desktop-light-1440x900.png') })
   report.screenshots.push('desktop-light-1440x900.png')
   check('light theme applied by the host (not forced by the plugin)', true, JSON.stringify(lightTheme))
+  // Priority mode in the light theme: same families, adapted tones.
+  await applyColorMode('priority')
+  const lightPriority = await sampleCards()
+  check('light theme: priority families preserved', lightPriority.every(card => familyOfColor(card.bg) === card.urgency), `${lightPriority.filter(card => familyOfColor(card.bg) === card.urgency).length}/${lightPriority.length} cards`)
+  await page.screenshot({ path: join(outDir, 'mode-priority-light-1440x900.png') })
+  report.screenshots.push('mode-priority-light-1440x900.png')
+  await applyColorMode('category')
 } else {
   report.limitations.push('Host theme preference is pinned to dark in this profile, so the light screenshot could not be produced by the host presenter; the light palette was validated against the mockup only.')
   check('light theme applied by the host', false, JSON.stringify(lightTheme))
@@ -390,6 +619,11 @@ report.screenshots.push('mobile-390x844.png')
 check('mobile column navigation is visible', mobile.mobilebarDisplay === 'flex' && mobile.buttons === 5, JSON.stringify(mobile))
 check('mobile has no host-level horizontal overflow', mobile.pageOverflowX <= 0, `overflow=${mobile.pageOverflowX}px`)
 await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 })
+// The shell re-renders on the width change; reload + reopen is the reliable
+// way back to a mounted board before the mockup comparison.
+await page.reload({ waitUntil: 'networkidle2', timeout: 90_000 })
+await openBoard()
+await settle(page, 900)
 
 // ---------------------------------------------------------------------------
 // 6. Numeric comparison with the reference mockup, rendered in the same browser.
@@ -487,8 +721,8 @@ if (mockupPath) {
     compare(`density.${density}.titleFont`, ours.titleFont, theirs.titleFont, 0.5)
   }
 
-  // Palette comparison on the violet tone (the mockup's dark pastel surface).
-  const ourTone = o.toneSample.find(sample => sample.tone === 'violet')
+  // Palette fidelity: the real "by card" violet against the mockup's violet.
+  const ourTone = cardModeViolet === null ? undefined : { bg: cardModeViolet }
   const mockTone = m.toneSample.find(sample => sample.tone === 'violet')
   const channelDelta = (a, b) => {
     if (typeof a !== 'string' || typeof b !== 'string') return Number.POSITIVE_INFINITY
@@ -522,17 +756,18 @@ for (const [name, value] of Object.entries(darkContrast)) {
 for (const [name, value] of Object.entries(lightContrast)) {
   check(`light contrast ${name} ≥ 4.5`, value !== null && value >= 4.5, `ratio=${value}`)
 }
+// Worst case across every sampled card, per mode: colour must never make the
+// title unreadable, whatever the category or the nuance.
+for (const mode of ['category', 'priority', 'project', 'card']) {
+  const samples = modeSample[mode] ?? []
+  if (samples.length === 0) continue
+  const worst = samples.reduce((min, card) => Math.min(min, contrast(`rgb(${card.title.r}, ${card.title.g}, ${card.title.b})`, `rgb(${card.bg.r}, ${card.bg.g}, ${card.bg.b})`)), Number.POSITIVE_INFINITY)
+  check(`${mode} mode: worst card title contrast ≥ 4.5`, worst >= 4.5, `min ratio=${worst}`)
+}
 
-// Every tone must paint a distinct surface (no random or collapsed palette).
-const tones = new Map()
-for (const sample of report.dsh.dark?.toneSample ?? []) {
-  if (sample.tone !== null) tones.set(sample.tone, sample.bg)
-}
-for (const sample of report.dsh.light?.toneSample ?? []) {
-  if (sample.tone !== null) tones.set(`${sample.tone}:light`, sample.bg)
-}
-report.dsh.tones = Object.fromEntries(tones)
-check('cards carry stable data-tone values', tones.size >= 4, `${tones.size} tone samples`)
+// Every palette family actually rendered in "by card" mode (no collapsed palette).
+report.dsh.cardModeTones = cardModeTones.counts ?? {}
+check('card mode renders several distinct palette tones', Object.keys(report.dsh.cardModeTones).length >= 4, `${Object.keys(report.dsh.cardModeTones).length} tones`)
 
 writeFileSync(join(outDir, 'metrics.json'), JSON.stringify(report, null, 2))
 
@@ -576,3 +811,5 @@ if (failed.length > 0) {
   for (const entry of failed) console.log(`  - ${entry.name}: ${entry.detail}`)
   process.exit(1)
 }
+
+

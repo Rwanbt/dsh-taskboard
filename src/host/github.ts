@@ -99,6 +99,7 @@ export class GithubProvider implements ExternalTaskProvider, ExternalWriteProvid
       description: typeof issue.body === 'string' ? issue.body : '',
       priority: labels.join(','), status: issue.state, assignedTo: assignee,
       assignees, closed: issue.state === 'closed', urgency: this.urgency(labels), url,
+      ...(labels.length > 0 ? { labels } : {}),
     }
   }
   private readCreatedAt(issue: Record<string, unknown>): string {

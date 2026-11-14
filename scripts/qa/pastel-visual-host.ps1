@@ -246,6 +246,23 @@ function New-SeedLedger([int]$count) {
   )
   $urgencies = @('urgent', 'normal', 'normal', 'normal', 'relaxed')
   $statuses = @('backlog', 'backlog', 'backlog', 'backlog', 'todo', 'todo', 'in_progress', 'in_progress', 'in_review', 'done')
+  # Functional categories (design brief): the factory palette plus one custom
+  # category, so the capture proves custom categories work end to end.
+  $categoryIds = @('development', 'bug', 'design', 'documentation', 'tests', 'performance', 'security', 'infrastructure', 'research', 'maintenance', 'analytics')
+  $categorySettings = @(
+    @{ id = 'development'; name = 'Développement'; color = '#a9c8f2'; order = 0 },
+    @{ id = 'bug'; name = 'Bug / Correction'; color = '#f1abb4'; order = 1 },
+    @{ id = 'design'; name = 'Design / UI-UX'; color = '#c5b2ef'; order = 2 },
+    @{ id = 'documentation'; name = 'Documentation'; color = '#9ed9c6'; order = 3 },
+    @{ id = 'tests'; name = 'Tests / QA'; color = '#f2c09d'; order = 4 },
+    @{ id = 'performance'; name = 'Performance'; color = '#eadd95'; order = 5 },
+    @{ id = 'security'; name = 'Sécurité'; color = '#d6a6c5'; order = 6 },
+    @{ id = 'infrastructure'; name = 'Infrastructure / CI'; color = '#a4d6dc'; order = 7 },
+    @{ id = 'research'; name = 'Recherche / R&D'; color = '#b8bbf0'; order = 8 },
+    @{ id = 'maintenance'; name = 'Maintenance'; color = '#c8cdd6'; order = 9 },
+    @{ id = 'analytics'; name = 'Données / Analyse'; color = '#b7d9c2'; order = 10 },
+    @{ id = 'general'; name = 'Général / Non classé'; color = '#e4e7ec'; order = 11 }
+  )
   $tasks = [System.Collections.Generic.List[object]]::new()
   for ($i = 0; $i -lt $count; $i++) {
     $projectId = if (($i % 4) -eq 0) { $script:WorkspaceId2 } else { $script:WorkspaceId }
@@ -284,16 +301,29 @@ function New-SeedLedger([int]$count) {
       executions = @()
     }
     if ($null -ne $checklist) { $task.checklist = $checklist }
+    if ($i % 13 -ne 0) { $task.category = $categoryIds[$i % $categoryIds.Length] }
     if ($i % 11 -eq 0) { $task.waitingForHuman = $true; $task.waitingReason = 'Décision requise sur le périmètre' }
     $tasks.Add($task)
   }
-  return [ordered]@{ schemaVersion = 1; revision = 1; tasks = $tasks }
+  return [ordered]@{
+    schemaVersion = 1
+    revision = 1
+    tasks = $tasks
+    settings = [ordered]@{
+      categories = $categorySettings
+      categoryLabelMap = [ordered]@{ analytics = 'analytics'; data = 'analytics' }
+    }
+  }
 }
 
 function Seed-Board([int]$count) {
   $state = (GetApi '/state').body.value
   $existing = @($state.tasks).Count
-  if ($existing -ge ($count - 20)) { Info "board already seeded ($existing tasks) — skipping"; return }
+  $categorized = @($state.tasks | Where-Object { $null -ne $_.category }).Count
+  if ($existing -ge ($count - 20) -and $categorized -ge ($count - 20)) {
+    Info "board already seeded with categories ($existing tasks) — skipping"
+    return
+  }
   Step "seeding $count tasks through POST /import (mode=replace, backed up by the host)"
   $ledger = New-SeedLedger $count
   $preview = Post '/import/preview' $ledger
@@ -350,5 +380,6 @@ try {
 } finally {
   if (-not $KeepHost) { try { Stop-Host } catch { } }
 }
+
 
 

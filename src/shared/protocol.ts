@@ -12,6 +12,7 @@
 import { MAX_TASK_DEPENDENCIES } from './dependencies.ts'
 import { normalizeExternalSource, normalizeExternalSyncRecords } from './external.ts'
 import { applyHumanWaitingPatch } from './human-wait.ts'
+import { asCategoryLabelMap, asTaskCategories, isValidCategoryId, type TaskCategory } from './categories.ts'
 
 // ---------------------------------------------------------------------------
 // Status vocabulary
@@ -328,6 +329,14 @@ export type BoardSettings = {
   dispatchIntervalMs?: number
   /** Maximum number of completed (done) tasks displayed on the board (default: 50). */
   completedDisplayLimit?: number
+  /**
+   * Task categories (design brief "coloration par catégorie"): user data that
+   * travels with the ledger, the JSON export/import and the host backups.
+   * Absent = the factory palette from `shared/categories.ts`.
+   */
+  categories?: TaskCategory[]
+  /** External label → category id mapping (case-insensitive labels). */
+  categoryLabelMap?: Record<string, string>
 }
 
 /** Validate raw input into sanitized {@link BoardSettings} (unknown fields dropped). */
@@ -419,7 +428,43 @@ export function asBoardSettings(raw: unknown): BoardSettings {
     }
     out.completedDisplayLimit = e.completedDisplayLimit
   }
+  // Categories are user data: sanitize into a dense, ordered, valid list. The
+  // sanitizer is fail-soft on purpose (a corrupt entry must never block a
+  // settings write that only wanted to change something else).
+  if (e.categories !== undefined) out.categories = asTaskCategories(e.categories)
+  if (e.categoryLabelMap !== undefined) {
+    out.categoryLabelMap = asCategoryLabelMap(e.categoryLabelMap, out.categories)
+  }
   return out
+}
+
+/** The effective category list (board setting → factory palette). */
+export function categoriesOf(settings?: BoardSettings): TaskCategory[] {
+  return settings?.categories === undefined ? asTaskCategories(undefined) : asTaskCategories(settings.categories)
+}
+
+/** The effective external label → category mapping (board setting → defaults). */
+export function categoryLabelMapOf(settings?: BoardSettings): Record<string, string> {
+  return asCategoryLabelMap(settings?.categoryLabelMap, categoriesOf(settings))
+}
+
+/**
+ * Validate a task's category reference against the board categories. Accepts an
+ * id or a display name; `null`/empty clears the category (unclassified).
+ * Throws for an unknown reference so nothing is silently reclassified.
+ */
+export function asTaskCategoryReference(settings: BoardSettings | undefined, raw: unknown): string | undefined {
+  if (raw === null) return undefined
+  if (typeof raw !== 'string') throw new Error('category must be a category id or name')
+  const reference = raw.trim()
+  if (reference.length === 0) return undefined
+  if (isValidCategoryId(reference)) {
+    const byId = categoriesOf(settings).find(category => category.id === reference)
+    if (byId !== undefined) return byId.id
+  }
+  const byName = categoriesOf(settings).find(category => category.name.toLocaleLowerCase() === reference.toLocaleLowerCase())
+  if (byName !== undefined) return byName.id
+  throw new Error(`unknown category "${reference}"`)
 }
 
 /** The effective default isolation for NEW tasks (board setting → factory default). */
@@ -947,6 +992,13 @@ export type TaskRecord = {
   workspaceId: string
   urgency: Urgency
   status: TaskStatus
+  /**
+   * Functional category id (design brief "coloration par catégorie"). Absent =
+   * unclassified ("Général / Non classé"); an id whose category was deleted also
+   * renders as unclassified. Purely descriptive: it never gates execution,
+   * approval, permissions or synchronization.
+   */
+  category?: string
   /** Horizontal marker: work cannot continue right now (any non-terminal status). */
   blocked: boolean
   /** Optional same-workspace prerequisite task IDs. All must reach human-approved done before starting. */
@@ -2174,6 +2226,9 @@ export function validateImportedTask(raw: unknown, now: number): { ok: true; tas
       workspaceId: strOr(e, 'workspaceId', ''),
       urgency: asUrgency(strOr(e, 'urgency', 'normal')),
       status,
+      // Category is descriptive: keep a well-formed id (a deleted category
+      // simply renders as unclassified) and drop anything else.
+      ...(isValidCategoryId(e.category) ? { category: e.category } : {}),
       blocked: e.blocked === true,
       ...(isPlausibleDependsOn(e.dependsOn, id) ? { dependsOn: [...(e.dependsOn as string[])] } : {}),
       // Hierarchy link: shape was validated above; the host revalidates
@@ -2292,6 +2347,8 @@ export type TaskSummary = {
   workspaceId: string
   urgency: Urgency
   status: TaskStatus
+  /** Functional category id (absent = unclassified). */
+  category?: string
   blocked: boolean
   dependsOn?: string[]
   /** Hierarchy parent id, when the task is a subtask (D6). */
@@ -2326,6 +2383,7 @@ export function summarize(task: TaskRecord): TaskSummary {
     workspaceId: task.workspaceId,
     urgency: task.urgency,
     status: task.status,
+    ...(task.category !== undefined ? { category: task.category } : {}),
     blocked: task.blocked,
     ...(task.dependsOn?.length ? { dependsOn: [...task.dependsOn] } : {}),
     ...(task.parentId !== undefined ? { parentId: task.parentId } : {}),

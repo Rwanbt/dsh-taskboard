@@ -1,26 +1,38 @@
 /**
  * Display-only appearance preferences for the board ("DeepSeek Pastel").
  *
- * Everything here is a LOCAL presentation choice: density, colour intensity,
- * the description/grouping switches and the optional manual card tones. None
- * of it is written to the ledger, so the data schema, the agent tools, the
+ * Everything here is a LOCAL presentation choice: colour mode, intensity,
+ * density, the description/grouping switches, per-card and per-project tone
+ * overrides, the optional priority palette and the priority-nuance toggle.
+ * None of it is written to the ledger, so the data schema, the agent tools, the
  * import/export payload and the external synchronizations are untouched — a
- * board that has never opened this panel still renders correctly with the
- * defaults ({@link defaultAppearance}).
+ * board that never opened this panel renders with {@link defaultAppearance}
+ * (colour by category, balanced intensity).
  *
- * Card tones are derived from the task id with a stable hash
- * ({@link hashTone}), never randomized at render time: the same task keeps its
- * tone across reloads, devices and teammates. A user may pin a tone per task
- * ({@link AppearancePrefs.tones}); that override lives in localStorage next to
- * the other display preferences and is dropped if the task disappears (a stale
- * id is harmless, it simply never matches a rendered card).
+ * Categories and the external label mapping are NOT here: they are shared user
+ * data and live in `BoardSettings` (see `shared/categories.ts`).
  *
- * The store is a tiny external store so React views can subscribe through
- * `useSyncExternalStore` without adding a context provider to the host tree.
+ * Storage is versioned and fail-soft: a v1 payload (the earlier density/
+ * vibrancy build) is migrated on read, and any corrupted entry falls back to
+ * the defaults instead of breaking the board.
  *
  * @module dsh-taskboard/client/board/appearance
  */
 import { useSyncExternalStore } from 'react'
+import type { Urgency } from '../../shared/protocol.ts'
+import {
+  CARD_TONES,
+  COLOR_INTENSITIES,
+  COLOR_MODES,
+  DEFAULT_COLOR_INTENSITY,
+  DEFAULT_COLOR_MODE,
+  INTENSITY_VIBRANCY,
+  asHex,
+  stableHash,
+  type CardTone,
+  type ColorIntensity,
+  type ColorMode,
+} from './coloring.ts'
 
 /** Card density presets, from the reference mockup. */
 export type Density = 'compact' | 'comfortable' | 'spacious'
@@ -34,44 +46,75 @@ export const DENSITIES: readonly Density[] = ['compact', 'comfortable', 'spaciou
  */
 export const DEFAULT_DENSITY: Density = 'spacious'
 
-/** Colour-intensity range exposed in Settings (percentage of the tone kept). */
-export const MIN_VIBRANCY = 25
+/** Colour-intensity range kept for backwards compatibility of the CSS bridge. */
+export const MIN_VIBRANCY = 45
 /** Maximum (full pastel surface). */
 export const MAX_VIBRANCY = 100
 /** Step of the intensity range. */
 export const VIBRANCY_STEP = 5
-/** Default colour intensity (full pastel). */
+/** Default colour intensity (full pastel) — see {@link DEFAULT_COLOR_INTENSITY}. */
 export const DEFAULT_VIBRANCY = 100
 
-/** The eight pastel tones of the reference palette. */
-export type CardTone = 'violet' | 'sky' | 'mint' | 'peach' | 'pink' | 'ink' | 'yellow' | 'lavender'
-
-/** Every tone, in palette order (the order used by the pickers). */
-export const CARD_TONES: readonly CardTone[] = ['violet', 'sky', 'mint', 'peach', 'pink', 'ink', 'yellow', 'lavender']
+/** The eight pastel tones of the reference palette (re-exported for callers). */
+export { CARD_TONES }
+export type { CardTone }
 
 /** Display preferences persisted in localStorage (never in the ledger). */
 export interface AppearancePrefs {
+  /** How the card background is chosen. Default: category. */
+  colorMode: ColorMode
+  /** Colour strength preset. Default: balanced. */
+  intensity: ColorIntensity
   /** Card density. */
   density: Density
-  /** Colour intensity in percent (MIN_VIBRANCY..MAX_VIBRANCY, step VIBRANCY_STEP). */
-  vibrancy: number
   /** Render the task description on the card (clamped to two lines / one when compact). */
   descriptions: boolean
   /** Group each column by project. */
   group: boolean
-  /** Manual per-task tone overrides; an absent id uses the deterministic hash. */
+  /** Manual per-task tone overrides (mode "card"). */
   tones: Record<string, CardTone>
+  /** Manual per-project tone overrides (mode "project"). */
+  projectColors: Record<string, CardTone>
+  /** Mode "priority": optional custom light-theme reference colours. */
+  priorityColors: Partial<Record<Urgency, string>>
+  /** Mode "priority": nuance the urgency family by category (default true). */
+  priorityNuance: boolean
 }
 
-/** localStorage key for the display preferences. */
-export const APPEARANCE_KEY = 'dsh-taskboard-appearance-v1'
+/** localStorage key for the display preferences (v2: colour modes). */
+export const APPEARANCE_KEY = 'dsh-taskboard-appearance-v2'
+/** Legacy key (v1: density + percentage intensity) — read once for migration. */
+export const LEGACY_APPEARANCE_KEY = 'dsh-taskboard-appearance-v1'
 
 /** The factory appearance (a board that never opened Settings). */
 export function defaultAppearance(): AppearancePrefs {
-  return { density: DEFAULT_DENSITY, vibrancy: DEFAULT_VIBRANCY, descriptions: true, group: true, tones: {} }
+  return {
+    colorMode: DEFAULT_COLOR_MODE,
+    intensity: DEFAULT_COLOR_INTENSITY,
+    density: DEFAULT_DENSITY,
+    descriptions: true,
+    group: true,
+    tones: {},
+    projectColors: {},
+    priorityColors: {},
+    priorityNuance: true,
+  }
 }
 
-/** Clamp an arbitrary number into the supported intensity range. */
+/** Map a legacy percentage to the nearest named intensity preset. */
+export function intensityFromVibrancy(vibrancy: number): ColorIntensity {
+  if (!Number.isFinite(vibrancy)) return DEFAULT_COLOR_INTENSITY
+  if (vibrancy <= 55) return 'subtle'
+  if (vibrancy <= 85) return 'balanced'
+  return 'strong'
+}
+
+/** The CSS custom-property value the board sets for the current intensity. */
+export function vibrancyOf(prefs: AppearancePrefs): string {
+  return INTENSITY_VIBRANCY[prefs.intensity]
+}
+
+/** Clamp an arbitrary number into the legacy intensity range. */
 export function clampVibrancy(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_VIBRANCY
   const stepped = Math.round(value / VIBRANCY_STEP) * VIBRANCY_STEP
@@ -85,6 +128,42 @@ export function asCardTone(raw: unknown): CardTone | undefined {
     : undefined
 }
 
+/** Narrowing helper for a persisted colour mode. */
+export function asColorMode(raw: unknown): ColorMode | undefined {
+  return typeof raw === 'string' && (COLOR_MODES as readonly string[]).includes(raw)
+    ? raw as ColorMode
+    : undefined
+}
+
+/** Narrowing helper for a persisted intensity. */
+export function asColorIntensity(raw: unknown): ColorIntensity | undefined {
+  return typeof raw === 'string' && (COLOR_INTENSITIES as readonly string[]).includes(raw)
+    ? raw as ColorIntensity
+    : undefined
+}
+
+/** Read a `Record<id, tone>` maps field, dropping unknown ids and tones. */
+function asToneMap(raw: unknown): Record<string, CardTone> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  const out: Record<string, CardTone> = {}
+  for (const [id, tone] of Object.entries(raw as Record<string, unknown>)) {
+    const parsed = asCardTone(tone)
+    if (id.length > 0 && parsed !== undefined) out[id] = parsed
+  }
+  return out
+}
+
+/** Read the custom priority colours, dropping invalid hues/values. */
+function asPriorityColors(raw: unknown): Partial<Record<Urgency, string>> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  const out: Partial<Record<Urgency, string>> = {}
+  for (const urgency of ['urgent', 'normal', 'relaxed'] as const) {
+    const color = asHex((raw as Record<string, unknown>)[urgency])
+    if (color !== undefined) out[urgency] = color
+  }
+  return out
+}
+
 /**
  * Sanitize unknown persisted JSON into {@link AppearancePrefs}. Unknown fields
  * are dropped and every invalid value falls back to its default, so a
@@ -94,17 +173,23 @@ export function sanitizeAppearance(raw: unknown): AppearancePrefs {
   const out = defaultAppearance()
   if (typeof raw !== 'object' || raw === null) return out
   const value = raw as Record<string, unknown>
+  const mode = asColorMode(value.colorMode)
+  if (mode !== undefined) out.colorMode = mode
+  const intensity = asColorIntensity(value.intensity)
+  if (intensity !== undefined) out.intensity = intensity
   if (typeof value.density === 'string' && (DENSITIES as readonly string[]).includes(value.density)) {
     out.density = value.density as Density
   }
-  if (typeof value.vibrancy === 'number') out.vibrancy = clampVibrancy(value.vibrancy)
   if (typeof value.descriptions === 'boolean') out.descriptions = value.descriptions
   if (typeof value.group === 'boolean') out.group = value.group
-  if (typeof value.tones === 'object' && value.tones !== null && !Array.isArray(value.tones)) {
-    for (const [id, tone] of Object.entries(value.tones as Record<string, unknown>)) {
-      const parsed = asCardTone(tone)
-      if (id.length > 0 && parsed !== undefined) out.tones[id] = parsed
-    }
+  if (typeof value.priorityNuance === 'boolean') out.priorityNuance = value.priorityNuance
+  out.tones = asToneMap(value.tones)
+  out.projectColors = asToneMap(value.projectColors)
+  out.priorityColors = asPriorityColors(value.priorityColors)
+  // v1 migration: a saved percentage maps to the closest named preset, and the
+  // old per-card tones are preserved (they are the "mode card" overrides).
+  if (out.colorMode === DEFAULT_COLOR_MODE && value.colorMode === undefined && typeof value.vibrancy === 'number') {
+    out.intensity = intensityFromVibrancy(value.vibrancy)
   }
   return out
 }
@@ -114,8 +199,10 @@ export function loadAppearance(): AppearancePrefs {
   if (typeof localStorage === 'undefined') return defaultAppearance()
   try {
     const raw = localStorage.getItem(APPEARANCE_KEY)
-    if (raw === null) return defaultAppearance()
-    return sanitizeAppearance(JSON.parse(raw) as unknown)
+    if (raw !== null) return sanitizeAppearance(JSON.parse(raw) as unknown)
+    const legacy = localStorage.getItem(LEGACY_APPEARANCE_KEY)
+    if (legacy !== null) return sanitizeAppearance(JSON.parse(legacy) as unknown)
+    return defaultAppearance()
   } catch {
     return defaultAppearance()
   }
@@ -132,22 +219,21 @@ export function saveAppearance(prefs: AppearancePrefs): void {
 }
 
 /**
- * Stable tone for a task id (FNV-1a over UTF-16 code units). The result only
- * depends on the id, so a card never changes colour between renders, reloads,
- * sessions or machines — unlike `Math.random()` or a list index.
+ * Stable tone for a task id (FNV-1a). Exposed for mode "card"; the actual
+ * resolver lives in `coloring.ts` so every mode shares one implementation.
  */
 export function hashTone(id: string): CardTone {
-  let hash = 0x811c9dc5
-  for (let i = 0; i < id.length; i++) {
-    hash ^= id.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193) >>> 0
-  }
-  return CARD_TONES[hash % CARD_TONES.length]!
+  return CARD_TONES[stableHash(id) % CARD_TONES.length]!
 }
 
-/** Resolve the tone a card actually renders: manual override first, then the stable hash. */
+/** Resolve the tone a card renders in "card" mode: override first, then the hash. */
 export function toneForTask(id: string, prefs: AppearancePrefs = getAppearance()): CardTone {
   return prefs.tones[id] ?? hashTone(id)
+}
+
+/** Resolve the tone a project renders in "project" mode: override first, then the hash. */
+export function toneForProject(workspaceId: string, prefs: AppearancePrefs = getAppearance()): CardTone {
+  return prefs.projectColors[workspaceId] ?? hashTone(workspaceId)
 }
 
 /** Subscriber callback. */
@@ -173,15 +259,15 @@ export function subscribeAppearance(listener: AppearanceListener): () => void {
   return () => { listeners.delete(listener) }
 }
 
-/** Apply a partial update, persist it, and notify subscribers. */
-export function setAppearance(patch: Partial<Omit<AppearancePrefs, 'tones'>>): AppearancePrefs {
-  snapshot = sanitizeAppearance({ ...snapshot, ...patch, tones: snapshot.tones })
+/** Apply a partial update (maps replaced whole), persist it, and notify subscribers. */
+export function setAppearance(patch: Partial<AppearancePrefs>): AppearancePrefs {
+  snapshot = sanitizeAppearance({ ...snapshot, ...patch })
   saveAppearance(snapshot)
   emit()
   return snapshot
 }
 
-/** Pin (tone) or unpin (undefined) the tone of one task. */
+/** Pin (tone) or unpin (undefined) the tone of one task (mode "card"). */
 export function setTaskTone(id: string, tone: CardTone | undefined): AppearancePrefs {
   const tones = { ...snapshot.tones }
   if (tone === undefined) delete tones[id]
@@ -192,7 +278,7 @@ export function setTaskTone(id: string, tone: CardTone | undefined): AppearanceP
   return snapshot
 }
 
-/** Drop every manual tone override (the deterministic palette takes over). */
+/** Drop every manual task tone (the deterministic palette takes over). */
 export function clearTaskTones(): AppearancePrefs {
   snapshot = { ...snapshot, tones: {} }
   saveAppearance(snapshot)
@@ -200,7 +286,46 @@ export function clearTaskTones(): AppearancePrefs {
   return snapshot
 }
 
-/** Restore the factory appearance (used by the Settings "reset" action and tests). */
+/** Pin (tone) or unpin (undefined) the colour of one project (mode "project"). */
+export function setProjectTone(workspaceId: string, tone: CardTone | undefined): AppearancePrefs {
+  const projectColors = { ...snapshot.projectColors }
+  if (tone === undefined) delete projectColors[workspaceId]
+  else projectColors[workspaceId] = tone
+  snapshot = { ...snapshot, projectColors }
+  saveAppearance(snapshot)
+  emit()
+  return snapshot
+}
+
+/** Drop every manual project colour. */
+export function clearProjectColors(): AppearancePrefs {
+  snapshot = { ...snapshot, projectColors: {} }
+  saveAppearance(snapshot)
+  emit()
+  return snapshot
+}
+
+/** Set (hex) or clear (undefined) one custom priority colour. */
+export function setPriorityColor(urgency: Urgency, color: string | undefined): AppearancePrefs {
+  const priorityColors = { ...snapshot.priorityColors }
+  const normalized = asHex(color)
+  if (normalized === undefined) delete priorityColors[urgency]
+  else priorityColors[urgency] = normalized
+  snapshot = { ...snapshot, priorityColors }
+  saveAppearance(snapshot)
+  emit()
+  return snapshot
+}
+
+/** Drop every custom priority colour (documented factory families return). */
+export function clearPriorityColors(): AppearancePrefs {
+  snapshot = { ...snapshot, priorityColors: {} }
+  saveAppearance(snapshot)
+  emit()
+  return snapshot
+}
+
+/** Restore the factory appearance (Settings "reset" action and tests). */
 export function resetAppearance(): AppearancePrefs {
   snapshot = defaultAppearance()
   saveAppearance(snapshot)

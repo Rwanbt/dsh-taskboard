@@ -21,6 +21,8 @@ export interface BoardFilters {
   workspaceId?: string
   /** Selected urgency chips (empty = all). */
   urgencies: Urgency[]
+  /** Selected functional category id (undefined = all categories). */
+  categoryId?: string
 }
 
 /** Column sort orders. */
@@ -30,15 +32,16 @@ export type SortBy = 'default' | 'updated' | 'urgency' | 'created' | 'title'
 const VIEW_KEY = 'dsh-taskboard-view-v1'
 
 /** Load the persisted view state (never throws; fresh on any parse error). */
-function loadView(): { workspaceId?: string; urgencies: Urgency[]; sortBy: SortBy; doneCollapsed: boolean; backlogCollapsed: boolean; todoCollapsed: boolean; collapsedWorkspaceGroups?: string[] } {
+function loadView(): { workspaceId?: string; urgencies: Urgency[]; categoryId?: string; sortBy: SortBy; doneCollapsed: boolean; backlogCollapsed: boolean; todoCollapsed: boolean; collapsedWorkspaceGroups?: string[] } {
   try {
     const raw = localStorage.getItem(VIEW_KEY)
     if (raw === null) return { urgencies: [], sortBy: 'default', doneCollapsed: false, backlogCollapsed: false, todoCollapsed: false }
-    const parsed = JSON.parse(raw) as { workspaceId?: string; urgencies?: Urgency[]; sortBy?: SortBy; doneCollapsed?: boolean; backlogCollapsed?: boolean; todoCollapsed?: boolean; collapsedWorkspaceGroups?: unknown }
+    const parsed = JSON.parse(raw) as { workspaceId?: string; urgencies?: Urgency[]; categoryId?: string; sortBy?: SortBy; doneCollapsed?: boolean; backlogCollapsed?: boolean; todoCollapsed?: boolean; collapsedWorkspaceGroups?: unknown }
     const sortBy = parsed.sortBy === 'updated' || parsed.sortBy === 'urgency' || parsed.sortBy === 'created' || parsed.sortBy === 'title' ? parsed.sortBy : 'default'
     return {
       workspaceId: typeof parsed.workspaceId === 'string' ? parsed.workspaceId : undefined,
       urgencies: Array.isArray(parsed.urgencies) ? parsed.urgencies.filter(u => u === 'urgent' || u === 'normal' || u === 'relaxed') : [],
+      categoryId: typeof parsed.categoryId === 'string' ? parsed.categoryId : undefined,
       sortBy,
       doneCollapsed: parsed.doneCollapsed === true,
       backlogCollapsed: parsed.backlogCollapsed === true,
@@ -112,7 +115,7 @@ function initialState(): ControllerState {
   return {
     ledger: emptyLedger(),
     workspaces: [],
-    filters: { workspaceId: view.workspaceId, urgencies: view.urgencies },
+    filters: { workspaceId: view.workspaceId, urgencies: view.urgencies, categoryId: view.categoryId },
     search: '',
     sortBy: view.sortBy,
     doneCollapsed: view.doneCollapsed,
@@ -277,6 +280,12 @@ export class BoardController {
     this.persistView()
   }
 
+  /** Set the functional-category filter (persisted). */
+  setCategoryFilter(categoryId?: string): void {
+    this.setState({ filters: { ...this.state.filters, categoryId } })
+    this.persistView()
+  }
+
   /** Toggle one urgency chip (persisted). */
   toggleUrgency(urgency: Urgency): void {
     const set = new Set(this.state.filters.urgencies)
@@ -336,6 +345,7 @@ export class BoardController {
       localStorage.setItem(VIEW_KEY, JSON.stringify({
         workspaceId: this.state.filters.workspaceId,
         urgencies: this.state.filters.urgencies,
+        categoryId: this.state.filters.categoryId,
         sortBy: this.state.sortBy,
         doneCollapsed: this.state.doneCollapsed,
         backlogCollapsed: this.state.backlogCollapsed,
@@ -1095,3 +1105,4 @@ export class BoardController {
     }
   }
 }
+

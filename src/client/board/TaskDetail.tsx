@@ -14,7 +14,7 @@ import { ApprovalPanel } from './ApprovalPanel.tsx'
 import type { BoardController } from '../controller.ts'
 import type { TaskIndexEntry } from '../api.ts'
 import type { CommentRecord, ExecutionRecord, TaskRecord } from '../../shared/protocol.ts'
-import { canTransition, checklistProgress, taskAssociatedSessionIds, taskSessionId } from '../../shared/protocol.ts'
+import { canTransition, categoriesOf, checklistProgress, taskAssociatedSessionIds, taskSessionId } from '../../shared/protocol.ts'
 import { dependencyState } from '../../shared/dependencies.ts'
 import { ancestorsOf } from '../../shared/hierarchy.ts'
 import { useAlert } from './AlertModal.tsx'
@@ -24,6 +24,7 @@ import { useT, type Translate } from '../i18n/runtime.ts'
 import { IMAGE_ACCEPT, acceptedImageFiles, imageAlt, imageMarkdown, insertImageMarkdown } from '../image-insert.ts'
 import { Icon, type IconName } from './Icon.tsx'
 import { CARD_TONES, setTaskTone, toneForTask, useAppearance } from './appearance.ts'
+import { GENERAL_CATEGORY_ID, categoryOf } from '../../shared/categories.ts'
 
 /** Statuses a user may move this task to, per the state machine. */
 function moveTargets(task: TaskRecord): TaskRecord['status'][] {
@@ -687,6 +688,15 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
   }, [controller, task.workspaceId])
   const { alert: showAlert, el: alertEl } = useAlert()
   const ws = controller.getSnapshot().workspaces.find(w => w.id === task.workspaceId)
+  // Functional category (descriptive): named here so the colour is never the
+  // only carrier of the information.
+  const categoryList = categoriesOf(controller.getSnapshot().ledger.settings)
+  const resolvedCategory = categoryOf(categoryList, task.category)
+  const categoryInfo = {
+    name: task.category === undefined || resolvedCategory.id === GENERAL_CATEGORY_ID
+      ? t('category.unclassified')
+      : resolvedCategory.name,
+  }
   const runningExecution = task.executions.find(e => e.outcome === 'running')
   const holder = task.status === 'in_progress' ? task.claimedBy : undefined
   // Run is blocked by work IN FLIGHT, not by the status label. A card the user
@@ -826,6 +836,7 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
           </div>
           <div className="dsh-atb-detail-chips">
             <Chip tone={task.urgency}>{t(URGENCY_KEYS[task.urgency] ?? task.urgency)}</Chip>
+            <Chip title={t('card.category.title', { name: categoryInfo.name })}>{categoryInfo.name}</Chip>
             <Chip icon="folder">{ws?.title ?? shortId(task.workspaceId)}</Chip>
             {task.model !== undefined && (
               <Chip
@@ -1460,3 +1471,4 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
     </div>
   )
 }
+

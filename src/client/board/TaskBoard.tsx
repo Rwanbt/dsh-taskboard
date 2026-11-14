@@ -25,7 +25,11 @@ import { TemplateManager } from './TemplateManager.tsx'
 import { useAlert } from './AlertModal.tsx'
 import { Select } from './Select.tsx'
 import { resolveWorkspaceName as resolveWorkspaceNameBase } from './project-label.ts'
-import { useAppearance, setAppearance } from './appearance.ts'
+import { useAppearance, setAppearance, vibrancyOf } from './appearance.ts'
+import { categoriesOf } from '../../shared/protocol.ts'
+
+/** Sentinel category filter for the "unclassified" bucket. */
+const UNCLASSIFIED_FILTER = '\u0000unclassified'
 
 /** Urgency sort rank (urgent first). */
 const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, normal: 1, relaxed: 2 }
@@ -36,6 +40,11 @@ export function filterTasks(state: ControllerState, tasks: TaskRecord[]): TaskRe
   const filtered = tasks.filter(t =>
     (state.filters.workspaceId === undefined || t.workspaceId === state.filters.workspaceId)
     && (state.filters.urgencies.length === 0 || state.filters.urgencies.includes(t.urgency))
+    // Category filter: the unclassified bucket matches tasks without a category.
+    && (state.filters.categoryId === undefined
+      || (state.filters.categoryId === UNCLASSIFIED_FILTER
+        ? t.category === undefined
+        : t.category === state.filters.categoryId))
     && (q.length === 0 || t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)))
   if (state.sortBy === 'default') return filtered
   const sorted = [...filtered]
@@ -150,6 +159,7 @@ export function groupAndSortTasksByWorkspace(
 export function TaskBoard({ controller }: { controller: BoardController }) {
   const t = useT()
   const appearance = useAppearance()
+  const categories = categoriesOf(controller.getSnapshot().ledger.settings)
   const state = useSyncExternalStore(
     cb => controller.subscribe(cb),
     () => controller.getSnapshot(),
@@ -220,7 +230,9 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
       data-atb-density={appearance.density}
       data-atb-descriptions={appearance.descriptions ? 'true' : 'false'}
       data-atb-group={appearance.group ? 'true' : 'false'}
-      style={{ '--atb-vibrancy': `${appearance.vibrancy}%` } as CSSProperties}
+      data-atb-color-mode={appearance.colorMode}
+      data-atb-intensity={appearance.intensity}
+      style={{ '--atb-vibrancy': vibrancyOf(appearance) } as CSSProperties}
     >
       <div className="dsh-atb-head">
         <h2 className="dsh-atb-title">{t('board.title')}</h2>
@@ -306,6 +318,17 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
           ]}
         />
         <Select
+          ariaLabel={t('board.filter.allCategories')}
+          title={t('board.filter.allCategories')}
+          value={state.filters.categoryId ?? ''}
+          onChange={v => controller.setCategoryFilter(v === '' ? undefined : v)}
+          options={[
+            { value: '', label: t('board.filter.allCategories') },
+            ...categories.map(category => ({ value: category.id, label: category.name })),
+            { value: UNCLASSIFIED_FILTER, label: t('category.unclassified') },
+          ]}
+        />
+        <Select
           ariaLabel={t('board.sort.title')}
           title={t('board.sort.title')}
           value={state.sortBy}
@@ -351,7 +374,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
         <button type="button" className="dsh-atb-btn" onClick={() => controller.toggleSecondary()}>
           {state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
         </button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}><Icon name="settings" /> {t('board.action.settings')}</button>
+        <button type="button" className="dsh-atb-btn" data-action="appearance" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}><Icon name="settings" /> {t('board.action.settings')}</button>
         <button type="button" className="dsh-atb-btn" title={t('board.action.diagTitle')} onClick={() => controller.openDiagnostics()}><Icon name="diagnostics" /> {t('board.action.diag')}</button>
         <button type="button" className="dsh-atb-btn" title={t('board.action.importTitle')} onClick={() => controller.openImport()}><Icon name="import" /> {t('board.action.import')}</button>
         <div className="dsh-atb-newmenu">

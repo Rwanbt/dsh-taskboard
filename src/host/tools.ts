@@ -35,6 +35,7 @@ import {
   asIsolation,
   asPermission,
   asStatus,
+  asTaskCategoryReference,
   asUrgency,
   canTransition,
   checklistFromTexts,
@@ -599,6 +600,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       workspaceId: { type: 'string', description: 'Filter by project: DSH workspace id, or that project\'s directory path.' },
       status: { type: 'string', description: 'Filter by exact status (backlog/todo/in_progress/in_review/done/canceled/archived).' },
       urgency: { type: 'string', description: 'Filter by urgency (urgent/normal/relaxed).' },
+      category: { type: 'string', description: 'Filter by functional category (category id or display name, e.g. development, bug, documentation).' },
       includeTrashed: { type: 'boolean', description: 'Include soft-deleted tasks (default false).' },
     },
     output: {
@@ -613,13 +615,18 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     },
     async execute(args, exec) {
       try {
-        const a = args as { workspaceId?: string; status?: string; urgency?: string; includeTrashed?: boolean }
+        const a = args as { workspaceId?: string; status?: string; urgency?: string; category?: string; includeTrashed?: boolean }
         const workspaceId = a.workspaceId === undefined ? undefined : await resolveWorkspaceArg(deps, a.workspaceId)
         if (a.workspaceId !== undefined && workspaceId === undefined) {
           throw new ToolError(ERR.notFound, await unknownWorkspaceDetail(deps, exec as ToolRunContext, a.workspaceId))
         }
         if (a.status !== undefined) asStatus(a.status)
         if (a.urgency !== undefined) asUrgency(a.urgency)
+        // Category filters accept the display name as well as the id; an
+        // unknown reference is an error, never a silent empty result.
+        const categoryId = a.category === undefined
+          ? undefined
+          : asTaskCategoryReference(store.snapshot().settings, a.category)
         const ledger = store.snapshot()
         // F4/F6: ONE id index for the whole listing; the readiness projection
         // is derived (D9) and only attached to tasks that have prerequisites.
@@ -628,6 +635,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           (workspaceId === undefined || t.workspaceId === workspaceId)
           && (a.status === undefined || t.status === a.status)
           && (a.urgency === undefined || t.urgency === a.urgency)
+          && (categoryId === undefined || t.category === categoryId)
           && (a.includeTrashed === true || t.trashedAt === undefined))
         return json({
           revision: ledger.revision,
@@ -707,6 +715,10 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       description: { type: 'string', description: 'What the task involves (plain text).' },
       prompt: { type: 'string', description: 'Extra execution instructions; the session receives title+description+this prompt.' },
       status: { type: 'string', description: 'Initial status; default todo. backlog = not approved for execution.' },
+      category: {
+        type: 'string',
+        description: 'Functional category id or display name (e.g. development, bug, documentation). Powers the "colour by category" board mode and the category badge. Omitted = unclassified (Général / Non classé); an unknown value is rejected.',
+      },
       execution: {
         type: 'object',
         additionalProperties: false,
@@ -764,6 +776,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       workspaceId: string
       urgency: string
       status?: string
+      category?: string
       description?: string
       prompt?: string
       execution?: { mode?: string; cron?: string; runAt?: string | number }
@@ -807,6 +820,12 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
         const checklistTexts = args.checklist?.map(c => c.trim()).filter(c => c.length > 0)
         const checklist = checklistTexts !== undefined && checklistTexts.length > 0 ? checklistFromTexts(checklistTexts) : undefined
         const now = deps.now()
+        // Category (design brief "coloration par catégorie"): agents may name a
+        // category id or its display name; the host validates against the board
+        // categories, so an unknown value fails loudly instead of mislabelling.
+        const category = args.category === undefined
+          ? undefined
+          : asTaskCategoryReference(store.snapshot().settings, args.category)
         const task: TaskRecord = {
           id: newTaskId(),
           title,
@@ -815,6 +834,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           workspaceId,
           urgency,
           status,
+          ...(category !== undefined ? { category } : {}),
           blocked: false,
           execution,
           model,
@@ -868,6 +888,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       description: { type: 'string', description: 'New description.' },
       prompt: { type: 'string', description: 'New execution prompt.' },
       urgency: { type: 'string', description: 'urgent | normal | relaxed.' },
+      // json node: accepts a category id/name to set, or null to clear it.
+      category: { type: 'json' },
       blocked: { type: 'boolean', description: 'Blocked marker (work cannot continue right now).' },
       dependsOn: { type: 'array', items: { type: 'string' }, description: 'Replace prerequisites by same-workspace task IDs; [] clears, cycles rejected. REMOVING an existing id requires reason and waits for user approval; additions apply immediately.' },
       reason: { type: 'string', description: 'Why a prerequisite must be removed/weakened (1..500 chars). Required only when dependsOn drops an existing id; recorded in the approval request and audit comment. Never include credentials.' },
@@ -902,6 +924,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       description?: string
       prompt?: string
       urgency?: string
+      category?: string | null
       blocked?: boolean
       dependsOn?: string[]
       reason?: string
@@ -984,6 +1007,13 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
             }
           }
           applyHumanWaitingPatch(next, args)
+          // Category: an id/display name is validated against the board
+          // categories; null clears it (unclassified). Descriptive only.
+          if (args.category !== undefined) {
+            const category = asTaskCategoryReference(store.snapshot().settings, args.category)
+            if (category === undefined) delete next.category
+            else next.category = category
+          }
           if (args.permission !== undefined) next.permission = asPermission(args.permission)
           next.version = task.version + 1
           next.updatedAt = deps.now()
@@ -1554,3 +1584,4 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
 
   return disposers
 }
+

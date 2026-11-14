@@ -38,6 +38,7 @@ import {
   setTaskTone,
   toneForTask,
 } from '../src/client/board/appearance.ts'
+import { DEFAULT_COLOR_INTENSITY, DEFAULT_COLOR_MODE } from '../src/client/board/coloring.ts'
 import type { TaskRecord } from '../src/shared/protocol.ts'
 import { waitFor } from './wait-for.ts'
 
@@ -105,40 +106,50 @@ function render(element: React.ReactElement): HTMLElement {
 }
 
 describe('appearance preferences — stable, display-only, persistable', () => {
-  it('defaults to the airy density at full intensity', () => {
+  it('defaults to colour by category, balanced intensity and the airy density', () => {
     expect(DEFAULT_DENSITY).toBe('spacious')
-    expect(DEFAULT_VIBRANCY).toBe(100)
+    expect(DEFAULT_COLOR_MODE).toBe('category')
+    expect(DEFAULT_COLOR_INTENSITY).toBe('balanced')
     expect(defaultAppearance()).toEqual({
-      density: 'spacious', vibrancy: 100, descriptions: true, group: true, tones: {},
+      colorMode: 'category',
+      intensity: 'balanced',
+      density: 'spacious',
+      descriptions: true,
+      group: true,
+      tones: {},
+      projectColors: {},
+      priorityColors: {},
+      priorityNuance: true,
     })
   })
 
   it('sanitizes unknown, partial and corrupted payloads back to safe values', () => {
     expect(sanitizeAppearance(null)).toEqual(defaultAppearance())
-    expect(sanitizeAppearance({ density: 'gigantic', vibrancy: 999, descriptions: 'yes' })).toEqual({
-      ...defaultAppearance(), vibrancy: MAX_VIBRANCY,
-    })
+    expect(sanitizeAppearance({ density: 'gigantic', colorMode: 'neon', intensity: 'loud', descriptions: 'yes' })).toEqual(defaultAppearance())
     // Unknown tones are dropped, known ones kept.
     expect(sanitizeAppearance({ tones: { 't-1': 'peach', 't-2': 'neon' } }).tones).toEqual({ 't-1': 'peach' })
-    // Clamping respects the exposed range and the 5 % step.
-    expect(sanitizeAppearance({ vibrancy: 3 }).vibrancy).toBe(MIN_VIBRANCY)
-    expect(sanitizeAppearance({ vibrancy: 63 }).vibrancy).toBe(65)
+    expect(sanitizeAppearance({ projectColors: { 'ws-a': 'mint', 'ws-b': 'neon' } }).projectColors).toEqual({ 'ws-a': 'mint' })
+    // v1 migration: the old percentage maps to the nearest named preset.
+    expect(sanitizeAppearance({ vibrancy: 45 }).intensity).toBe('subtle')
+    expect(sanitizeAppearance({ vibrancy: 75 }).intensity).toBe('balanced')
+    expect(sanitizeAppearance({ vibrancy: 100 }).intensity).toBe('strong')
     // A corrupted localStorage payload never throws and never leaks.
     localStorage.setItem(APPEARANCE_KEY, '{not json')
     expect(loadAppearance()).toEqual(defaultAppearance())
   })
 
   it('persists preferences and manual tones across a reload', () => {
-    setAppearance({ density: 'compact', vibrancy: 55, descriptions: false, group: false })
+    setAppearance({ density: 'compact', colorMode: 'card', intensity: 'subtle', descriptions: false, group: false })
     setTaskTone('t-pinned', 'pink')
     const raw = JSON.parse(localStorage.getItem(APPEARANCE_KEY)!) as Record<string, unknown>
     expect(raw.density).toBe('compact')
-    expect(raw.vibrancy).toBe(55)
+    expect(raw.colorMode).toBe('card')
+    expect(raw.intensity).toBe('subtle')
     expect(raw.descriptions).toBe(false)
     expect(raw.group).toBe(false)
     expect(raw.tones).toEqual({ 't-pinned': 'pink' })
     // Simulate a full reload: module state is re-read from the same storage.
-    const expected = { density: 'compact', vibrancy: 55, descriptions: false, group: false, tones: { 't-pinned': 'pink' } }
+    const expected = { ...defaultAppearance(), density: 'compact', colorMode: 'card', intensity: 'subtle', descriptions: false, group: false, tones: { 't-pinned': 'pink' } }
     expect(sanitizeAppearance(raw)).toEqual(expected)
     reloadAppearance()
     expect(loadAppearance()).toEqual(expected)
@@ -164,7 +175,7 @@ describe('appearance preferences — stable, display-only, persistable', () => {
       expect(STYLES).toContain(`.dsh-atb-card[data-tone="${tone}"]`)
     }
     // The user intensity is a percentage mixed over the host surface.
-    expect(STYLES).toContain('color-mix(in oklab, var(--atb-card-tone')
+    expect(STYLES).toContain('color-mix(in oklab, var(--atb-card-bg')
     expect(STYLES).toContain('var(--atb-vibrancy)')
     // The historic priority stripe is gone (cards are full surfaces).
     expect(STYLES).not.toContain('.dsh-atb-card::before')
@@ -193,7 +204,11 @@ describe('card surface', () => {
     await waitFor(() => host.querySelector('.dsh-atb-card') !== null)
 
     const card = host.querySelector<HTMLElement>('.dsh-atb-card')!
-    expect(card.dataset.tone).toBe(hashTone('TB-034'))
+    // Default mode is "by category": the surface comes from the resolver, not
+    // from a palette data-tone.
+    expect(card.dataset.colorMode).toBe('category')
+    expect(card.style.getPropertyValue('--atb-card-bg')).toContain('light-dark(')
+    expect(card.style.getPropertyValue('--atb-tone-accent')).toContain('light-dark(')
     // Priority stays explicit and independent from the tone.
     expect(card.dataset.urgency).toBe('urgent')
     expect(host.querySelector('.dsh-atb-card-project')?.textContent).toBe('Ravum')
@@ -232,7 +247,7 @@ describe('card surface', () => {
   })
 
   it('honours a manual tone and hides the description when the preference says so', async () => {
-    setAppearance({ descriptions: false })
+    setAppearance({ descriptions: false, colorMode: 'card' })
     setTaskTone('TB-034', 'peach')
     const task = makeTask({ id: 'TB-034', title: 'Carte', description: 'Contexte utile.' })
     const controller = makeController([task])
@@ -256,7 +271,7 @@ describe('card surface', () => {
 
 describe('board rendering', () => {
   it('publishes the appearance preferences on the board root', async () => {
-    setAppearance({ density: 'comfortable', vibrancy: 45, descriptions: true, group: false })
+    setAppearance({ density: 'comfortable', intensity: 'subtle', descriptions: true, group: false })
     const controller = makeController([makeTask({ id: 't-1', title: 'One', status: 'todo' })])
     const host = render(React.createElement(TaskBoard, { controller }))
     controller.start()
@@ -266,6 +281,8 @@ describe('board rendering', () => {
     expect(board.dataset.atbDescriptions).toBe('true')
     expect(board.dataset.atbGroup).toBe('false')
     expect(board.style.getPropertyValue('--atb-vibrancy')).toBe('45%')
+    expect(board.dataset.atbColorMode).toBe('category')
+    expect(board.dataset.atbIntensity).toBe('subtle')
   })
 
   it('renders five columns with the project groups, and a flat list when grouping is off', async () => {
@@ -311,6 +328,7 @@ describe('board rendering', () => {
   })
 
   it('pins a tone from the detail pane and renders it on the card', async () => {
+    setAppearance({ colorMode: 'card' })
     const controller = makeController([makeTask({ id: 't-tone', title: 'Tone' })])
     const host = render(React.createElement(TaskBoard, { controller }))
     controller.start()
@@ -349,29 +367,31 @@ describe('appearance settings', () => {
     await waitFor(() => host.querySelector('#dsh-atb-settings-panel-appearance')?.hasAttribute('hidden') === false)
 
     const panel = host.querySelector<HTMLElement>('#dsh-atb-settings-panel-appearance')!
-    const densities = [...panel.querySelectorAll<HTMLButtonElement>('.dsh-atb-mode-opt')]
-    expect(densities).toHaveLength(3)
-    expect(densities.filter(button => button.dataset.on === 'true')).toHaveLength(1)
-    // Default is the airy one, selected out of the box.
-    expect(densities[2]!.dataset.on).toBe('true')
-    densities[0]!.click()
+    // Colouring mode: four modes, category selected by default.
+    const modes = [...panel.querySelectorAll<HTMLButtonElement>('.dsh-atb-colormode')]
+    expect(modes).toHaveLength(4)
+    expect(modes.map(mode => mode.dataset.on)).toEqual(['false', 'false', 'true', 'false'])
+    modes[3]!.click()
+    await waitFor(() => loadAppearance().colorMode === 'priority')
+
+    // Intensity: three named presets, balanced by default.
+    const intensityButtons = [...panel.querySelectorAll<HTMLButtonElement>('[data-picker="intensity"] .dsh-atb-mode-opt')]
+    expect(intensityButtons).toHaveLength(3)
+    expect(intensityButtons.map(button => button.dataset.on)).toEqual(['false', 'true', 'false'])
+    intensityButtons[0]!.click()
+    await waitFor(() => loadAppearance().intensity === 'subtle')
+
+    // Density is still available.
+    const densityButtons = [...panel.querySelectorAll<HTMLButtonElement>('[data-picker="density"] .dsh-atb-mode-opt')]
+    expect(densityButtons).toHaveLength(3)
+    densityButtons[0]!.click()
     await waitFor(() => loadAppearance().density === 'compact')
 
-    const range = panel.querySelector<HTMLInputElement>('input[type=range]')!
-    expect(range.min).toBe(String(MIN_VIBRANCY))
-    expect(range.max).toBe(String(MAX_VIBRANCY))
-    // React tracks input.value on the instance: go through the prototype
-    // setter so the change is observed (native-event parity, not a shortcut).
-    const nativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-    nativeValue.call(range, '40')
-    range.dispatchEvent(new Event('input', { bubbles: true }))
-    await waitFor(() => loadAppearance().vibrancy === 40)
-
     const switches = [...panel.querySelectorAll<HTMLInputElement>('.dsh-atb-switch input[type=checkbox]')]
-    expect(switches).toHaveLength(2)
-    switches[0]!.click()
-    await waitFor(() => loadAppearance().descriptions === false)
+    expect(switches).toHaveLength(3) // priority nuance + descriptions + grouping
     switches[1]!.click()
+    await waitFor(() => loadAppearance().descriptions === false)
+    switches[2]!.click()
     await waitFor(() => loadAppearance().group === false)
 
     // Display preferences never go through the ledger settings route.
@@ -392,6 +412,9 @@ describe('appearance settings', () => {
     await waitFor(() => host.querySelector('[role=tabpanel]') !== null)
     host.querySelector<HTMLButtonElement>('#dsh-atb-settings-tab-appearance')!.click()
     await waitFor(() => host.querySelector('#dsh-atb-settings-panel-appearance')?.hasAttribute('hidden') === false)
+    // Manual tones are edited in "by card" mode; switch there first.
+    ;[...host.querySelectorAll<HTMLButtonElement>('.dsh-atb-colormode')][0]!.click()
+    await waitFor(() => loadAppearance().colorMode === 'card')
     const panel = host.querySelector<HTMLElement>('#dsh-atb-settings-panel-appearance')!
     const reset = [...panel.querySelectorAll<HTMLButtonElement>('button')]
       .find(button => button.textContent?.includes('Restore automatic colours'))!
@@ -413,4 +436,7 @@ describe('detail pane', () => {
     expect(auto.getAttribute('aria-pressed')).toBe('true')
   })
 })
+
+
+
 
