@@ -949,6 +949,16 @@ export const zh = {
   "form.category.label": "类别",
   "form.category.none": "常规 / 未分类",
   "form.category.hint": "类别用于「按类别」着色模式，不影响执行或审批。",
+  "board.category.hint.title": "尚无分类任务",
+  "board.category.hint.body": "{n} 个任务未分类：按类别模式会显示中性颜色。一次性自动分类，或改用其它模式。",
+  "board.category.hint.classify": "自动分类现有任务",
+  "board.category.hint.classifying": "分类中… {done}/{total}",
+  "board.category.hint.usePriority": "按优先级显示",
+  "classification.result": "已分类 {classified} 个任务（失败 {failed} 个）。",
+  "classification.none": "没有可自动分类的任务。",
+  "set.color.classify.count": "已分类 {classified}/{total} 个任务",
+  "set.color.classify.action": "分类现有任务",
+  "set.color.classify.hint": "根据外部标签映射和标题/描述关键词一次性分类。已设置类别的任务永不覆盖；分类可通过表单修改。",
 } as const
 
 /** The dictionary shape en.ts must match key-for-key. */

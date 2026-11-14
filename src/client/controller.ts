@@ -572,8 +572,35 @@ export class BoardController {
     }
   }
 
-  /** Retry session archiving without repeating the task's terminal transition. */
-  async retryArchiveSessions(id: string): Promise<void> {
+  /**
+   * Classify many existing tasks in one pass (explicit migration): the
+   * validated per-task update route is reused, so versions, archived tasks and
+   * category validation still apply — but the board is refreshed ONCE at the
+   * end instead of after every write (a 400-task board must not trigger 400
+   * reconciliations). A failing entry is counted, never retried.
+   */
+  async classifyTasks(entries: ReadonlyArray<{ id: string; ifVersion: number; category: string }>): Promise<{ classified: number; failed: number }> {
+    let classified = 0
+    let failed = 0
+    const queue = [...entries]
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const entry = queue.shift()
+        if (entry === undefined) return
+        try {
+          await this.client.update(entry.id, { ifVersion: entry.ifVersion, category: entry.category })
+          classified += 1
+        } catch {
+          failed += 1
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(8, queue.length) }, worker))
+    if (entries.length > 0) await this.refresh()
+    return { classified, failed }
+  }
+
+  /** Retry session archiving without repeating the task's terminal transition. */  async retryArchiveSessions(id: string): Promise<void> {
     try {
       if (this.client.archiveSessions === undefined) return
       const result = await this.client.archiveSessions(id)

@@ -128,7 +128,29 @@ peach `#4a3a33`, pink `#4b3443`, ink `#323c4f`, yellow `#49412e`, lavender `#3b3
   malformée ; les synchronisations externes appliquent le mapping **une seule fois** à la
   création d'une carte (jamais de reclassement, jamais d'écrasement d'un choix explicite).
 
-### 4.2 Préférences d'affichage (locales)
+### 4.2 Tâches historiques : pourquoi tout est gris, et que faire
+
+Le mode par défaut est « par catégorie ». Or les tâches existantes n'ont **aucune**
+catégorie (elles sont toutes « Général / Non classé »), et le neutre est la couleur
+documentée de ce bac — un board monochrome est donc le comportement attendu tant que rien
+n'est classé, pas un bug d'affichage. Pour éviter l'impression que « les couleurs ne
+fonctionnent pas », deux garde-fous ont été ajoutés :
+
+1. **Bandeau explicatif sur le board** quand le mode « par catégorie » est actif et que
+   zéro tâche n'est classée : il explique le neutre, propose **Classer automatiquement les
+   tâches existantes** (un clic) et **Coloriage par priorité** (immédiat).
+2. **Bouton équivalent dans Réglages → Apparence → Catégorie**, avec le compteur
+   `classées/total` et le résultat de l'opération.
+
+La classification (`src/client/board/classify.ts`) est **explicite, déterministe et
+réversible** : d'abord le mapping de libellés externes (comme à l'import), sinon une
+liste documentée de mots-clés (sécurité, bug, tests, documentation, design, performance,
+infrastructure, recherche, maintenance, développement), sur le titre + la description.
+Elle ne touche **jamais** une tâche déjà classée ni une tâche supprimée, ne s'exécute pas
+implicitement au rendu, et écrit via la route de mise à jour versionnée (une seule
+réconciliation du board en fin de lot, requêtes parallélisées par 8).
+
+### 4.3 Préférences d'affichage (locales)
 
 `localStorage` clé `dsh-taskboard-appearance-v2` : `colorMode`, `intensity`, `density`,
 `descriptions`, `group`, `tones` (par carte), `projectColors` (par projet),
@@ -165,6 +187,12 @@ contrôles**, captures desktop sombre/clair, détail, mobile 390×844, backlog d
 quatre modes, comparaison camaïeu on/off, écrans Apparence, et comparaison numérique avec
 la maquette (géométrie/typographie/densités/palette). Voir
 [`visual-report.md`](visual-report.md).
+
+Validation dédiée de la migration des tâches historiques (hôte réel, 10 tâches sans
+catégorie) : bandeau affiché → un clic → 10 tâches classées dans 9 catégories, 9 surfaces
+distinctes, bandeau disparu. Captures :
+[`captures/classification-before.png`](captures/classification-before.png) /
+[`captures/classification-after.png`](captures/classification-after.png).
 
 Reproduire :
 

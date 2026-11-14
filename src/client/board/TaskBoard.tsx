@@ -26,7 +26,8 @@ import { useAlert } from './AlertModal.tsx'
 import { Select } from './Select.tsx'
 import { resolveWorkspaceName as resolveWorkspaceNameBase } from './project-label.ts'
 import { useAppearance, setAppearance, vibrancyOf } from './appearance.ts'
-import { categoriesOf } from '../../shared/protocol.ts'
+import { runClassification } from './classify.ts'
+import { categoriesOf, categoryLabelMapOf } from '../../shared/protocol.ts'
 
 /** Sentinel category filter for the "unclassified" bucket. */
 const UNCLASSIFIED_FILTER = '\u0000unclassified'
@@ -174,6 +175,31 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
   const allLive = filterTasks(state, state.ledger.tasks.filter(t => t.trashedAt === undefined))
   const needsHumanCount = allLive.filter(task => humanWaiting(task).needs).length
   const live = onlyNeedsHuman ? allLive.filter(task => humanWaiting(task).needs) : allLive
+  // "Colour by category" is only meaningful once tasks have categories. On a
+  // board whose tasks are all unclassified the surfaces are neutral by design,
+  // which reads as "everything is grey": offer the explicit migration instead
+  // of silently reclassifying anything.
+  const categorizedCount = allLive.filter(task => task.category !== undefined).length
+  const [classifyProgress, setClassifyProgress] = useState<{ done: number; total: number } | undefined>()
+  const classifyExisting = (): void => {
+    if (classifyProgress !== undefined) return
+    setClassifyProgress({ done: 0, total: 0 })
+    void runClassification(controller, {
+      categories: categoriesOf(controller.getSnapshot().ledger.settings),
+      labelMap: categoryLabelMapOf(controller.getSnapshot().ledger.settings),
+      onProgress: (done, total) => setClassifyProgress({ done, total }),
+    }).then(result => {
+      setClassifyProgress(undefined)
+      if (result.classified === 0 && result.failed === 0) {
+        showAlert(t('classification.none'))
+        return
+      }
+      showAlert(t('classification.result', { classified: result.classified, failed: result.failed }))
+    }).catch(error => {
+      setClassifyProgress(undefined)
+      showAlert(error instanceof Error ? error.message : String(error))
+    })
+  }
   const selected = state.selectedId === undefined ? undefined : state.ledger.tasks.find(t => t.id === state.selectedId)
   const detailPanelRef = useRef<HTMLDivElement>(null)
 
@@ -421,6 +447,32 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
       </div>
 
       {state.error !== undefined && <div className="dsh-atb-error">{state.error}</div>}
+
+      {!state.secondaryOpen && appearance.colorMode === 'category' && allLive.length > 0 && categorizedCount === 0 && (
+        <div className="dsh-atb-classifyhint" role="status">
+          <Icon name="checklist" size={16} />
+          <div className="dsh-atb-classifyhint-text">
+            <span className="dsh-atb-classifyhint-title">{t('board.category.hint.title')}</span>
+            <span className="dsh-atb-classifyhint-body">{t('board.category.hint.body', { n: allLive.length })}</span>
+          </div>
+          <span className="dsh-atb-classifyhint-actions">
+            <button
+              type="button"
+              className="dsh-atb-btn"
+              data-primary="true"
+              disabled={classifyProgress !== undefined}
+              onClick={classifyExisting}
+            >
+              {classifyProgress === undefined
+                ? t('board.category.hint.classify')
+                : t('board.category.hint.classifying', { done: classifyProgress.done, total: classifyProgress.total })}
+            </button>
+            <button type="button" className="dsh-atb-btn" onClick={() => setAppearance({ colorMode: 'priority' })}>
+              {t('board.category.hint.usePriority')}
+            </button>
+          </span>
+        </div>
+      )}
 
       {state.secondaryOpen
         ? <SecondaryTab controller={controller} tasks={filterTasks(state, state.ledger.tasks)} />
@@ -1022,3 +1074,4 @@ function SecondaryTab({ controller, tasks }: { controller: BoardController; task
     </div>
   )
 }
+

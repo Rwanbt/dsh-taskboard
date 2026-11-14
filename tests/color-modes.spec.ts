@@ -61,6 +61,7 @@ import {
 } from '../src/shared/protocol.ts'
 import { registerTaskboardTools, type WorkspaceFace } from '../src/host/tools.ts'
 import { TaskStore } from '../src/host/store.ts'
+import { classifyTask, matchesKeyword, planClassification } from '../src/client/board/classify.ts'
 
 /** Preferences with sane defaults for a resolver call. */
 function prefs(patch: Partial<ColorPreferences> = {}): ColorPreferences {
@@ -292,6 +293,60 @@ describe('categories — user data, validation and fallbacks', () => {
     const stale = asCategoryLabelMap({ bug: 'deleted-category' }, categories)
     expect(stale.bug).toBe(DEFAULT_CATEGORY_LABEL_MAP.bug)
     expect(asCategoryLabelMap({ bug: 'deleted-category' }, [])).toEqual(expect.objectContaining({ bug: 'bug' }))
+  })
+})
+
+describe('historical classification (explicit migration)', () => {
+  const labelMap = asCategoryLabelMap(undefined, categories)
+  const base = { description: '', external: undefined as TaskRecord['external'] }
+
+  it('prefers the remote label mapping over the keywords', () => {
+    const withLabels = {
+      ...base,
+      title: 'Documentation for the parser bug',
+      external: { connectionId: 'c1', provider: 'github', item: { id: '1', labels: ['bug'] }, syncedAt: 0, conflicts: [] } as never,
+    }
+    expect(classifyTask(withLabels, categories, labelMap)).toBe('bug')
+  })
+
+  it('classifies by deterministic keywords (accents and English included)', () => {
+    expect(classifyTask({ ...base, title: 'Corriger la régression du parseur' }, categories, labelMap)).toBe('bug')
+    expect(classifyTask({ ...base, title: 'Write the README and ADR' }, categories, labelMap)).toBe('documentation')
+    expect(classifyTask({ ...base, title: 'Ajouter des tests e2e' }, categories, labelMap)).toBe('tests')
+    expect(classifyTask({ ...base, title: 'Audit de sécurité et secrets' }, categories, labelMap)).toBe('security')
+    expect(classifyTask({ ...base, title: 'Pipeline CI et déploiement Docker' }, categories, labelMap)).toBe('infrastructure')
+    expect(classifyTask({ ...base, title: 'Spike de recherche sur le cache' }, categories, labelMap)).toBe('research')
+    expect(classifyTask({ ...base, title: 'Refactor du hook de synchronisation' }, categories, labelMap)).toBe('maintenance')
+    expect(classifyTask({ ...base, title: 'Implémenter la feature de tri' }, categories, labelMap)).toBe('development')
+    // No signal: stays unclassified (neutral bucket), never guessed.
+    expect(classifyTask({ ...base, title: 'RV-001' }, categories, labelMap)).toBeUndefined()
+    // Word matching is token-based: "ui" does not match "build".
+    expect(matchesKeyword('build pipeline', 'ui')).toBe(false)
+    expect(matchesKeyword('ui tweaks', 'ui')).toBe(true)
+    expect(matchesKeyword('corriger', 'corrige')).toBe(true)
+  })
+
+  it('never touches a classified or trashed task, and is deterministic', () => {
+    const task = (id: string, title: string, patch: Partial<TaskRecord> = {}) => ({
+      id, title, description: '', prompt: '', workspaceId: 'ws-a', urgency: 'normal' as const, status: 'todo' as const,
+      blocked: false, execution: { mode: 'claim' as const }, version: 1, createdAt: 1, updatedAt: 1,
+      createdBy: { kind: 'user' as const }, updatedBy: { kind: 'user' as const }, comments: [], executions: [],
+      ...patch,
+    })
+    const tasks = [
+      task('t-1', 'Fix the bug'),
+      task('t-2', 'Fix the bug', { category: 'design' }),
+      task('t-3', 'Trash me', { trashedAt: 5 }),
+      task('t-4', 'Untitled'),
+    ]
+    const first = planClassification(tasks, categories, labelMap)
+    const second = planClassification(tasks, categories, labelMap)
+    expect(first).toEqual(second)
+    expect(first.map(entry => entry.id)).toEqual(['t-1'])
+    expect(first[0]).toMatchObject({ category: 'bug', version: 1 })
+    // A category deleted from the board is never assigned.
+    const withoutBug = categories.filter(category => category.id !== 'bug')
+    expect(planClassification(tasks, withoutBug, labelMap).some(entry => entry.category === 'bug')).toBe(false)
   })
 })
 

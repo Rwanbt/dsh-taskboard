@@ -1830,6 +1830,21 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
 .dsh-atb-preview-card .dsh-atb-card-divider { margin: 9px 0 7px; }
 .dsh-atb-preview-card .dsh-atb-card-category-name { max-width: 60%; }
 
+/* Colouring-by-category is meaningful only once tasks are classified: on an
+   all-unclassified board the surfaces are neutral by design, so explain it and
+   offer the explicit one-time migration instead of guessing. */
+.dsh-atb-classifyhint {
+  display: flex; align-items: center; gap: 11px; flex-wrap: wrap;
+  padding: 11px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--atb-accent) 8%, var(--atb-hover));
+  color: var(--atb-text-2); border: 1px solid var(--atb-border);
+}
+.dsh-atb-classifyhint > .dsh-atb-icon { color: var(--atb-accent); flex: none; }
+.dsh-atb-classifyhint-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 260px; }
+.dsh-atb-classifyhint-title { font-size: 12px; font-weight: 680; color: var(--atb-text); }
+.dsh-atb-classifyhint-body { font-size: 11px; line-height: 1.45; }
+.dsh-atb-classifyhint-actions { display: inline-flex; gap: 7px; flex-wrap: wrap; }
+
 /* Responsive: five readable columns first, then a snap-scrolled column
    carousel with an explicit column navigation bar. */
 @media (max-width: 1180px) {

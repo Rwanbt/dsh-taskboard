@@ -17,6 +17,7 @@ import { localeStore, setLocalePreference, useT, type LocalePreference, type Tra
 import { Icon } from './Icon.tsx'
 import { CategoryManager } from './CategoryManager.tsx'
 import { ColorModePreview } from './ColorPreview.tsx'
+import { runClassification } from './classify.ts'
 import { URGENCY_KEYS } from './labels.ts'
 import {
   DENSITIES,
@@ -117,6 +118,29 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
   const [labelMapDraft, setLabelMapDraft] = useState(() => formatLabelMap(categoryLabelMap))
   const [labelMapError, setLabelMapError] = useState<string | undefined>()
   const [priorityError, setPriorityError] = useState<string | undefined>()
+  const [classifyProgress, setClassifyProgress] = useState<{ done: number; total: number } | undefined>()
+
+  /** Run the explicit migration of unclassified historical tasks. */
+  const classifyExisting = (): void => {
+    if (classifyProgress !== undefined) return
+    setClassifyProgress({ done: 0, total: 0 })
+    void runClassification(controller, {
+      categories: categoriesOf(controller.getSnapshot().ledger.settings),
+      labelMap: categoryLabelMapOf(controller.getSnapshot().ledger.settings),
+      onProgress: (done, total) => setClassifyProgress({ done, total }),
+    }).then(result => {
+      setClassifyProgress(undefined)
+      setClassificationResult(
+        result.classified === 0 && result.failed === 0
+          ? t('classification.none')
+          : t('classification.result', { classified: result.classified, failed: result.failed }),
+      )
+    }).catch(error => {
+      setClassifyProgress(undefined)
+      setClassificationResult(error instanceof Error ? error.message : String(error))
+    })
+  }
+  const [classificationResult, setClassificationResult] = useState<string | undefined>()
 
   /** Merge one settings patch over the current settings and persist it. */
   const persistSettings = (patch: Partial<BoardSettings>): void => {
@@ -757,6 +781,24 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
               <div className="dsh-atb-setting">
                 <span className="dsh-atb-setting-label">{t('set.color.category.heading')}</span>
                 <CategoryManager categories={categories} onChange={next => persistSettings({ categories: next })} />
+                <div className="dsh-atb-setting-actions">
+                  <span className="dsh-atb-setting-value">
+                    {t('set.color.classify.count', { classified: state.ledger.tasks.filter(task => task.category !== undefined).length, total: state.ledger.tasks.filter(task => task.trashedAt === undefined).length })}
+                  </span>
+                  <button
+                    type="button"
+                    className="dsh-atb-btn"
+                    data-primary="true"
+                    disabled={classifyProgress !== undefined}
+                    onClick={classifyExisting}
+                  >
+                    {classifyProgress === undefined
+                      ? t('set.color.classify.action')
+                      : t('board.category.hint.classifying', { done: classifyProgress.done, total: classifyProgress.total })}
+                  </button>
+                </div>
+                <p className="dsh-atb-setting-hint">{t('set.color.classify.hint')}</p>
+                {classificationResult !== undefined && <p className="dsh-atb-setting-hint" role="status">{classificationResult}</p>}
               </div>
             )}
 

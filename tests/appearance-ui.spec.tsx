@@ -312,8 +312,7 @@ describe('board rendering', () => {
     expect(buttons.map(button => button.getAttribute('data-status'))).toEqual(['backlog', 'todo', 'in_progress', 'in_review', 'done'])
   })
 
-  it('does not mutate the host document (theme, attributes or body style)', async () => {
-    const htmlAttributes = document.documentElement.getAttributeNames().sort()
+  it('does not mutate the host document (theme, attributes or body style)', async () => {    const htmlAttributes = document.documentElement.getAttributeNames().sort()
     const bodyAttributes = document.body.getAttributeNames().sort()
     const bodyStyle = document.body.getAttribute('style')
     const controller = makeController([makeTask({ id: 't-1', title: 'One' })])
@@ -348,8 +347,57 @@ describe('board rendering', () => {
   })
 })
 
-describe('appearance settings', () => {
-  it('applies density, intensity and switches immediately, without a ledger write', async () => {
+describe('board classification hint', () => {
+  it('offers the explicit one-time classification on an all-unclassified board', async () => {
+    // Historical boards have no category: "by category" is neutral by design,
+    // so the board must explain it and offer the migration (never guess).
+    const tasks = [
+      makeTask({ id: 't-bug', title: 'Fix the parser bug', description: 'A regression appears.' }),
+      makeTask({ id: 't-doc', title: 'Documentation for the board', description: '' }),
+      makeTask({ id: 't-misc', title: 'Something unrelated', description: '' }),
+    ]
+    const updates: Array<{ id: string; category?: string }> = []
+    const controller = new BoardController({
+      state: async () => ({ schemaVersion: 1, revision: 1, tasks }),
+      workspaces: async () => [{ id: 'ws-a', title: 'Ravum' }],
+      templates: async () => ({ templates: [] }),
+      stream: () => () => {},
+      update: async (id: string, body: { category?: string }) => {
+        const task = tasks.find(entry => entry.id === id)!
+        task.category = body.category
+        task.version += 1
+        updates.push({ id, category: body.category })
+        return { ok: true }
+      },
+    } as never)
+    cleanups.push(() => controller.dispose())
+    const host = render(React.createElement(TaskBoard, { controller }))
+    controller.start()
+    await waitFor(() => host.querySelector('.dsh-atb-board') !== null)
+    const hint = host.querySelector<HTMLElement>('.dsh-atb-classifyhint')!
+    expect(hint).not.toBeNull()
+    expect(hint.textContent).toContain('unclassified')
+    // The secondary action switches to priority colouring immediately.
+    const [, priorityButton] = [...hint.querySelectorAll<HTMLButtonElement>('button')]
+    priorityButton!.click()
+    await waitFor(() => loadAppearance().colorMode === 'priority')
+    setAppearance({ colorMode: 'category' })
+    await waitFor(() => host.querySelector('.dsh-atb-classifyhint') !== null)
+    // The primary action applies the documented classifier through the
+    // versioned update route, then the hint disappears once tasks are classified.
+    host.querySelector<HTMLButtonElement>('.dsh-atb-classifyhint button')!.click()
+    await waitFor(() => tasks.some(task => task.category !== undefined))
+    expect(updates).toEqual(expect.arrayContaining([
+      { id: 't-bug', category: 'bug' },
+      { id: 't-doc', category: 'documentation' },
+    ]))
+    // An unrelated task stays unclassified; the hint therefore stays visible
+    // (it disappears only when the whole board is classified).
+    await waitFor(() => host.textContent?.includes('Classified') === true || host.querySelector('.dsh-atb-classifyhint') !== null)
+  })
+})
+
+describe('appearance settings', () => {  it('applies density, intensity and switches immediately, without a ledger write', async () => {
     const updated: unknown[] = []
     const controller = {
       getSnapshot: () => ({ ledger: { tasks: [], settings: {} } }),
@@ -396,6 +444,42 @@ describe('appearance settings', () => {
 
     // Display preferences never go through the ledger settings route.
     expect(updated).toEqual([])
+  })
+
+  it('classifies existing tasks from the category panel and reports the outcome', async () => {
+    const tasks = [
+      makeTask({ id: 't-bug', title: 'Fix the parser bug' }),
+      makeTask({ id: 't-doc', title: 'Documentation for the board' }),
+      makeTask({ id: 't-none', title: 'Nothing to see' }),
+    ]
+    const batches: Array<ReadonlyArray<{ id: string; category: string }>> = []
+    const controller = {
+      getSnapshot: () => ({ ledger: { tasks, settings: {} } }),
+      fetchModelCatalog: async () => [],
+      fetchPresetCatalog: async () => ({ presets: [] }),
+      closeSettings: () => {},
+      updateSettings: async () => true,
+      classifyTasks: async (entries: ReadonlyArray<{ id: string; category: string }>) => {
+        batches.push(entries)
+        return { classified: entries.length, failed: 0 }
+      },
+    } as unknown as BoardController
+    const host = render(React.createElement(SettingsModal, { controller }))
+    await waitFor(() => host.querySelector('[role=tabpanel]') !== null)
+    host.querySelector<HTMLButtonElement>('#dsh-atb-settings-tab-appearance')!.click()
+    await waitFor(() => host.querySelector('#dsh-atb-settings-panel-appearance')?.hasAttribute('hidden') === false)
+
+    const panel = host.querySelector<HTMLElement>('#dsh-atb-settings-panel-appearance')!
+    const classify = [...panel.querySelectorAll<HTMLButtonElement>('button')]
+      .find(button => button.textContent?.includes('Classify existing tasks'))!
+    expect(classify).toBeDefined()
+    classify.click()
+    await waitFor(() => batches.length === 1)
+    expect(batches[0]).toEqual(expect.arrayContaining([
+      { id: 't-bug', ifVersion: 1, category: 'bug' },
+      { id: 't-doc', ifVersion: 1, category: 'documentation' },
+    ]))
+    await waitFor(() => host.textContent?.includes('Classified 2 task(s)') === true)
   })
 
   it('restores automatic colours from the appearance panel', async () => {
