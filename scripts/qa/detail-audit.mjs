@@ -230,6 +230,10 @@ const measure = () => page.evaluate(() => {
   const detail = document.querySelector('.dsh-atb-detail')
   const checklist = document.querySelector('.dsh-atb-fieldcard[data-kind="checklist"]')
   const items = [...document.querySelectorAll('.dsh-atb-cl-item')]
+  const scrollable = detail !== null && detail.scrollHeight > detail.clientHeight + 1
+  const checklistTopInView = detail !== null && checklist !== null
+    ? Math.round(checklist.getBoundingClientRect().top - detail.getBoundingClientRect().top)
+    : null
   const lineHeightOf = text => {
     const lh = parseFloat(getComputedStyle(text).lineHeight)
     if (Number.isFinite(lh)) return lh
@@ -239,6 +243,15 @@ const measure = () => page.evaluate(() => {
     status: document.querySelector('.dsh-atb-badge[data-kind="status"], .dsh-atb-card[data-selected]') !== null ? 'selected' : null,
     panel: rect(panel), detail: rect(detail),
     checklist: { rect: rect(checklist), style: box(checklist), label: checklist?.querySelector('.dsh-atb-fieldcard-label')?.textContent?.slice(0, 40) ?? null },
+    drawer: detail === null ? null : {
+      clientHeight: detail.clientHeight,
+      scrollHeight: detail.scrollHeight,
+      scrollTop: Math.round(detail.scrollTop),
+      scrollable,
+      // Where the checklist block starts inside the drawer viewport.
+      checklistTopInView,
+      blockCount: detail.children.length,
+    },
     items: items.map(item => {
       const text = item.querySelector('.dsh-atb-cl-text')
       const meta = item.querySelector('.dsh-atb-cl-meta')
@@ -266,8 +279,52 @@ async function shoot(prefix) {
 }
 
 const audit = { portrait: await measure() }
+console.log('drawer:', JSON.stringify(audit.portrait.drawer))
 await shoot('portrait')
+// Can the user actually reach the checklist? Scroll the drawer to its end and
+// measure again: an unreachable block is the real "not visible" failure.
+await page.evaluate(() => {
+  const detail = document.querySelector('.dsh-atb-detail')
+  if (detail !== null) detail.scrollTop = detail.scrollHeight
+})
+await sleep(600)
+audit.portraitScrolled = await measure()
+console.log('scrolled:', JSON.stringify(audit.portraitScrolled.checklist.rect), JSON.stringify(audit.portraitScrolled.drawer))
+await shoot('portrait-scrolled')
 console.log('portrait:', JSON.stringify(audit.portrait.items.map(item => ({ text: item.text.rect, meta: item.meta.rect, lines: item.lines, chars: item.charsPerLine }))))
+
+// Phone shapes: is the checklist visible without scrolling on each one?
+audit.shapes = {}
+for (const shape of [
+  { name: '390x844', width: 390, height: 844 },
+  { name: '360x640', width: 360, height: 640 },
+  { name: '412x915', width: 412, height: 915 },
+  { name: '844x390', width: 844, height: 390 },
+]) {
+  await page.setViewport({ width: shape.width, height: shape.height, deviceScaleFactor: 2 })
+  await sleep(900)
+  await page.evaluate(() => {
+    const detail = document.querySelector('.dsh-atb-detail')
+    if (detail !== null) detail.scrollTop = 0
+  })
+  await sleep(300)
+  const measured = await measure()
+  const panel = measured.panel
+  const drawer = measured.drawer
+  audit.shapes[shape.name] = {
+    focus: await page.evaluate(() => document.querySelector('.dsh-atb-board')?.getAttribute('data-atb-focus') ?? null),
+    panel,
+    drawer,
+    checklistRect: measured.checklist.rect,
+    // Positive = the block starts below the drawer's visible area.
+    belowFoldBy: panel === null || measured.checklist.rect === null
+      ? null
+      : Math.round(measured.checklist.rect.y - (panel.y + Math.min(panel.h, drawer?.clientHeight ?? panel.h))),
+  }
+  console.log('shape', shape.name, JSON.stringify(audit.shapes[shape.name]))
+}
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 })
+await sleep(600)
 
 // Desktop pass: the same task, five-column layout, to prove the fix left the
 // wide layout untouched.

@@ -225,6 +225,26 @@ still resolves to exactly 280 px on a 1048 px row. Pinned by
 `tests/checklist-layout.spec.ts` (the CSS determinants) and by
 `scripts/qa/detail-audit.mjs` (the real geometry, portrait + desktop).
 
+### 4.4 Fixed on the way: the checklist fell below the sheet
+
+Follow-up report: "the acceptance checklist is no longer visible on my phone".
+Measured with `detail-audit.mjs` on a task that has a checklist, the block was
+*rendered* but the drawer only shows its first ~270–709 px, and the checklist sat
+**after** the execution report — so on a small portrait phone or in landscape it
+started below the visible sheet:
+
+| Shape | Before the reorder | After |
+| --- | --- | --- |
+| 390×844 portrait | 137 px above the fold | 432 px above |
+| 360×640 portrait | **58 px below the fold** | 237 px above |
+| 412×915 portrait | 224 px above | 519 px above |
+| 844×390 landscape | **124 px below the fold** | 86 px above |
+
+Fix: in the review/done section (and in the fallback branch) the **acceptance
+checklist now comes before the execution report** — it is the gate the reader
+opens the task for, and the report can be long. Nothing is hidden or collapsed:
+the sheet still scrolls, the block is simply on screen in every phone shape.
+
 ### 4.4 Honest limits
 
 * Synthetic touch **scrolling** cannot be produced in this headless Chromium

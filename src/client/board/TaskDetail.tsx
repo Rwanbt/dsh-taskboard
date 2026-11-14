@@ -1037,6 +1037,10 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
 
       {(isReviewOrDone || hasReport) && (
         <>
+          {/* The acceptance checklist comes before the execution report: it is
+              the gate the reader opens the task for, and on a phone the drawer
+              is short enough that anything below the report starts off-screen. */}
+          <ChecklistBlock task={task} controller={controller} />
           <ReportBlock task={task} />
           {task.executions.slice(0, -1).some(e => e.report !== undefined) && (
             <details className="dsh-atb-fieldcard" data-kind="report-history">
@@ -1046,7 +1050,6 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
               ))}
             </details>
           )}
-          <ChecklistBlock task={task} controller={controller} />
         </>
       )}
 
@@ -1070,8 +1073,8 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
 
       {!isReviewOrDone && !hasReport && (
         <>
-          <ReportBlock task={task} />
           <ChecklistBlock task={task} controller={controller} />
+          <ReportBlock task={task} />
         </>
       )}
 

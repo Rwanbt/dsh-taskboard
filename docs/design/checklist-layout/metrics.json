@@ -16,9 +16,9 @@
     "checklist": {
       "rect": {
         "x": 17,
-        "y": 684,
+        "y": 389,
         "w": 356,
-        "h": 165
+        "h": 180
       },
       "style": {
         "display": "flex",
@@ -37,18 +37,26 @@
       },
       "label": "Liste de contrôle d’acceptation (DoD) 1/"
     },
+    "drawer": {
+      "clientHeight": 709,
+      "scrollHeight": 1284,
+      "scrollTop": 0,
+      "scrollable": true,
+      "checklistTopInView": 266,
+      "blockCount": 9
+    },
     "items": [
       {
         "rect": {
           "x": 32,
-          "y": 717,
+          "y": 437,
           "w": 326,
           "h": 65
         },
         "text": {
           "rect": {
             "x": 71,
-            "y": 727,
+            "y": 447,
             "w": 139,
             "h": 48
           },
@@ -72,7 +80,7 @@
         "meta": {
           "rect": {
             "x": 219,
-            "y": 728,
+            "y": 448,
             "w": 129,
             "h": 44
           },
@@ -99,14 +107,14 @@
       {
         "rect": {
           "x": 32,
-          "y": 787,
+          "y": 507,
           "w": 326,
           "h": 49
         },
         "text": {
           "rect": {
             "x": 71,
-            "y": 797,
+            "y": 517,
             "w": 218,
             "h": 32
           },
@@ -130,7 +138,7 @@
         "meta": {
           "rect": {
             "x": 298,
-            "y": 799,
+            "y": 519,
             "w": 50,
             "h": 14
           },
@@ -161,6 +169,274 @@
       "h": 844
     }
   },
+  "portraitScrolled": {
+    "status": null,
+    "panel": {
+      "x": 0,
+      "y": 112,
+      "w": 390,
+      "h": 732
+    },
+    "detail": {
+      "x": 15,
+      "y": 123,
+      "w": 360,
+      "h": 709
+    },
+    "checklist": {
+      "rect": {
+        "x": 17,
+        "y": -186,
+        "w": 356,
+        "h": 180
+      },
+      "style": {
+        "display": "flex",
+        "width": "326px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "normal",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "label": "Liste de contrôle d’acceptation (DoD) 1/"
+    },
+    "drawer": {
+      "clientHeight": 709,
+      "scrollHeight": 1284,
+      "scrollTop": 575,
+      "scrollable": true,
+      "checklistTopInView": -309,
+      "blockCount": 9
+    },
+    "items": [
+      {
+        "rect": {
+          "x": 32,
+          "y": -138,
+          "w": 326,
+          "h": 65
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": -128,
+            "w": 139,
+            "h": 48
+          },
+          "style": {
+            "display": "block",
+            "width": "139.484px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Vérifier la grille responsive sur un petit écran de téléphone"
+        },
+        "meta": {
+          "rect": {
+            "x": 219,
+            "y": -127,
+            "w": 129,
+            "h": 44
+          },
+          "style": {
+            "display": "flex",
+            "width": "128.516px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": " agent-01 · Preuve : preuve très longue qui décrit en détail la vérification effectuée sur"
+        },
+        "lines": 3,
+        "charsPerLine": 20.3
+      },
+      {
+        "rect": {
+          "x": 32,
+          "y": -68,
+          "w": 326,
+          "h": 49
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": -58,
+            "w": 218,
+            "h": 32
+          },
+          "style": {
+            "display": "block",
+            "width": "217.875px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Confirmer la lisibilité du compteur intégré"
+        },
+        "meta": {
+          "rect": {
+            "x": 298,
+            "y": -56,
+            "w": 50,
+            "h": 14
+          },
+          "style": {
+            "display": "flex",
+            "width": "50.125px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Non coché"
+        },
+        "lines": 2,
+        "charsPerLine": 21.5
+      }
+    ],
+    "panelOverflowX": 0,
+    "viewport": {
+      "w": 390,
+      "h": 844
+    }
+  },
+  "shapes": {
+    "390x844": {
+      "focus": "portrait",
+      "panel": {
+        "x": 0,
+        "y": 112,
+        "w": 390,
+        "h": 732
+      },
+      "drawer": {
+        "clientHeight": 709,
+        "scrollHeight": 1284,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 266,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 17,
+        "y": 389,
+        "w": 356,
+        "h": 180
+      },
+      "belowFoldBy": -432
+    },
+    "360x640": {
+      "focus": "portrait",
+      "panel": {
+        "x": 0,
+        "y": 79,
+        "w": 360,
+        "h": 561
+      },
+      "drawer": {
+        "clientHeight": 538,
+        "scrollHeight": 1323,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 289,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 17,
+        "y": 380,
+        "w": 326,
+        "h": 196
+      },
+      "belowFoldBy": -237
+    },
+    "412x915": {
+      "focus": "portrait",
+      "panel": {
+        "x": 0,
+        "y": 123,
+        "w": 412,
+        "h": 792
+      },
+      "drawer": {
+        "clientHeight": 769,
+        "scrollHeight": 1240,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 238,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 17,
+        "y": 373,
+        "w": 378,
+        "h": 164
+      },
+      "belowFoldBy": -519
+    },
+    "844x390": {
+      "focus": "landscape",
+      "panel": {
+        "x": 66,
+        "y": 91,
+        "w": 768,
+        "h": 299
+      },
+      "drawer": {
+        "clientHeight": 269,
+        "scrollHeight": 972,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 167,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 87,
+        "y": 274,
+        "w": 726,
+        "h": 146
+      },
+      "belowFoldBy": -86
+    }
+  },
   "desktop": {
     "status": null,
     "panel": {
@@ -178,7 +454,7 @@
     "checklist": {
       "rect": {
         "x": 321,
-        "y": 711,
+        "y": 518,
         "w": 1078,
         "h": 146
       },
@@ -199,18 +475,26 @@
       },
       "label": "Liste de contrôle d’acceptation (DoD) 1/"
     },
+    "drawer": {
+      "clientHeight": 501,
+      "scrollHeight": 911,
+      "scrollTop": 0,
+      "scrollable": true,
+      "checklistTopInView": 154,
+      "blockCount": 9
+    },
     "items": [
       {
         "rect": {
           "x": 336,
-          "y": 744,
+          "y": 551,
           "w": 1048,
           "h": 62
         },
         "text": {
           "rect": {
             "x": 375,
-            "y": 754,
+            "y": 561,
             "w": 710,
             "h": 16
           },
@@ -234,7 +518,7 @@
         "meta": {
           "rect": {
             "x": 1094,
-            "y": 755,
+            "y": 562,
             "w": 280,
             "h": 44
           },
@@ -261,14 +545,14 @@
       {
         "rect": {
           "x": 336,
-          "y": 811,
+          "y": 618,
           "w": 1048,
           "h": 33
         },
         "text": {
           "rect": {
             "x": 375,
-            "y": 821,
+            "y": 628,
             "w": 940,
             "h": 16
           },
@@ -292,7 +576,7 @@
         "meta": {
           "rect": {
             "x": 1324,
-            "y": 823,
+            "y": 630,
             "w": 50,
             "h": 14
           },
