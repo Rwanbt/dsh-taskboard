@@ -1,0 +1,326 @@
+{
+  "portrait": {
+    "status": null,
+    "panel": {
+      "x": 0,
+      "y": 112,
+      "w": 390,
+      "h": 732
+    },
+    "detail": {
+      "x": 15,
+      "y": 123,
+      "w": 360,
+      "h": 709
+    },
+    "checklist": {
+      "rect": {
+        "x": 17,
+        "y": 609,
+        "w": 356,
+        "h": 165
+      },
+      "style": {
+        "display": "flex",
+        "width": "326px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "normal",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "label": "Acceptance checklist (DoD) 1/2"
+    },
+    "items": [
+      {
+        "rect": {
+          "x": 32,
+          "y": 642,
+          "w": 326,
+          "h": 65
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": 652,
+            "w": 139,
+            "h": 48
+          },
+          "style": {
+            "display": "block",
+            "width": "139.484px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Vérifier la grille responsive sur un petit écran de téléphone"
+        },
+        "meta": {
+          "rect": {
+            "x": 219,
+            "y": 653,
+            "w": 129,
+            "h": 44
+          },
+          "style": {
+            "display": "flex",
+            "width": "128.516px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": " agent-01 · Evidence: preuve très longue qui décrit en détail la vérification effectuée su"
+        },
+        "lines": 3,
+        "charsPerLine": 20.3
+      },
+      {
+        "rect": {
+          "x": 32,
+          "y": 712,
+          "w": 326,
+          "h": 49
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": 722,
+            "w": 217,
+            "h": 32
+          },
+          "style": {
+            "display": "block",
+            "width": "216.812px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Confirmer la lisibilité du compteur intégré"
+        },
+        "meta": {
+          "rect": {
+            "x": 297,
+            "y": 724,
+            "w": 51,
+            "h": 14
+          },
+          "style": {
+            "display": "flex",
+            "width": "51.1875px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Unchecked"
+        },
+        "lines": 2,
+        "charsPerLine": 21.5
+      }
+    ],
+    "panelOverflowX": 0,
+    "viewport": {
+      "w": 390,
+      "h": 844
+    }
+  },
+  "desktop": {
+    "status": null,
+    "panel": {
+      "x": 300,
+      "y": 349,
+      "w": 1120,
+      "h": 531
+    },
+    "detail": {
+      "x": 319,
+      "y": 364,
+      "w": 1082,
+      "h": 501
+    },
+    "checklist": {
+      "rect": {
+        "x": 321,
+        "y": 704,
+        "w": 1078,
+        "h": 146
+      },
+      "style": {
+        "display": "flex",
+        "width": "1048px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "normal",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "label": "Acceptance checklist (DoD) 1/2"
+    },
+    "items": [
+      {
+        "rect": {
+          "x": 336,
+          "y": 737,
+          "w": 1048,
+          "h": 62
+        },
+        "text": {
+          "rect": {
+            "x": 375,
+            "y": 747,
+            "w": 710,
+            "h": 16
+          },
+          "style": {
+            "display": "block",
+            "width": "710px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Vérifier la grille responsive sur un petit écran de téléphone"
+        },
+        "meta": {
+          "rect": {
+            "x": 1094,
+            "y": 748,
+            "w": 280,
+            "h": 44
+          },
+          "style": {
+            "display": "flex",
+            "width": "280px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": " agent-01 · Evidence: preuve très longue qui décrit en détail la vérification effectuée su"
+        },
+        "lines": 1,
+        "charsPerLine": 61
+      },
+      {
+        "rect": {
+          "x": 336,
+          "y": 804,
+          "w": 1048,
+          "h": 33
+        },
+        "text": {
+          "rect": {
+            "x": 375,
+            "y": 814,
+            "w": 939,
+            "h": 16
+          },
+          "style": {
+            "display": "block",
+            "width": "938.812px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Confirmer la lisibilité du compteur intégré"
+        },
+        "meta": {
+          "rect": {
+            "x": 1323,
+            "y": 816,
+            "w": 51,
+            "h": 14
+          },
+          "style": {
+            "display": "flex",
+            "width": "51.1875px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Unchecked"
+        },
+        "lines": 1,
+        "charsPerLine": 43
+      }
+    ],
+    "panelOverflowX": 0,
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    }
+  }
+}

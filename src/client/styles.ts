@@ -1187,8 +1187,13 @@ color: var(--dsw-alias-state-business-primary, var(--atb-accent));
 .dsh-atb-cl-item[data-alert="true"] {
   border-color: rgba(229,72,77,.45); background: rgba(229,72,77,.06);
 }
-.dsh-atb-cl-text { flex: 1; min-width: 0; font-size: 12.5px; word-break: break-word; }
-.dsh-atb-cl-meta { flex-shrink: 0; font-size: 10.5px; color: var(--atb-text-3, gray); display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+.dsh-atb-cl-text { flex: 1 1 140px; min-width: 0; font-size: 12.5px; word-break: break-word; }
+/* The checker/evidence column must never eat the item text: it used to be
+   flex-shrink 0 with a 280px nowrap evidence note, which squeezed the label
+   to zero and printed it one character per line in the mobile drawer (found on
+   a real phone). It now shrinks and caps at 42% of the row, ellipsizing its own
+   note, so the label always keeps a readable width. */
+.dsh-atb-cl-meta { flex: 0 1 auto; min-width: 0; max-width: 42%; font-size: 10.5px; color: var(--atb-text-3, gray); display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
 .dsh-atb-cl-note { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dsw-alias-label-secondary, inherit); }
 
 .dsh-atb-rpt-summary { font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin-bottom: 8px; }

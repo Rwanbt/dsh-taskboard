@@ -198,7 +198,34 @@ Highlights:
   (5/5), tab click back to backlog at 0 px;
 * back to 1440×900: five columns and desktop drag restored.
 
-### 4.3 Honest limits
+### 4.3 Fixed on the way: the checklist printed one letter per line
+
+Reported from a real phone: opening a task whose **acceptance checklist** carried
+an evidence note printed the item label **one character per line** (48 lines of a
+single glyph), making the block unreadable.
+
+Mechanism, measured on the real host before touching anything: the row was
+`.dsh-atb-cl-item { display: flex }` with the label at `flex: 1` (basis `0`) and
+the evidence column at `flex-shrink: 0` holding a `white-space: nowrap` note
+capped at `max-width: 280px`. In a 326 px row inside the mobile drawer the meta
+claimed 280 px, the label had **0 px** left and `word-break: break-word` wrapped
+it per character.
+
+| Measurement (390×844 drawer) | Before | After |
+| --- | --- | --- |
+| label box | **0 × 832 px** | 139 × 48 px |
+| characters per line | **1.3** | 20.3 |
+| checklist block height | 949 px | 165 px |
+| desktop 1440×900 label | (unchanged layout) | 710 × 16 px, 1 line |
+
+Fix: the label keeps a real basis (`flex: 1 1 140px`), the evidence column
+becomes shrinkable and capped (`flex: 0 1 auto; min-width: 0; max-width: 42%`),
+and its note stays a 280 px truncated preview. Desktop is untouched: the meta
+still resolves to exactly 280 px on a 1048 px row. Pinned by
+`tests/checklist-layout.spec.ts` (the CSS determinants) and by
+`scripts/qa/detail-audit.mjs` (the real geometry, portrait + desktop).
+
+### 4.4 Honest limits
 
 * Synthetic touch **scrolling** cannot be produced in this headless Chromium
   build (no GPU compositor): `Input.dispatchTouchEvent` delivers touch events but
@@ -233,6 +260,7 @@ src/client/i18n/{zh,en,ru}.ts               (mobile keys, parity kept)
 tests/mobile-focus.spec.ts                  (new)
 tests/mobile-focus-ui.spec.tsx              (new)
 tests/toolbar-compact.spec.tsx               (new)
+tests/checklist-layout.spec.ts               (new — checklist label squeeze regression)
 scripts/qa/mobile-swipe-capture.mjs         (new)
 scripts/qa/desktop-header-capture.mjs        (new)
 scripts/qa/pastel-visual-host.ps1           (-CaptureScript)
