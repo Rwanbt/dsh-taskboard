@@ -35,6 +35,7 @@ param(
   [int]    $Port = 64941,
   [string] $Label = 'unlabelled',
   [int]    $SeedCount = 340,
+  [string] $CaptureScript = 'pastel-capture.mjs',
   [switch] $SkipSetup,
   [switch] $SkipSeed,
   [switch] $KeepHost
@@ -340,7 +341,8 @@ function Seed-Board([int]$count) {
 # ---------------------------------------------------------------------------
 function Invoke-Capture {
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-  $outDir = Join-Path $script:Repo "scripts/qa/reports/pastel-$stamp"
+  $kind = [System.IO.Path]::GetFileNameWithoutExtension($CaptureScript)
+  $outDir = Join-Path $script:Repo "scripts/qa/reports/$kind-$stamp"
   New-Item -ItemType Directory -Force -Path $outDir | Out-Null
   $browser = @(
     'C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe',
@@ -355,7 +357,7 @@ function Invoke-Capture {
   $env:PTB_MOCKUP = if ($null -ne $script:Mini) { Join-Path $script:Mini 'DSH_Task_Board_DeepSeek_Pastel_Maquette_V1.html' } else { '' }
   $env:PTB_LABEL = $Label
   Step "capturing with $browser → $outDir"
-  $script = Join-Path $PSScriptRoot 'pastel-capture.mjs'
+  $script = Join-Path $PSScriptRoot $CaptureScript
   & node $script
   if ($LASTEXITCODE -ne 0) { Fail "capture failed with exit code $LASTEXITCODE" }
   Info "captures + metrics written to $outDir"
