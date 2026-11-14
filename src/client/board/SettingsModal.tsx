@@ -15,6 +15,7 @@ import type { CatalogModelItem, CatalogPresetItem } from '../../shared/api.ts'
 import { BRANCH_NAME_MODES, DEFAULT_BRANCH_NAME_PREFIX, DEFAULT_COMPLETED_DISPLAY_LIMIT, DEFAULT_DISPATCH_INTERVAL_MS, DEFAULT_ISOLATION, DEFAULT_MAX_CONCURRENT, DEFAULT_QUEUE_MAX_AGE_MINUTES, DEFAULT_SCHEDULE_MISSED_AFTER_MINUTES, MIN_COMPLETED_DISPLAY_LIMIT, MAX_COMPLETED_DISPLAY_LIMIT, allowClaimFromLinkedRootsOf, branchNameModeOf, branchNamePrefixOf, buildBranchName, completedDisplayLimitOf, defaultPermissionOf, defaultSyncExternalSessionsOf, dispatchIntervalMsOf, maxConcurrentOf, queueMaxAgeMinutesOf, scheduleMissedAfterMinutesOf, type BranchNameMode, type IsolationMode, type PermissionMode } from '../../shared/protocol.ts'
 import { localeStore, setLocalePreference, useT, type LocalePreference, type Translate } from '../i18n/runtime.ts'
 import { Icon } from './Icon.tsx'
+import { DENSITIES, MAX_VIBRANCY, MIN_VIBRANCY, VIBRANCY_STEP, clearTaskTones, setAppearance, useAppearance } from './appearance.ts'
 
 /** The isolation options with one-line hints (mirrors the task form; translated per render). */
 const isolationOptions = (t: Translate): ReadonlyArray<{ value: IsolationMode; name: string; hint: string }> => [
@@ -42,8 +43,9 @@ const PREVIEW_ID = 't-1a2b'
  */
 export function SettingsModal({ controller }: { controller: BoardController }) {
   const t = useT()
+  const appearance = useAppearance()
   const localePreference = localeStore.getSnapshot().preference
-  const [section, setSection] = useState<'general' | 'external'>('general')
+  const [section, setSection] = useState<'general' | 'appearance' | 'external'>('general')
   const state = controller.getSnapshot()
   const currentIso = state.ledger.settings?.defaultIsolation ?? DEFAULT_ISOLATION
   const currentSync = defaultSyncExternalSessionsOf(state.ledger.settings)
@@ -156,11 +158,16 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
             onKeyDown={e => {
               if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return
               e.preventDefault()
-              const next = e.key === 'Home' ? 'general' : e.key === 'End' ? 'external' : section === 'general' ? 'external' : 'general'
+              const order = ['general', 'appearance', 'external'] as const
+              const index = order.indexOf(section)
+              const next = (e.key === 'Home' ? order[0]
+                : e.key === 'End' ? order[order.length - 1]
+                : e.key === 'ArrowDown' ? order[Math.min(order.length - 1, index + 1)]
+                : order[Math.max(0, index - 1)])!
               setSection(next)
               e.currentTarget.querySelector<HTMLButtonElement>(`#dsh-atb-settings-tab-${next}`)?.focus()
             }}>
-            {(['general', 'external'] as const).map(value => <button key={value} id={`dsh-atb-settings-tab-${value}`} type="button" role="tab"
+            {(['general', 'appearance', 'external'] as const).map(value => <button key={value} id={`dsh-atb-settings-tab-${value}`} type="button" role="tab"
               aria-selected={section === value} aria-controls={`dsh-atb-settings-panel-${value}`} tabIndex={section === value ? 0 : -1}
               onClick={() => setSection(value)}>{t(`set.nav.${value}`)}{value === 'general' && dirty ? ' •' : ''}</button>)}
           </nav>
@@ -524,6 +531,96 @@ export function SettingsModal({ controller }: { controller: BoardController }) {
               >
                 {storageBusy ? t('set.storage.migrating') : t('set.storage.migrate')}
               </button>
+            </div>
+          </section>
+        </div>
+        <div className="dsh-atb-modal-body" id="dsh-atb-settings-panel-appearance" role="tabpanel" aria-labelledby="dsh-atb-settings-tab-appearance" hidden={section !== 'appearance'}>
+          <section className="dsh-atb-diag-sec">
+            <h4 className="dsh-atb-setting-title">{t('set.appearance.heading')}</h4>
+            <p className="dsh-atb-isolation-note">{t('set.appearance.hint')}</p>
+
+            <div className="dsh-atb-setting">
+              <span className="dsh-atb-setting-label">{t('set.appearance.density')}</span>
+              <div className="dsh-atb-mode-picker" data-exec="true" role="group" aria-label={t('set.appearance.density')}>
+                {DENSITIES.map(density => (
+                  <button
+                    key={density}
+                    type="button"
+                    className="dsh-atb-mode-opt"
+                    data-on={appearance.density === density}
+                    aria-pressed={appearance.density === density}
+                    onClick={() => setAppearance({ density })}
+                  >
+                    <span className="dsh-atb-mode-name">{t(`set.appearance.density.${density}`)}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="dsh-atb-setting-hint">{t('set.appearance.densityHint')}</p>
+            </div>
+
+            <div className="dsh-atb-setting">
+              <label className="dsh-atb-setting-label" htmlFor="dsh-atb-vibrancy">
+                <span>{t('set.appearance.vibrancy')}</span>
+                <span className="dsh-atb-setting-value">{appearance.vibrancy} %</span>
+              </label>
+              <input
+                id="dsh-atb-vibrancy"
+                className="dsh-atb-range"
+                type="range"
+                min={MIN_VIBRANCY}
+                max={MAX_VIBRANCY}
+                step={VIBRANCY_STEP}
+                value={appearance.vibrancy}
+                onChange={e => setAppearance({ vibrancy: Number(e.target.value) })}
+                aria-valuetext={`${appearance.vibrancy} %`}
+              />
+              <p className="dsh-atb-setting-hint">{t('set.appearance.vibrancyHint')}</p>
+            </div>
+
+            <div className="dsh-atb-setting">
+              <label className="dsh-atb-switchrow">
+                <span className="dsh-atb-setting-label">{t('set.appearance.descriptions')}</span>
+                <span className="dsh-atb-switch">
+                  <input
+                    type="checkbox"
+                    checked={appearance.descriptions}
+                    onChange={e => setAppearance({ descriptions: e.target.checked })}
+                  />
+                  <span className="dsh-atb-switch-track" aria-hidden="true" />
+                </span>
+              </label>
+              <p className="dsh-atb-setting-hint">{t('set.appearance.descriptionsHint')}</p>
+            </div>
+
+            <div className="dsh-atb-setting">
+              <label className="dsh-atb-switchrow">
+                <span className="dsh-atb-setting-label">{t('set.appearance.group')}</span>
+                <span className="dsh-atb-switch">
+                  <input
+                    type="checkbox"
+                    checked={appearance.group}
+                    onChange={e => setAppearance({ group: e.target.checked })}
+                  />
+                  <span className="dsh-atb-switch-track" aria-hidden="true" />
+                </span>
+              </label>
+              <p className="dsh-atb-setting-hint">{t('set.appearance.groupHint')}</p>
+            </div>
+
+            <div className="dsh-atb-setting">
+              <span className="dsh-atb-setting-label">{t('set.appearance.tones')}</span>
+              <p className="dsh-atb-setting-hint">{t('set.appearance.tonesHint')}</p>
+              <div className="dsh-atb-setting-actions">
+                <span className="dsh-atb-setting-value">{t('set.appearance.tonesCount', { n: Object.keys(appearance.tones).length })}</span>
+                <button
+                  type="button"
+                  className="dsh-atb-btn"
+                  disabled={Object.keys(appearance.tones).length === 0}
+                  onClick={() => clearTaskTones()}
+                >
+                  {t('set.appearance.tonesReset')}
+                </button>
+              </div>
             </div>
           </section>
         </div>

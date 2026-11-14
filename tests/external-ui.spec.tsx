@@ -65,25 +65,30 @@ describe('provider-driven external UI', () => {
     await act(async () => { root!.render(createElement(SettingsModal, { controller })) })
     const tabs = [...host.querySelectorAll<HTMLButtonElement>('[role=tab]')]
     const panels = [...host.querySelectorAll<HTMLElement>('[role=tabpanel]')]
-    expect(tabs).toHaveLength(2)
-    expect(panels[0]!.hidden).toBe(false); expect(panels[1]!.hidden).toBe(true)
+    // General, Appearance (DeepSeek Pastel, display-only) and External sync.
+    expect(tabs).toHaveLength(3)
+    expect(panels[0]!.hidden).toBe(false); expect(panels[1]!.hidden).toBe(true); expect(panels[2]!.hidden).toBe(true)
     await act(async () => { panels[0]!.querySelectorAll<HTMLButtonElement>('.dsh-atb-mode-opt')[1]!.click() })
+    // The appearance panel edits localStorage preferences only: no ledger footer.
     await act(async () => { tabs[1]!.click() })
     expect(panels[0]!.hidden).toBe(true); expect(panels[1]!.hidden).toBe(false)
     expect(host.querySelector('.dsh-atb-modal-foot')).toBeNull()
-    await waitFor(() => selectText(selectByIndex(panels[1]!, 0)).includes('ZenTao'))
-    expect(panels[1]!.querySelectorAll('input[type=password]')).toHaveLength(1)
-    const auth = selectByIndex(panels[1]!, 1)
+    await act(async () => { tabs[2]!.click() })
+    expect(panels[1]!.hidden).toBe(true); expect(panels[2]!.hidden).toBe(false)
+    expect(host.querySelector('.dsh-atb-modal-foot')).toBeNull()
+    await waitFor(() => selectText(selectByIndex(panels[2]!, 0)).includes('ZenTao'))
+    expect(panels[2]!.querySelectorAll('input[type=password]')).toHaveLength(1)
+    const auth = selectByIndex(panels[2]!, 1)
     expect(selectText(auth)).toContain('Username and password')
     await act(async () => {
       expect(selectOptionLabels(auth).some(label => label.includes('Token'))).toBe(false)
     })
-    await choose(selectByIndex(panels[1]!, 0), 'TAPD')
+    await choose(selectByIndex(panels[2]!, 0), 'TAPD')
     await act(async () => { tabs[0]!.click() })
     expect(panels[0]!.querySelectorAll<HTMLElement>('.dsh-atb-mode-opt')[1]!.dataset.on).toBe('true')
     await act(async () => { tabs[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })
     expect(tabs[1]!.getAttribute('aria-selected')).toBe('true')
-    expect(selectText(selectByIndex(panels[1]!, 0))).toContain('TAPD')
+    expect(selectText(selectByIndex(panels[2]!, 0))).toContain('TAPD')
   })
   it('renders auth fields and item types from descriptors, discovers projects, submits generic config', async () => {
     const calls: Array<{ path: string; body: Record<string, unknown> }> = []

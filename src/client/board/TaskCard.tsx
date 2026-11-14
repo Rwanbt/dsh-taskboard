@@ -1,13 +1,20 @@
 /**
- * One board card: urgency edge, title, project/urgency/model/schedule/
- * blocked/trashed badges, comment count, and the last execution outcome.
- * Click opens the detail pane; cards in the backlog/todo columns are
- * draggable between those two columns (HTML5 drag & drop). Cards sitting
- * in the in_review column also carry quick-review actions (✓ complete /
- * ✗ send back with an optional note).
+ * One board card, "DeepSeek Pastel" layout: project + id header, dominant
+ * title, clamped description, deliverable block, semantic flags, a hairline
+ * separator and a footer carrying the priority label and the update time.
  *
- * The root is a div[role=button] (not a <button>) so the quick actions can
- * be real nested buttons — valid HTML and native keyboard activation.
+ * The card is a fully tinted pastel surface (see styles.ts): the tone comes
+ * from the task id (stable hash) or from the user's local override, and is
+ * completely independent from `urgency` — a violet card can be urgent, the
+ * priority stays explicit in the footer and in the status/flag badges.
+ *
+ * Preserved contracts (do not weaken):
+ * - single click opens the detail pane; double click jumps to the session;
+ * - only the controller's allowed transitions are offered (quick review
+ *   actions on in_review cards, drag on backlog/todo cards);
+ * - every business alert (blocked, approval, human wait, dependency, subtasks,
+ *   stale claim, permissions, unchecked checklist, external conflicts) stays
+ *   visible on the card.
  *
  * @module dsh-taskboard/client/board/TaskCard
  */
@@ -21,6 +28,8 @@ import { OUTCOME_KEYS, URGENCY_KEYS, statusText } from './labels.ts'
 import { Icon } from './Icon.tsx'
 import { useT } from '../i18n/runtime.ts'
 import { externalTypeLabel } from '../external-api.ts'
+import { resolveWorkspaceName } from './project-label.ts'
+import { toneForTask, useAppearance } from './appearance.ts'
 
 /** dataTransfer type carrying the dragged task id. */
 export const DRAG_TYPE = 'application/x-dsh-atb-task'
@@ -49,6 +58,7 @@ export const resolveTaskSessionId = taskSessionId
  */
 export function TaskCard({ task, controller, draggable = false, now, onAlert }: { task: TaskRecord; controller: BoardController; draggable?: boolean; now?: number; onAlert?: (msg: string) => void }) {
   const t = useT()
+  const appearance = useAppearance()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [note, setNote] = useState('')
   const last = task.executions.length > 0 ? task.executions[task.executions.length - 1] : undefined
@@ -59,8 +69,8 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   // 0.10.1: agent-proposed dependency changes awaiting the user's decision.
   const pendingApprovals = task.pendingChanges ?? []
   // The card badge is information, never an error: its tooltip carries the
-  // actual prerequisite names + statuses (the detail belongs there, not on
-  // the card). Missing/trashed ids are resolved from the loaded ledger; a
+  // actual prerequisite names + statuses (the detail belongs there, not on the
+  // card). Missing/trashed ids are resolved from the loaded ledger; a
   // prerequisite omitted by the collapsed completed column still shows its id.
   const dependencyTitle = (task.dependsOn ?? []).map(id => {
     const source = controller.getSnapshot().ledger.tasks.find(item => item.id === id)
@@ -84,6 +94,15 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   const targetSessionId = resolveTaskSessionId(task)
   const sessionTitle = controller.getSessionTitle(targetSessionId)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const tone = toneForTask(task.id, appearance)
+  const projectName = resolveWorkspaceName(
+    task.workspaceId,
+    controller.getSnapshot().workspaces,
+    t('board.workspace.unassigned'),
+  )
+  const checklistDone = task.checklist?.filter(item => item.checked).length ?? 0
+  const checklistTotal = task.checklist?.length ?? 0
+  const checklistPct = checklistTotal > 0 ? Math.round(checklistDone / checklistTotal * 100) : 0
 
   useEffect(() => {
     return () => {
@@ -156,6 +175,7 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
       tabIndex={0}
       className="dsh-atb-card"
       data-urgency={task.urgency}
+      data-tone={tone}
       data-needs-human={needsHuman.needs ? 'true' : undefined}
       draggable={draggable && !rejectOpen}
       onDragStart={(e) => {
@@ -183,12 +203,22 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
         }
       }}
     >
-      <div className="dsh-atb-card-title">
-        {needsHuman.needs && <span className="dsh-atb-badge" data-kind="needs-human" style={{ marginRight: 6, verticalAlign: 'middle' }}><Icon name="hand" /> {needsHuman.reason ?? t('card.badge.needsHuman')}</span>}
-        {task.title}
+      <div className="dsh-atb-card-top">
+        <span className="dsh-atb-card-project" title={projectName}>
+          <span className="dsh-atb-card-tone-dot" aria-hidden="true" />
+          <span className="dsh-atb-card-project-name">{projectName}</span>
+        </span>
+        <span className="dsh-atb-card-id" title={task.id}>{task.id}</span>
       </div>
-      {task.external && <small>{task.external.providerName ?? task.external.provider} · {externalTypeLabel(task.external.item.type, t)} #{task.external.item.id}{task.external.conflicts.length > 0 ? <><Icon name="warning" /> </> : ''}</small>}
-      
+
+      <div className="dsh-atb-card-title">{task.title}</div>
+
+      {appearance.descriptions && task.description.trim().length > 0 && (
+        <p className="dsh-atb-card-desc" title={task.description}>{task.description}</p>
+      )}
+
+      {task.external && <small className="dsh-atb-card-external">{task.external.providerName ?? task.external.provider} · {externalTypeLabel(task.external.item.type, t)} #{task.external.item.id}{task.external.conflicts.length > 0 ? <><Icon name="warning" /> </> : ''}</small>}
+
       {(task.status === 'in_review' || task.status === 'done') && (
         <div className="dsh-atb-card-deliverable">
           <div className="dsh-atb-card-deliv-row">
@@ -207,10 +237,10 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
           </div>
           <div className="dsh-atb-card-deliv-row">
             <span className="dsh-atb-card-deliv-tag"><Icon name="checklist" /> {t('card.deliv.acceptance')}:</span>
-            {task.checklist && task.checklist.length > 0 ? (
-              <span className="dsh-atb-card-deliv-val" title={task.checklist.map(c => `${c.checked ? '✓' : '✗'} ${c.text}`).join('\n')}>
-                {t('card.deliv.checklistProgress', { done: task.checklist.filter(c => c.checked).length, total: task.checklist.length })}
-                {task.status === 'in_review' && task.checklist.some(c => !c.checked) && (
+            {checklistTotal > 0 ? (
+              <span className="dsh-atb-card-deliv-val" title={task.checklist!.map(c => `${c.checked ? '✓' : '✗'} ${c.text}`).join('\n')}>
+                {t('card.deliv.checklistProgress', { done: checklistDone, total: checklistTotal })}
+                {task.status === 'in_review' && checklistDone < checklistTotal && (
                   <span className="dsh-atb-deliv-warn"> ({t('card.deliv.uncheckedWarn')})</span>
                 )}
               </span>
@@ -224,6 +254,11 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
               </span>
             )}
           </div>
+          {checklistTotal > 0 && (
+            <div className="dsh-atb-card-progress" role="img" aria-label={t('card.deliv.checklistProgress', { done: checklistDone, total: checklistTotal })}>
+              <span style={{ width: `${checklistPct}%` }} />
+            </div>
+          )}
           {latestReport?.summary && (
             <div className="dsh-atb-card-deliv-summary" title={latestReport.summary}>
               {latestReport.summary}
@@ -232,8 +267,12 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
         </div>
       )}
 
-      <div className="dsh-atb-card-meta">
-        <span className="dsh-atb-badge">{t(URGENCY_KEYS[task.urgency])}</span>
+      <div className="dsh-atb-card-meta dsh-atb-card-flags">
+        {needsHuman.needs && (
+          <span className="dsh-atb-badge" data-kind="needs-human" title={t('card.badge.needsHumanTitle')}>
+            <Icon name="hand" /> {needsHuman.reason ?? t('card.badge.needsHuman')}
+          </span>
+        )}
         {task.blocked && <span className="dsh-atb-badge" data-kind="blocked"><Icon name="warning" /> {t('shared.blocked')}</span>}
         {pendingApprovals.length > 0 && (
           <span
@@ -289,13 +328,13 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
             <Icon name="shieldCheck" /> {t('card.badge.permFull')}
           </span>
         )}
-        {task.checklist !== undefined && task.checklist.length > 0 && (
+        {checklistTotal > 0 && (
           <span
             className="dsh-atb-badge"
-            data-kind={task.status === 'in_review' && task.checklist.some(i => !i.checked) ? 'blocked' : 'checklist'}
-            title={task.status === 'in_review' && task.checklist.some(i => !i.checked) ? t('card.badge.checklistReview') : t('card.badge.checklist')}
+            data-kind={task.status === 'in_review' && checklistDone < checklistTotal ? 'blocked' : 'checklist'}
+            title={task.status === 'in_review' && checklistDone < checklistTotal ? t('card.badge.checklistReview') : t('card.badge.checklist')}
           >
-            <Icon name="checklist" /> {task.checklist.filter(i => i.checked).length}/{task.checklist.length}
+            <Icon name="checklist" /> {checklistDone}/{checklistTotal}
           </span>
         )}
         {task.status === 'done' && <span className="dsh-atb-badge" data-kind="done">{t('status.pill.done')}</span>}
@@ -335,10 +374,20 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
             <Icon name="comment" /> {t('card.session.badge', { id: shortId(targetSessionId) })}
           </span>
         )}
-        {task.comments.length > 0 && <span><Icon name="comment" /> {task.comments.length}</span>}
+        {task.comments.length > 0 && <span className="dsh-atb-badge" data-kind="comments"><Icon name="comment" /> {task.comments.length}</span>}
         {task.trashedAt !== undefined && <span className="dsh-atb-badge" data-kind="trashed"><Icon name="trash" /> {t('card.badge.pendingPurge')}</span>}
-        <span style={{ marginLeft: 'auto' }}>{fmtTime(task.updatedAt)}</span>
       </div>
+
+      <div className="dsh-atb-card-divider" aria-hidden="true" />
+
+      <div className="dsh-atb-card-bottom">
+        <span className="dsh-atb-card-priority" data-urgency={task.urgency}>
+          <span className="dsh-atb-dot" data-urgency={task.urgency} aria-hidden="true" />
+          {t(URGENCY_KEYS[task.urgency])}
+        </span>
+        <span className="dsh-atb-card-time">{fmtTime(task.updatedAt)}</span>
+      </div>
+
       {reviewing && (rejectOpen
         ? (
             <div className="dsh-atb-quick-reject" onClick={e => e.stopPropagation()}>

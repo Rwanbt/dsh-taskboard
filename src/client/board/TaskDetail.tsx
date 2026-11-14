@@ -23,6 +23,7 @@ import { MOVE_KEYS, OUTCOME_KEYS, STATUS_KEYS, URGENCY_KEYS, statusText } from '
 import { useT, type Translate } from '../i18n/runtime.ts'
 import { IMAGE_ACCEPT, acceptedImageFiles, imageAlt, imageMarkdown, insertImageMarkdown } from '../image-insert.ts'
 import { Icon, type IconName } from './Icon.tsx'
+import { CARD_TONES, setTaskTone, toneForTask, useAppearance } from './appearance.ts'
 
 /** Statuses a user may move this task to, per the state machine. */
 function moveTargets(task: TaskRecord): TaskRecord['status'][] {
@@ -639,6 +640,9 @@ function IsolationBlock({ task, controller }: { task: TaskRecord; controller: Bo
  */
 export function TaskDetail({ task, controller, now }: { task: TaskRecord; controller: BoardController; now?: number }) {
   const t = useT()
+  const appearance = useAppearance()
+  const cardTone = toneForTask(task.id, appearance)
+  const toneIsManual = appearance.tones[task.id] !== undefined
   const [comment, setComment] = useState('')
   const [commentUploading, setCommentUploading] = useState(false)
   const commentRef = useRef<HTMLTextAreaElement>(null)
@@ -886,6 +890,32 @@ export function TaskDetail({ task, controller, now }: { task: TaskRecord; contro
                 ? t('detail.sub.idCopied')
                 : idCopyState === 'failed' ? t('detail.sub.idCopyFailed') : task.id}
             </button>
+          </div>
+          <div className="dsh-atb-tone-pick" role="group" aria-label={t('appearance.tone.label')}>
+            <span className="dsh-atb-tone-pick-label" title={t('appearance.tone.title')}>{t('appearance.tone.label')}</span>
+            <button
+              type="button"
+              className="dsh-atb-tone-swatch"
+              data-tone="auto"
+              data-on={!toneIsManual}
+              aria-pressed={!toneIsManual}
+              aria-label={t('appearance.tone.auto')}
+              title={t('appearance.tone.auto')}
+              onClick={() => setTaskTone(task.id, undefined)}
+            ><span className="dsh-atb-tone-auto-glyph" aria-hidden="true" /></button>
+            {CARD_TONES.map(tone => (
+              <button
+                key={tone}
+                type="button"
+                className="dsh-atb-tone-swatch"
+                data-tone={tone}
+                data-on={toneIsManual && cardTone === tone}
+                aria-pressed={toneIsManual && cardTone === tone}
+                aria-label={t(`appearance.tone.${tone}`)}
+                title={t(`appearance.tone.${tone}`)}
+                onClick={() => setTaskTone(task.id, tone)}
+              ><span className="dsh-atb-tone-swatch-dot" aria-hidden="true" /></button>
+            ))}
           </div>
         </div>
         <div className="dsh-atb-detail-topbtns">
