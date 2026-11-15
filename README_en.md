@@ -1,7 +1,7 @@
 [![npm version](https://img.shields.io/npm/v/dsh-taskboard.svg)](https://www.npmjs.com/package/dsh-taskboard)
 [![License](https://img.shields.io/npm/l/dsh-taskboard.svg)](https://github.com/cloader/dsh-taskboard/blob/main/LICENSE)
 
-English | [简体中文](./README.md)
+**English** | [Français](./README_fr.md) | [简体中文](./README.md)
 
 # dsh-taskboard
 
@@ -158,7 +158,7 @@ Available in any session. Project boundary: only sessions belonging to the task'
 - **Image attachments (0.7.0)**: task descriptions and comments accept PNG/JPEG/GIF/WebP through file picker, paste, or drag and drop and insert Markdown automatically; task details show thumbnails with click-to-zoom lightbox previews. Images stay in the local data directory, capped at 5 MiB each
 - **Two-column wide task form + slash completion (0.6.0)**: the create/edit modal goes two-column (core fields and execution config on the left, description and prompt on the right); typing `/` in the description/prompt pops command and skill completion (↑↓/Enter/Tab/Esc keyboard navigation; host-discovered items merge over the built-in list); Markdown images in description/prompt render as thumbnails with a click-to-zoom lightbox
 - **Execution permission (0.6.0)**: per-task three-way execution permission (📁 workspace write / 🔒 read-only / ⚡ full access) picked in the form plus a default-permission board setting; permission badges on cards, the detail panel and the template list
-- **Interface language (0.9.7)**: supports Chinese, English and Russian. Choose a language in Board Settings → General → Interface language; Follow DSH is the default. Explicit choices apply immediately and are saved automatically in the current browser; returning to Follow DSH adopts its current language. This only changes the board UI, leaving DSH's language setting intact. Without the locale service, the board falls back to the page or browser language. Built-in template content currently uses English in the Russian UI.
+- **Interface language (0.9.7; eight locales since 0.14.0)**: the same eight languages DSH ships — Chinese, English, Russian, French, German, Spanish, Japanese and Brazilian Portuguese. "Follow DSH" is the default: whichever language DSH uses, the board uses it, with no configuration. Board Settings → General → Interface language still lets you pin one; explicit choices apply immediately and are saved automatically in the current browser, and returning to Follow DSH adopts its current language. This only changes the board UI, leaving DSH's language setting intact. Without the locale service the board falls back to the page `<html lang>` or the browser language, matched by primary subtag (`pt-PT` → pt, `zh-TW` → zh, `de-AT` → de); when DSH runs an external language pack the board does not translate, it falls back to English exactly like DSH does. Built-in template content still ships in Chinese and English only, so the other locales use the English content.
 - **External session auto-sync (0.5.5)**: with "🔄 auto-capture sessions" enabled in board settings, sessions created directly in a workspace spawn task cards automatically — the project is resolved from the session's cwd and the first user message becomes the title/description; running sessions enter In Progress with the session bound (one-click jump works), successful turns settle into In Review, failures fall back to Todo; subagent sessions are filtered too since 0.6.0; placeholder titles ("session xxxxxxxx") reconcile to the real title automatically (0.8.8); off by default
 - **One-click session jump (0.5.4; double-click since 0.8.8)**: **double-click a task card** to open its execution session directly (the board collapses over it; single-click still selects the card — a 250ms debounce keeps the two apart); the detail panel's "🤖 Jump to session" button and the holder chip work the same — straight to the running (or most recent) execution's session. A card created in a conversation and worked on in that same conversation records no execution, and now still jumps back to that conversation; archived / deleted / unavailable sessions each get a precise notice
 - **Remember the last model (0.5.4)**: the new-task form brings back the last chosen model and reasoning effort (template prefill and editing are unaffected)
@@ -270,6 +270,8 @@ node tests/manual-git-e2e.mjs   # real-git end-to-end manual test (full worktree
 
 For local development, build first, then link the local repository with `dsh plugin --profile web add "link:/path/to/dsh-taskboard"`. Rebuild and refresh the page after client changes; host-side changes also require restarting `dsh web`.
 
+**Adding a language / changing copy**: UI copy lives in `src/client/i18n/<locale>.ts`, one dictionary per locale whose key set must equal `zh.ts` exactly (a missing or extra key is a compile error). Adding a locale means a new dictionary plus an entry in `runtime.ts` (`SHIPPED_LOCALES`, `LOCALE_LABELS`, `DICTS`); `tests/i18n.spec.ts` checks every key, every placeholder set (`{n}`, `{{lastExecution}}`, …), empty values and zero-width characters, and scans every `t('…')` literal in the client — so a missing translation fails CI.
+
 ## External task sync
 
 ZenTao supports project or execution/iteration mapping for Bugs, Stories and Tasks. TAPD supports Bugs, Stories and Tasks. GitHub, GitLab and Gitea/Forgejo sync Issues; Jira Cloud and Linear sync Issues. ZenTao's two modes have passed read-only real-deployment checks; TAPD, GitHub, GitLab, Gitea, Jira and Linear remain locally mock-validated (no real credentials; production compatibility is not claimed).
@@ -332,6 +334,12 @@ curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
 Endpoints: `/meta`, `/projects`, `/tasks`, `/tasks/:id`, `/tasks/:id/dependencies`, `/executions/:id`, `/events` (SSE: `/events/stream`); lifecycle: `POST /executions/claim`, `:id/session`, `:id/attempts`, `:id/handoff`, `:id/report`, `:id/complete`, `:id/interrupt`. Full fields, error codes, idempotency and fencing semantics: [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md). Without Agent Board, Task Board runs fully independently; leaving the token unset disables the API entirely.
 
 ## Changelog
+
+### 0.14.0
+
+- **Eight-locale UI that follows the user's language automatically**: the board now ships the same eight languages DSH does, adding Français / Deutsch / Español / 日本語 / Português (Brasil). "Follow DSH" stays the default, so the board speaks whatever language DSH uses with no configuration; an explicit choice can still pin one locale and is saved in the current browser.
+- **Detection aligned with DSH**: the page `lang` and the browser languages are matched by primary subtag (`pt-PT` → pt, `zh-TW` → zh, `de-AT` → de); when DSH runs an external language pack the board does not translate, it falls back to English, exactly like DSH itself.
+- **Guardrails**: key sets and placeholders are compared key by key across all eight dictionaries, empty values and non-standard characters are rejected, and the client `t('…')` key scan covers every dictionary.
 
 ### 0.9.10
 

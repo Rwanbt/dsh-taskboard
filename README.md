@@ -1,7 +1,7 @@
 [![npm version](https://img.shields.io/npm/v/dsh-taskboard.svg)](https://www.npmjs.com/package/dsh-taskboard)
 [![License](https://img.shields.io/npm/l/dsh-taskboard.svg)](https://github.com/cloader/dsh-taskboard/blob/main/LICENSE)
 
-[English](./README_en.md) | 简体中文
+[English](./README_en.md) | [Français](./README_fr.md) | **简体中文**
 
 # dsh-taskboard
 
@@ -158,7 +158,7 @@ agent：
 - **图片附件（0.7.0）**：任务描述与评论可选择、粘贴或拖放 PNG/JPEG/GIF/WebP，自动插入 Markdown；详情中显示缩略图，点击灯箱放大。图片保存在本机数据目录，单文件上限 5 MiB
 - **双栏宽屏任务弹窗 + Slash 补全（0.6.0）**：新建/编辑弹窗左右双栏（左栏核心字段与执行配置，右栏描述与 Prompt）；描述/Prompt 输入 `/` 即弹出命令与技能补全（↑↓/Enter/Tab/Esc 键盘导航，宿主动态发现与内置清单合并）；描述与 Prompt 中的 Markdown 图片渲染为缩略图，点击灯箱放大
 - **执行权限（0.6.0）**：任务级三档执行权限（📁 可写入工作区 / 🔒 仅可查看 / ⚡ 完全权限），表单选择 + 看板设置默认执行权限；卡片、详情、模板列表显示权限徽章
-- **界面语言（0.9.7）**：支持简体中文、English 和 Русский。在「看板设置 → 通用设置 → 界面语言」中选择，默认跟随 DSH；手动选择立即生效并自动保存在当前浏览器，切回跟随时使用 DSH 的当前语言。仅改变看板界面，不修改 DSH 的语言设置；无 locale 服务时按页面或浏览器语言降级。俄语界面下内置模板内容暂用英文。
+- **界面语言（0.9.7；0.14.0 起八语）**：与 DSH 同款八种语言——简体中文、English、Русский、Français、Deutsch、Español、日本語、Português (Brasil)。默认「跟随 DSH」：DSH 用哪种语言，看板就用哪种，无需任何配置；也可在「看板设置 → 通用设置 → 界面语言」手动指定，立即生效并自动保存在当前浏览器，切回跟随时使用 DSH 的当前语言。仅改变看板界面，不修改 DSH 的语言设置；无 locale 服务时按页面 `lang` 或浏览器语言降级（按主语言子标签匹配：`pt-PT`→pt、`zh-TW`→zh、`de-AT`→de）；DSH 装了看板未内置的外部语言包时回退 English，与 DSH 自身回退一致。内置模板内容仍只有中文/英文两套，其他语言使用英文内容。
 - **外部会话自动同步（0.5.5）**：看板设置开启「🔄 自动纳入会话」后，工作区直接新建的会话自动在看板生成任务卡片（按会话工作目录映射项目，取首条消息作标题/描述）——运行中进「进行中」并绑定会话（可一键跳转）、成功结算自动流转「待验收」、异常退回「待办」；自动过滤看板内部执行会话（0.6.0 起连同子代理会话一并过滤），多轮续跑延续同一张卡片；占位标题（会话 xxxxxxxx）拿到真实标题后自动回填（0.8.8）；出厂默认关闭
 - **一键跳转执行会话（0.5.4；0.8.8 起双击直达）**：**双击任务卡片**直接打开对应执行会话（看板自动收起；单击选中卡片，250ms 防抖互不误触）；详情页顶部「🤖 跳转会话 ↗」按钮与持有者 Chip 同样可点——进行中优先、其次最近一次执行对应的会话；**在会话里创建、也在同一会话里干完的卡（没有执行记录）同样能跳回那个会话**；已归档 / 已删除 / 会话服务不可用分别精准提示
 - **记住上次模型（0.5.4）**：新建任务自动带出上次选用的模型与思考强度（模板预填与编辑不受影响）
@@ -270,6 +270,8 @@ node tests/manual-git-e2e.mjs   # 真 git 端到端手测（worktree 全链路 +
 
 本地开发时，先完成构建，再用 `dsh plugin --profile web add "link:/path/to/dsh-taskboard"` 挂载本地仓库。修改客户端后重新构建并刷新页面；修改宿主侧代码后还需重启 `dsh web`。
 
+**加一门语言 / 改文案**：界面文案在 `src/client/i18n/<locale>.ts`，每种语言一份，键集必须与 `zh.ts` 完全一致（少键/多键是编译错误）。加新语言＝新增字典 + 在 `runtime.ts` 的 `SHIPPED_LOCALES` / `LOCALE_LABELS` / `DICTS` 登记；`tests/i18n.spec.ts` 会逐键校验键集、占位符集合（`{n}`、`{{lastExecution}}` 等）、空值与零宽字符，并扫描客户端所有 `t('…')` 字面量，因此漏译会在 CI 直接失败。
+
 ## 外部任务同步
 
 ZenTao 支持按「关联项目」或「关联执行/迭代」同步缺陷、研发需求和任务；TAPD 支持缺陷、需求、任务；GitHub/GitLab/Gitea/Forgejo 同步 Issues；Jira Cloud 与 Linear 同步 Issue。两种禅道模式已在真实环境进行只读验证；TAPD、GitHub、GitLab、Gitea、Jira、Linear 目前以本地模拟服务器验证为主（无真实凭据，不宣称生产兼容性已验证）。
@@ -336,6 +338,12 @@ curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
 端点：`/meta`、`/projects`、`/tasks`、`/tasks/:id`、`/tasks/:id/dependencies`、`/executions/:id`、`/events`（SSE：`/events/stream`）；生命周期：`POST /executions/claim`、`:id/session`、`:id/attempts`、`:id/handoff`、`:id/report`、`:id/complete`、`:id/interrupt`。完整字段、错误码、幂等与 fencing 语义见 [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md)。没有 Agent Board 时 Task Board 完全独立运行；不配置 Token 即彻底关闭该接口。
 
 ## 升级日志
+
+### 0.14.0
+
+- **八语界面，自动跟随用户语言**：看板语言从 3 种扩展到 DSH 自带的 8 种，新增 Français / Deutsch / Español / 日本語 / Português (Brasil)。默认仍为「跟随 DSH」，因此 DSH 用什么语言看板就用什么语言，无需任何配置；手动选择仍可固定某一种，并保存在当前浏览器。
+- **探测与 DSH 对齐**：页面 `lang` 与浏览器语言按主语言子标签匹配（`pt-PT`→pt、`zh-TW`→zh、`de-AT`→de）；DSH 侧选用看板未内置的外部语言包时回退 English，与 DSH 自身回退一致。
+- **护栏**：8 种语言的键集与占位符逐键比对，空值与非标准字符拒绝，客户端 `t('…')` 键扫描覆盖全部字典。
 
 ### 0.9.11
 
