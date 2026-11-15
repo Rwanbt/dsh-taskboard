@@ -16,6 +16,8 @@ import {
   branchNamePrefixOf,
   buildBranchName,
   DEFAULT_PERMISSION,
+  defaultPermissionOf,
+  newSystemComment,
   effectiveIsolation,
   DEFAULT_MAX_CONCURRENT,
   effectivePrompt,
@@ -59,6 +61,14 @@ declare module '@deepseek-ai/dsh-llm' {
 
 /** Why a scheduled conversation could not be continued. */
 export type SessionReuseDegradeReason = 'archived' | 'busy' | 'incompatible' | 'unresumable' | 'unavailable'
+
+/**
+ * How long an EXTERNAL execution (owned by another engine, `managedBy:
+ * 'external'`) may stay silent before this host expires it. The local agent
+ * registry cannot observe a remote worker, so a restart must not kill it; the
+ * lease bounds a genuinely abandoned claim instead.
+ */
+export const EXTERNAL_EXECUTION_LEASE_MS = 24 * 60 * 60 * 1000
 
 /** Narrow agents face (the registry's create, structurally). */
 export interface AgentsFace {
@@ -651,6 +661,22 @@ export class ExecutionService {
         gate = `comment wake requires in_review (current ${target.status})`
         return undefined
       }
+      // Human-facing flags are real execution barriers for AUTOMATIC triggers.
+      // A manual run is an explicit operator action and stays possible; the
+      // board-side readiness gate refuses automatic launches of these cards.
+      if (trigger !== 'manual' && (target.blocked === true || target.waitingForHuman === true)) {
+        gate = target.blocked === true ? 'task is blocked' : 'task is waiting for a human decision'
+        return undefined
+      }
+      // An interrupted one-shot is never replayed automatically: it carries a
+      // recovery marker until a human (or a manual run) explicitly clears it.
+      if (target.execution.recoveryRequired === true) {
+        if (trigger !== 'manual') {
+          gate = 'task requires an explicit recovery decision after an interrupted run'
+          return undefined
+        }
+        delete target.execution.recoveryRequired
+      }
       // Atomic prerequisite gate covers manual, scheduled and comment-wake runs.
       const prerequisite = dependencyState(target, ledger.tasks)
       if (!prerequisite.ready) {
@@ -676,6 +702,9 @@ export class ExecutionService {
         gate = `execution concurrency limit reached (${running}/${max} running)`
         return undefined
       }
+      // A task-level report belongs to the PREVIOUS manual claim; a new run
+      // replaces it (the agent submits a fresh one through the report tool).
+      delete target.report
       target.executions.push({
         id: executionId,
         trigger,
@@ -859,10 +888,33 @@ export class ExecutionService {
     await this.deps.workspaces.attach(task.workspaceId, sessionId).catch(() => { /* cosmetic */ })
 
     // 3a. Apply execution session permission (0.5.5; 'workspace-write' | 'read-only' | 'danger-full-access').
-    if (this.deps.setPermission !== undefined) {
+    // A card that EXPLICITLY asks for a permission is a safety boundary: when
+    // the switch cannot be applied and verified, the run is failed before any
+    // prompt is injected. Continuing under the session default could grant a
+    // broader sandbox than the card requested (audit A02, fail-open).
+    const requestedPermission = task.permission
+    // A card permission that MATCHES the board default is the default path:
+    // without a permission service the session already runs under that
+    // deployment default, so it stays best-effort. A DIFFERENT (typically
+    // stricter) explicit choice must be applied and verified.
+    const explicitPermission = requestedPermission !== undefined && requestedPermission !== defaultPermissionOf(settings)
+    let permissionError: string | undefined
+    if (this.deps.setPermission === undefined) {
+      if (explicitPermission) permissionError = 'the host exposes no permission service'
+    } else {
       try {
-        this.deps.setPermission(sessionId, task.permission ?? DEFAULT_PERMISSION)
-      } catch { /* best effort */ }
+        this.deps.setPermission(sessionId, requestedPermission ?? DEFAULT_PERMISSION)
+      } catch (error) {
+        if (explicitPermission) permissionError = error instanceof Error ? error.message : String(error)
+      }
+    }
+    if (permissionError !== undefined) {
+      const message = `execution permission could not be applied: ${permissionError}`
+      await this.patchExecution(executionId, { outcome: 'failed', error: message.slice(0, 500), endedAt: this.deps.now() })
+      await this.revertProgress(taskId)
+      await this.cleanupMirror(prepared, workspace.path)
+      if (!handle.borrowed) await handle.dispose().catch(() => { /* best effort */ })
+      return { ok: false, error: message }
     }
 
     // 3b. Best-effort rename: pin the session title to the task title so the
@@ -1302,12 +1354,47 @@ export class ExecutionService {
       for (const task of ledger.tasks) {
         let dirty = false
         for (const execution of task.executions) {
-          if (execution.outcome === 'running' && !adopted.has(execution.id)) {
-            execution.outcome = 'failed'
-            execution.error = 'interrupted by host restart'
-            execution.endedAt = now
+          if (execution.outcome !== 'running' || adopted.has(execution.id)) continue
+          // An EXTERNAL execution is owned by another engine: the absence of a
+          // local DSH agent says nothing about its liveness. It keeps running
+          // until its own lease expires (or it settles), so a host restart can
+          // no longer invalidate a still-working remote claim (audit A04).
+          if (execution.managedBy === 'external') {
+            const lastActivity = execution.lastActivityAt ?? execution.startedAt ?? now
+            if (now - lastActivity < EXTERNAL_EXECUTION_LEASE_MS) continue
+            this.settleInterruptedExecution(execution, now, 'external execution lease expired')
             dirty = true
+            continue
           }
+          const neverStarted = execution.sessionId === undefined
+          this.settleInterruptedExecution(execution, now, 'interrupted by host restart')
+          // A one-shot whose process died before opening a session has no
+          // pending window left (runAt/queued/dispatching were consumed): re-arm
+          // it once so the scheduler can retry safely. A run that HAD a session
+          // may have produced side effects, so it is never replayed silently —
+          // it carries an explicit recovery marker instead (audit A09).
+          if (task.execution.mode === 'scheduled' && task.execution.cron === undefined) {
+            const windowClear = task.execution.runAt === undefined
+              && task.execution.queuedRunAt === undefined && task.execution.dispatchingRunAt === undefined
+            if (neverStarted && windowClear) {
+              task.execution.runAt = now
+              task.comments.push(newSystemComment(
+                'sys.execution.rearmed',
+                '[system] One-shot execution interrupted before it started; re-armed for the next scheduler tick.',
+                {},
+                now,
+              ))
+            } else if (!neverStarted) {
+              task.execution.recoveryRequired = true
+              task.comments.push(newSystemComment(
+                'sys.execution.recoveryRequired',
+                '[system] One-shot execution was interrupted after starting; it will not run again until a human resumes it explicitly.',
+                {},
+                now,
+              ))
+            }
+          }
+          dirty = true
         }
         if (!dirty) continue
         if (task.status === 'in_progress') {
@@ -1548,6 +1635,25 @@ export class ExecutionService {
     return effectivePrompt(task)
       .replace(/\{\{lastExecution\}\}/g, lastExecText)
       .replace(/\{\{lastComments\}\}/g, lastCommentsText)
+  }
+
+  /**
+   * Mark one still-running execution as interrupted, keeping the envelope and
+   * its attempt chain coherent. A settled envelope must never leave a
+   * `running` attempt behind (audit finding).
+   */
+  private settleInterruptedExecution(execution: ExecutionRecord, now: number, reason: string): void {
+    execution.outcome = 'failed'
+    execution.error = reason
+    execution.endedAt = now
+    if (Array.isArray(execution.attempts)) {
+      for (const attempt of execution.attempts) {
+        if (attempt.outcome !== 'running') continue
+        attempt.outcome = 'failed'
+        attempt.endedAt = now
+        attempt.reason = reason
+      }
+    }
   }
 
   /** Move a task back out of in_progress (and release its hold) after a failed start. */

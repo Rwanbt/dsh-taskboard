@@ -112,6 +112,7 @@ export class JiraProvider implements ExternalTaskProvider, ExternalWriteProvider
     try {
       if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error('invalid Jira issue URL')
     } catch { throw new Error('invalid Jira issue URL') }
+    const labels = Array.isArray(f.labels) ? f.labels.filter((label): label is string => typeof label === 'string' && label.trim().length > 0) : []
     return {
       projectId, type: 'issue', id: key,
       title: f.summary.trim(),
@@ -123,6 +124,7 @@ export class JiraProvider implements ExternalTaskProvider, ExternalWriteProvider
       closed: category?.key === 'done',
       urgency: this.urgency(typeof priority === 'string' ? priority : ''),
       url,
+      ...(labels.length > 0 ? { labels } : {}),
       revision: typeof f.updated === 'string' ? f.updated : '',
     }
   }

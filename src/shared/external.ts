@@ -256,6 +256,12 @@ export type ExternalItem = ExternalFields & {
   closed: boolean
   /** Remote revision (updated_at / etag / version) used for optimistic conflict detection. */
   revision?: string
+  /**
+   * Remote labels/tags, when the adapter exposes them. Used ONLY at ingestion
+   * to derive a functional category through the configurable label map; never
+   * pushed back and never used to reclassify an existing card.
+   */
+  labels?: string[]
 }
 /**
  * What the local card looked like at the last completed push. Separate from

@@ -166,6 +166,11 @@ export class SchedulerService {
       // states retain their config so an explicit reopen can resume — none
       // of these ever refire from here.
       if (task.status !== 'todo') continue
+      // Human-facing flags are execution barriers: a blocked card or one
+      // explicitly waiting for a human decision never queues or spends a
+      // scheduled window. The trigger stays pending and is re-evaluated under
+      // the normal missed-window policy once the wait clears (audit A08).
+      if (task.blocked === true || task.waitingForHuman === true) continue
       // Already queued while this host was online: do not apply the offline
       // missed-window policy to it. Dispatch happens in the FIFO pass below.
       if (task.execution.queuedRunAt !== undefined) continue
@@ -223,6 +228,9 @@ export class SchedulerService {
     for (const task of queuedTasks) {
       if (task.execution.mode !== 'scheduled' || task.status !== 'todo'
         || task.trashedAt !== undefined || task.execution.queuedRunAt === undefined) continue
+      // A card that became blocked/waiting AFTER being queued is deferred, not
+      // dispatched, and its queue entry keeps its expiry clock released.
+      if (task.blocked === true || task.waitingForHuman === true) { deferred.push(task.id); continue }
       if (isDependencyReady(task, dispatchIndex)) ready.push(task)
       else deferred.push(task.id)
     }
@@ -320,6 +328,7 @@ export class SchedulerService {
       const task = ledger.tasks.find(t => t.id === taskId)
       if (task === undefined || task.execution.cron === undefined || task.execution.queuedRunAt !== undefined) return undefined
       if (task.status !== 'todo' || task.trashedAt !== undefined || task.execution.nextRunAt !== due) return undefined
+      if (task.blocked === true || task.waitingForHuman === true) return undefined
       const match = parseCron(task.execution.cron)
       const next = match === null ? undefined : nextCronTime(match, now) ?? undefined
       if (next === undefined) return undefined
@@ -336,6 +345,7 @@ export class SchedulerService {
       const task = ledger.tasks.find(t => t.id === taskId)
       if (task === undefined || task.execution.runAt !== due || task.execution.queuedRunAt !== undefined) return undefined
       if (task.status !== 'todo' || task.trashedAt !== undefined) return undefined
+      if (task.blocked === true || task.waitingForHuman === true) return undefined
       delete task.execution.runAt
       task.execution.nextRunAt = undefined
       task.execution.queuedRunAt = due
@@ -358,6 +368,9 @@ export class SchedulerService {
       // explicit manual clear ('cleared') stays unconditional — it is user
       // intent, not a policy drop.
       if (reason !== 'cleared') {
+        // Never spend work that a human paused or that is blocked: the entry
+        // stays queued for a later tick (same rule as unmet prerequisites).
+        if (task.blocked === true || task.waitingForHuman === true) return undefined
         const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
         if (!isDependencyReady(task, dependencyIndex)) return undefined
       }
@@ -438,6 +451,7 @@ export class SchedulerService {
       const task = ledger.tasks.find(t => t.id === taskId)
       if (task === undefined || task.execution.queuedRunAt !== queuedWindow) return undefined
       if (task.status !== 'todo' || task.trashedAt !== undefined) return undefined
+      if (task.blocked === true || task.waitingForHuman === true) return undefined
       const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
       if (!isDependencyReady(task, dependencyIndex)) return undefined
       if (task.execution.cron !== undefined) {
@@ -483,6 +497,7 @@ export class SchedulerService {
       // blocked the window is left in place and the next tick queues it as a
       // deferred durable entry instead.
       if (missedDue !== undefined) {
+        if (task.blocked === true || task.waitingForHuman === true) return undefined
         const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
         if (!isDependencyReady(task, dependencyIndex)) return undefined
       }
@@ -525,6 +540,7 @@ export class SchedulerService {
       // still blocked the window is left due and the next tick queues it as a
       // deferred durable entry instead.
       if (missedDue !== undefined) {
+        if (task.blocked === true || task.waitingForHuman === true) return undefined
         const dependencyIndex: ReadonlyMap<string, TaskRecord> = buildDependencyIndex(ledger.tasks)
         if (!isDependencyReady(task, dependencyIndex)) return undefined
       }

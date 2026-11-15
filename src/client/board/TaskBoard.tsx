@@ -4,7 +4,7 @@
  *
  * @module dsh-taskboard/client/board/TaskBoard
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import type { BoardController, ControllerState } from '../controller.ts'
 import type { TaskRecord, TaskStatus, Urgency } from '../../shared/protocol.ts'
 import { MAIN_STATUSES, canTransition, completedDisplayLimitOf } from '../../shared/protocol.ts'
@@ -24,6 +24,13 @@ import { ImportModal } from './ImportModal.tsx'
 import { TemplateManager } from './TemplateManager.tsx'
 import { useAlert } from './AlertModal.tsx'
 import { Select } from './Select.tsx'
+import { resolveWorkspaceName as resolveWorkspaceNameBase } from './project-label.ts'
+import { useAppearance, setAppearance, vibrancyOf } from './appearance.ts'
+import { runClassification } from './classify.ts'
+import { categoriesOf, categoryLabelMapOf } from '../../shared/protocol.ts'
+
+/** Sentinel category filter for the "unclassified" bucket. */
+const UNCLASSIFIED_FILTER = '\u0000unclassified'
 
 /** Urgency sort rank (urgent first). */
 const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, normal: 1, relaxed: 2 }
@@ -34,6 +41,11 @@ export function filterTasks(state: ControllerState, tasks: TaskRecord[]): TaskRe
   const filtered = tasks.filter(t =>
     (state.filters.workspaceId === undefined || t.workspaceId === state.filters.workspaceId)
     && (state.filters.urgencies.length === 0 || state.filters.urgencies.includes(t.urgency))
+    // Category filter: the unclassified bucket matches tasks without a category.
+    && (state.filters.categoryId === undefined
+      || (state.filters.categoryId === UNCLASSIFIED_FILTER
+        ? t.category === undefined
+        : t.category === state.filters.categoryId))
     && (q.length === 0 || t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)))
   if (state.sortBy === 'default') return filtered
   const sorted = [...filtered]
@@ -55,22 +67,12 @@ export interface WorkspaceTaskGroup {
   tasks: TaskRecord[]
 }
 
-/** Resolve display name for a workspace. */
-export function resolveWorkspaceName(
-  workspaceId: string | undefined,
-  workspaces: Array<{ id: string; title?: string; path?: string }>,
-  unassignedLabel: string,
-): string {
-  if (!workspaceId) return unassignedLabel
-  const ws = workspaces.find(w => w.id === workspaceId)
-  if (ws?.title && ws.title.trim().length > 0) return ws.title.trim()
-  if (ws?.path && ws.path.trim().length > 0) {
-    const trimmed = ws.path.trim().replace(/[/\\]+$/, '')
-    const base = trimmed.split(/[/\\]/).filter(Boolean).pop()
-    return base || trimmed
-  }
-  return workspaceId.slice(0, 8)
-}
+/**
+ * Resolve display name for a workspace. Implemented in `project-label.ts` so
+ * the card header and the project grouping can never disagree; re-exported
+ * here because the board has always published it.
+ */
+export const resolveWorkspaceName = resolveWorkspaceNameBase
 
 export type GroupSortOrder = 'name' | 'latestTask' | 'updated' | 'created' | 'urgency'
 
@@ -157,6 +159,8 @@ export function groupAndSortTasksByWorkspace(
  */
 export function TaskBoard({ controller }: { controller: BoardController }) {
   const t = useT()
+  const appearance = useAppearance()
+  const categories = categoriesOf(controller.getSnapshot().ledger.settings)
   const state = useSyncExternalStore(
     cb => controller.subscribe(cb),
     () => controller.getSnapshot(),
@@ -171,6 +175,31 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
   const allLive = filterTasks(state, state.ledger.tasks.filter(t => t.trashedAt === undefined))
   const needsHumanCount = allLive.filter(task => humanWaiting(task).needs).length
   const live = onlyNeedsHuman ? allLive.filter(task => humanWaiting(task).needs) : allLive
+  // "Colour by category" is only meaningful once tasks have categories. On a
+  // board whose tasks are all unclassified the surfaces are neutral by design,
+  // which reads as "everything is grey": offer the explicit migration instead
+  // of silently reclassifying anything.
+  const categorizedCount = allLive.filter(task => task.category !== undefined).length
+  const [classifyProgress, setClassifyProgress] = useState<{ done: number; total: number } | undefined>()
+  const classifyExisting = (): void => {
+    if (classifyProgress !== undefined) return
+    setClassifyProgress({ done: 0, total: 0 })
+    void runClassification(controller, {
+      categories: categoriesOf(controller.getSnapshot().ledger.settings),
+      labelMap: categoryLabelMapOf(controller.getSnapshot().ledger.settings),
+      onProgress: (done, total) => setClassifyProgress({ done, total }),
+    }).then(result => {
+      setClassifyProgress(undefined)
+      if (result.classified === 0 && result.failed === 0) {
+        showAlert(t('classification.none'))
+        return
+      }
+      showAlert(t('classification.result', { classified: result.classified, failed: result.failed }))
+    }).catch(error => {
+      setClassifyProgress(undefined)
+      showAlert(error instanceof Error ? error.message : String(error))
+    })
+  }
   const selected = state.selectedId === undefined ? undefined : state.ledger.tasks.find(t => t.id === state.selectedId)
   const detailPanelRef = useRef<HTMLDivElement>(null)
 
@@ -211,12 +240,40 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
   const closeExport = (): void => setExportOpen(false)
   // Fold/expand toggle for completed tasks (0.8.8)
   const [doneExpanded, setDoneExpanded] = useState(false)
+  // Narrow-viewport column navigation: scroll the five columns into view one
+  // at a time without introducing a second navigation model (the host sidebar
+  // stays the only app navigation).
+  const scrollToColumn = (status: TaskStatus): void => {
+    const column = document.querySelector<HTMLElement>(`.dsh-atb-board .dsh-atb-column[data-status="${status}"]`)
+    if (column === null) return
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    column.scrollIntoView({ block: 'nearest', inline: 'start', behavior: reduce ? 'auto' : 'smooth' })
+  }
 
   return (
-    <div className="dsh-atb-board">
-      <div className="dsh-atb-toolbar">
+    <div
+      className="dsh-atb-board"
+      data-atb-density={appearance.density}
+      data-atb-descriptions={appearance.descriptions ? 'true' : 'false'}
+      data-atb-group={appearance.group ? 'true' : 'false'}
+      data-atb-color-mode={appearance.colorMode}
+      data-atb-intensity={appearance.intensity}
+      style={{ '--atb-vibrancy': vibrancyOf(appearance) } as CSSProperties}
+    >
+      <div className="dsh-atb-head">
         <h2 className="dsh-atb-title">{t('board.title')}</h2>
         <span className="dsh-atb-count">{t('board.count.tasks', { n: live.length, rev: state.ledger.revision })}</span>
+        <div className="dsh-atb-spacer" />
+        <button
+          type="button"
+          className="dsh-atb-btn dsh-atb-grouptoggle"
+          aria-pressed={appearance.group}
+          title={t('appearance.group.title')}
+          onClick={() => setAppearance({ group: !appearance.group })}
+        >
+          <Icon name="folder" />
+          <span className="dsh-atb-grouptoggle-label">{t('appearance.group')}</span>
+        </button>
         <div className="dsh-atb-newmenu">
           <button
             type="button"
@@ -263,14 +320,20 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             </>
           )}
         </div>
-        <div className="dsh-atb-spacer" />
-        <input
-          className="dsh-atb-input dsh-atb-search"
-          value={state.search}
-          placeholder={t('board.search.placeholder')}
-          spellCheck={false}
-          onChange={e => controller.setSearch(e.target.value)}
-        />
+      </div>
+
+      <div className="dsh-atb-toolbar">
+        <label className="dsh-atb-searchfield">
+          <Icon name="search" />
+          <input
+            className="dsh-atb-search"
+            value={state.search}
+            placeholder={t('board.search.placeholder')}
+            aria-label={t('board.search.placeholder')}
+            spellCheck={false}
+            onChange={e => controller.setSearch(e.target.value)}
+          />
+        </label>
         <Select
           ariaLabel={t('board.filter.allProjects')}
           value={state.filters.workspaceId ?? ''}
@@ -278,6 +341,17 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
           options={[
             { value: '', label: t('board.filter.allProjects') },
             ...state.workspaces.map(ws => ({ value: ws.id, label: ws.title || ws.path })),
+          ]}
+        />
+        <Select
+          ariaLabel={t('board.filter.allCategories')}
+          title={t('board.filter.allCategories')}
+          value={state.filters.categoryId ?? ''}
+          onChange={v => controller.setCategoryFilter(v === '' ? undefined : v)}
+          options={[
+            { value: '', label: t('board.filter.allCategories') },
+            ...categories.map(category => ({ value: category.id, label: category.name })),
+            { value: UNCLASSIFIED_FILTER, label: t('category.unclassified') },
           ]}
         />
         <Select
@@ -293,6 +367,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             { value: 'title', label: t('board.sort.byTitle') },
           ]}
         />
+        <span className="dsh-atb-toolbar-divider" aria-hidden="true" />
         {(['urgent', 'normal', 'relaxed'] as const).map(u => (
           <button
             key={u}
@@ -321,10 +396,11 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
         >
           <Icon name="hand" /> {t("board.filter.needsHuman")} {needsHumanCount > 0 ? `(${needsHumanCount})` : ""}
         </button>
+        <div className="dsh-atb-spacer" />
         <button type="button" className="dsh-atb-btn" onClick={() => controller.toggleSecondary()}>
           {state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
         </button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}><Icon name="settings" /> {t('board.action.settings')}</button>
+        <button type="button" className="dsh-atb-btn" data-action="appearance" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}><Icon name="settings" /> {t('board.action.settings')}</button>
         <button type="button" className="dsh-atb-btn" title={t('board.action.diagTitle')} onClick={() => controller.openDiagnostics()}><Icon name="diagnostics" /> {t('board.action.diag')}</button>
         <button type="button" className="dsh-atb-btn" title={t('board.action.importTitle')} onClick={() => controller.openImport()}><Icon name="import" /> {t('board.action.import')}</button>
         <div className="dsh-atb-newmenu">
@@ -372,10 +448,51 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
 
       {state.error !== undefined && <div className="dsh-atb-error">{state.error}</div>}
 
+      {!state.secondaryOpen && appearance.colorMode === 'category' && allLive.length > 0 && categorizedCount === 0 && (
+        <div className="dsh-atb-classifyhint" role="status">
+          <Icon name="checklist" size={16} />
+          <div className="dsh-atb-classifyhint-text">
+            <span className="dsh-atb-classifyhint-title">{t('board.category.hint.title')}</span>
+            <span className="dsh-atb-classifyhint-body">{t('board.category.hint.body', { n: allLive.length })}</span>
+          </div>
+          <span className="dsh-atb-classifyhint-actions">
+            <button
+              type="button"
+              className="dsh-atb-btn"
+              data-primary="true"
+              disabled={classifyProgress !== undefined}
+              onClick={classifyExisting}
+            >
+              {classifyProgress === undefined
+                ? t('board.category.hint.classify')
+                : t('board.category.hint.classifying', { done: classifyProgress.done, total: classifyProgress.total })}
+            </button>
+            <button type="button" className="dsh-atb-btn" onClick={() => setAppearance({ colorMode: 'priority' })}>
+              {t('board.category.hint.usePriority')}
+            </button>
+          </span>
+        </div>
+      )}
+
       {state.secondaryOpen
         ? <SecondaryTab controller={controller} tasks={filterTasks(state, state.ledger.tasks)} />
         : (
-          <div className="dsh-atb-columns">
+          <div className="dsh-atb-board-body">
+            <nav className="dsh-atb-mobilebar" aria-label={t('board.columns.nav')}>
+              {MAIN_STATUSES.map(status => (
+                <button
+                  key={status}
+                  type="button"
+                  className="dsh-atb-mobilebar-btn"
+                  data-status={status}
+                  onClick={() => scrollToColumn(status)}
+                >
+                  <span className="dsh-atb-dot" data-status={status} aria-hidden="true" />
+                  {t(COLUMN_KEYS[status])} · {live.filter(task => task.status === status).length}
+                </button>
+              ))}
+            </nav>
+            <div className="dsh-atb-columns">
             {MAIN_STATUSES.map(status => {
               const rawColumnTasks = live.filter(t => t.status === status)
               const isBacklog = status === 'backlog'
@@ -427,6 +544,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                   <div
                     className="dsh-atb-column"
                     key={status}
+                    data-status={status}
                     data-collapsed="true"
                     onDragOver={onDragOver}
                     onDragLeave={onDragLeave}
@@ -482,6 +600,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                 <div
                   className="dsh-atb-column"
                   key={status}
+                  data-status={status}
                   onDragOver={onDragOver}
                   onDragLeave={onDragLeave}
                   onDrop={onDrop}
@@ -537,24 +656,40 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                     )}
                   </div>
                   <div className="dsh-atb-cards">
-                    {workspaceGroups.map(group => (
-                      <div className="dsh-atb-ws-group" key={group.workspaceId ?? 'unassigned'}>
-                        <button type="button" className="dsh-atb-ws-group-head"
-                          aria-expanded={!controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}
-                          aria-label={t(controller.isWorkspaceGroupCollapsed(status, group.workspaceId) ? 'board.workspace.expand' : 'board.workspace.collapse', { name: group.workspaceName })}
-                          title={group.workspaceName}
-                          onClick={() => controller.toggleWorkspaceGroup(status, group.workspaceId)}>
-                          <span className="dsh-atb-ws-group-chevron"><Icon name="chevronRight" size={12} /></span>
-                          <span className="dsh-atb-ws-group-icon">
-                            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M1.5 3.5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 .8.4L8 4.5h5.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z" />
-                            </svg>
-                          </span>
-                          <span className="dsh-atb-ws-group-name">{group.workspaceName}</span>
-                          <span className="dsh-atb-ws-group-count">{group.tasks.length}</span>
-                        </button>
-                        <div className="dsh-atb-ws-group-cards" hidden={controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}>
-                          {group.tasks.map(task => (
+                    {appearance.group
+                      ? workspaceGroups.map(group => (
+                        <div className="dsh-atb-ws-group" key={group.workspaceId ?? 'unassigned'}>
+                          <button type="button" className="dsh-atb-ws-group-head"
+                            aria-expanded={!controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}
+                            aria-label={t(controller.isWorkspaceGroupCollapsed(status, group.workspaceId) ? 'board.workspace.expand' : 'board.workspace.collapse', { name: group.workspaceName })}
+                            title={group.workspaceName}
+                            onClick={() => controller.toggleWorkspaceGroup(status, group.workspaceId)}>
+                            <span className="dsh-atb-ws-group-chevron"><Icon name="chevronRight" size={12} /></span>
+                            <span className="dsh-atb-ws-group-icon">
+                              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M1.5 3.5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 .8.4L8 4.5h5.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z" />
+                              </svg>
+                            </span>
+                            <span className="dsh-atb-ws-group-name">{group.workspaceName}</span>
+                            <span className="dsh-atb-ws-group-count">{group.tasks.length}</span>
+                          </button>
+                          <div className="dsh-atb-ws-group-cards" hidden={controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}>
+                            {group.tasks.map(task => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                controller={controller}
+                                draggable
+                                now={now}
+                                onAlert={showAlert}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                      : (
+                        <div className="dsh-atb-ws-group-cards">
+                          {visibleTasks.map(task => (
                             <TaskCard
                               key={task.id}
                               task={task}
@@ -565,9 +700,13 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                             />
                           ))}
                         </div>
+                      )}
+                    {columnTasks.length === 0 && (
+                      <div className="dsh-atb-empty">
+                        <Icon name="checklist" size={22} />
+                        <span className="dsh-atb-empty-title">{t('board.empty')}</span>
                       </div>
-                    ))}
-                    {columnTasks.length === 0 && <div className="dsh-atb-empty">{t('board.empty')}</div>}
+                    )}
                     {isDone && !isSearching && columnTasks.length > doneLimit && (
                       <div className="dsh-atb-done-foldbar">
                         {!doneExpanded ? (
@@ -596,6 +735,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                 </div>
               )
             })}
+            </div>
           </div>
         )}
 
@@ -934,3 +1074,4 @@ function SecondaryTab({ controller, tasks }: { controller: BoardController; task
     </div>
   )
 }
+

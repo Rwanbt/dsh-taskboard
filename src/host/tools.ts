@@ -35,6 +35,7 @@ import {
   asIsolation,
   asPermission,
   asStatus,
+  asTaskCategoryReference,
   asUrgency,
   canTransition,
   checklistFromTexts,
@@ -599,6 +600,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       workspaceId: { type: 'string', description: 'Filter by project: DSH workspace id, or that project\'s directory path.' },
       status: { type: 'string', description: 'Filter by exact status (backlog/todo/in_progress/in_review/done/canceled/archived).' },
       urgency: { type: 'string', description: 'Filter by urgency (urgent/normal/relaxed).' },
+      category: { type: 'string', description: 'Filter by functional category (category id or display name, e.g. development, bug, documentation).' },
       includeTrashed: { type: 'boolean', description: 'Include soft-deleted tasks (default false).' },
     },
     output: {
@@ -613,13 +615,18 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     },
     async execute(args, exec) {
       try {
-        const a = args as { workspaceId?: string; status?: string; urgency?: string; includeTrashed?: boolean }
+        const a = args as { workspaceId?: string; status?: string; urgency?: string; category?: string; includeTrashed?: boolean }
         const workspaceId = a.workspaceId === undefined ? undefined : await resolveWorkspaceArg(deps, a.workspaceId)
         if (a.workspaceId !== undefined && workspaceId === undefined) {
           throw new ToolError(ERR.notFound, await unknownWorkspaceDetail(deps, exec as ToolRunContext, a.workspaceId))
         }
         if (a.status !== undefined) asStatus(a.status)
         if (a.urgency !== undefined) asUrgency(a.urgency)
+        // Category filters accept the display name as well as the id; an
+        // unknown reference is an error, never a silent empty result.
+        const categoryId = a.category === undefined
+          ? undefined
+          : asTaskCategoryReference(store.snapshot().settings, a.category)
         const ledger = store.snapshot()
         // F4/F6: ONE id index for the whole listing; the readiness projection
         // is derived (D9) and only attached to tasks that have prerequisites.
@@ -628,6 +635,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           (workspaceId === undefined || t.workspaceId === workspaceId)
           && (a.status === undefined || t.status === a.status)
           && (a.urgency === undefined || t.urgency === a.urgency)
+          && (categoryId === undefined || t.category === categoryId)
           && (a.includeTrashed === true || t.trashedAt === undefined))
         return json({
           revision: ledger.revision,
@@ -707,6 +715,10 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       description: { type: 'string', description: 'What the task involves (plain text).' },
       prompt: { type: 'string', description: 'Extra execution instructions; the session receives title+description+this prompt.' },
       status: { type: 'string', description: 'Initial status; default todo. backlog = not approved for execution.' },
+      category: {
+        type: 'string',
+        description: 'Functional category id or display name (e.g. development, bug, documentation). Powers the "colour by category" board mode and the category badge. Omitted = unclassified (Général / Non classé); an unknown value is rejected.',
+      },
       execution: {
         type: 'object',
         additionalProperties: false,
@@ -764,6 +776,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       workspaceId: string
       urgency: string
       status?: string
+      category?: string
       description?: string
       prompt?: string
       execution?: { mode?: string; cron?: string; runAt?: string | number }
@@ -807,6 +820,12 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
         const checklistTexts = args.checklist?.map(c => c.trim()).filter(c => c.length > 0)
         const checklist = checklistTexts !== undefined && checklistTexts.length > 0 ? checklistFromTexts(checklistTexts) : undefined
         const now = deps.now()
+        // Category (design brief "coloration par catégorie"): agents may name a
+        // category id or its display name; the host validates against the board
+        // categories, so an unknown value fails loudly instead of mislabelling.
+        const category = args.category === undefined
+          ? undefined
+          : asTaskCategoryReference(store.snapshot().settings, args.category)
         const task: TaskRecord = {
           id: newTaskId(),
           title,
@@ -815,6 +834,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           workspaceId,
           urgency,
           status,
+          ...(category !== undefined ? { category } : {}),
           blocked: false,
           execution,
           model,
@@ -868,6 +888,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       description: { type: 'string', description: 'New description.' },
       prompt: { type: 'string', description: 'New execution prompt.' },
       urgency: { type: 'string', description: 'urgent | normal | relaxed.' },
+      // json node: accepts a category id/name to set, or null to clear it.
+      category: { type: 'json' },
       blocked: { type: 'boolean', description: 'Blocked marker (work cannot continue right now).' },
       dependsOn: { type: 'array', items: { type: 'string' }, description: 'Replace prerequisites by same-workspace task IDs; [] clears, cycles rejected. REMOVING an existing id requires reason and waits for user approval; additions apply immediately.' },
       reason: { type: 'string', description: 'Why a prerequisite must be removed/weakened (1..500 chars). Required only when dependsOn drops an existing id; recorded in the approval request and audit comment. Never include credentials.' },
@@ -902,6 +924,7 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       description?: string
       prompt?: string
       urgency?: string
+      category?: string | null
       blocked?: boolean
       dependsOn?: string[]
       reason?: string
@@ -984,6 +1007,13 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
             }
           }
           applyHumanWaitingPatch(next, args)
+          // Category: an id/display name is validated against the board
+          // categories; null clears it (unclassified). Descriptive only.
+          if (args.category !== undefined) {
+            const category = asTaskCategoryReference(store.snapshot().settings, args.category)
+            if (category === undefined) delete next.category
+            else next.category = category
+          }
           if (args.permission !== undefined) next.permission = asPermission(args.permission)
           next.version = task.version + 1
           next.updatedAt = deps.now()
@@ -1317,11 +1347,16 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
     }, exec: unknown) {
       try {
         const { actor } = caller(exec as ToolRunContext)
+        // The project boundary applies to EVERY agent write, not only
+        // update/delete/move: a session must not edit another project's
+        // acceptance checklist (audit A10).
+        const claimScope = await callerClaimScope(deps, exec as ToolRunContext)
         // R1: guards + the checklist edit itself run inside the mutation.
         let next: TaskRecord | undefined
         await store.mutate('task-updated', ledger => {
           const { index, task } = liveTaskAt(ledger, args.id)
           versionGuard(task, args.ifVersion)
+          assertProjectAccess(claimScope, allowClaimFromLinkedRootsOf(ledger.settings), task)
           if (task.status === 'archived') throw new ToolError(ERR.invalidTransition, 'archived tasks are immutable')
           next = structuredClone(task)
           const checklist: ChecklistItem[] = next.checklist === undefined ? [] : [...next.checklist]
@@ -1379,7 +1414,8 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       'Submit the structured execution report for the task you are currently executing (summary / changed '
       + 'files / how you verified / artifacts / remaining risk). Submit BEFORE moving the task to in_review; '
       + 'a later submission overwrites the previous report. If your run already settled, you may back-submit '
-      + 'onto your latest succeeded execution while you still hold the task. Commits and diffs are host-collected.',
+      + 'onto your latest succeeded execution while you still hold the task. A task you claimed directly '
+      + '(no execution envelope) stores the report on the task itself. Commits and diffs are host-collected.',
     parameters: {
       summary: { type: 'string', required: true, description: 'What was done (1..2000 chars).' },
       changedFiles: {
@@ -1404,9 +1440,10 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
       render: (_args, value) => {
         const v = value as { taskId?: string; executionId?: string; report?: { summary?: string } }
         if (v.taskId === undefined || v.report === undefined) return [{ type: 'text', text: '报告提交失败。' }]
+        const target = v.executionId === undefined ? `任务 ${v.taskId}` : `任务 ${v.taskId}（执行 ${v.executionId}）`
         return [{
           type: 'text',
-          text: `执行报告已记录到任务 ${v.taskId}（执行 ${v.executionId}）：${v.report.summary?.slice(0, 120) ?? ''}\n`
+          text: `执行报告已记录到${target}：${v.report.summary?.slice(0, 120) ?? ''}\n`
             + '接下来：taskboard_comment_add 留交接评论，然后 taskboard_move 移至待验收 in_review。',
         }]
       },
@@ -1457,10 +1494,27 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
             return undefined
           })
         }
-        if (taskId === undefined || executionId === undefined) {
-          throw new ToolError(ERR.forbidden, 'no running execution and no settled execution of yours to report on — reports attach to your running execution, or back-submit onto your latest succeeded one while you hold the task')
+        // Path 3 (manual claim, audit A15): the main conversation claimed the
+        // card directly (taskboard_move todo→in_progress) and therefore has no
+        // execution envelope. Its report belongs to the TASK and is shown to
+        // the reviewer; a new run clears it. Only the claim holder may write it.
+        if (taskId === undefined) {
+          await store.mutate('task-updated', ledger => {
+            for (const task of ledger.tasks) {
+              if (task.trashedAt !== undefined || task.status !== 'in_progress' || task.claimedBy !== sessionId) continue
+              task.report = report
+              task.updatedAt = deps.now()
+              task.updatedBy = { kind: 'agent', sessionId }
+              taskId = task.id
+              return [task]
+            }
+            return undefined
+          })
         }
-        return json({ taskId, executionId, report })
+        if (taskId === undefined) {
+          throw new ToolError(ERR.forbidden, 'back-submit onto your latest succeeded one while you hold the task, attach the report to a task you claim directly, or submit it from your running execution — no running or settled execution of yours was found')
+        }
+        return json({ taskId, ...(executionId !== undefined ? { executionId } : {}), report })
       } catch (error) { fail(error) }
     },
   })) as () => void)
@@ -1497,13 +1551,27 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
           + ` · 推送 ${v.pushed ?? 0} · 推送失败 ${v.pushFailed ?? 0}。` }]
       },
     },
-    async execute(args: { taskId?: string; scope?: string }) {
+    async execute(args: { taskId?: string; scope?: string }, exec: unknown) {
       try {
         const service = deps.externalSync?.()
         if (service === undefined) throw new ToolError(ERR.invalidInput, 'external sync is not available in this host')
+        // The project boundary applies to external writes too (audit A11). A
+        // GLOBAL sync pulls and pushes every mapped project, so an agent
+        // session may not trigger it; that stays an operator action (GUI/API
+        // route). Direct operator invocation without an agent is unchanged.
+        const agentSession = (exec as ToolRunContext | undefined)?.agent
         if (args.taskId === undefined) {
           if (args.scope !== undefined) throw new ToolError(ERR.invalidInput, 'scope requires taskId')
+          if (agentSession !== undefined) {
+            throw new ToolError(ERR.forbidden, 'a full external sync spans every project; run it from the Task Board GUI. An agent session may only push one card of its own project.')
+          }
           return json({ mode: 'sync', ...await service.sync() })
+        }
+        if (agentSession !== undefined) {
+          const claimScope = await callerClaimScope(deps, exec as ToolRunContext)
+          const target = store.get(args.taskId)
+          if (target === undefined || target.trashedAt !== undefined) throw new ToolError(ERR.notFound, `no task ${args.taskId}`)
+          assertProjectAccess(claimScope, allowClaimFromLinkedRootsOf(store.snapshot().settings), target)
         }
         const outcome = await service.pushTask(args.taskId, args.scope)
         return json({
@@ -1516,3 +1584,4 @@ export function registerTaskboardTools(ctx: ToolContextFace, deps: ToolDeps): Ar
 
   return disposers
 }
+

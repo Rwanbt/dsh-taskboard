@@ -19,6 +19,8 @@ import {
 } from '../shared/external.ts'
 import { bestExternalMatch, externalKey, externalMatchScore, mergeExternalFields, normalizeExternalSource, normalizeExternalSyncRecords } from '../shared/external.ts'
 import { defaultIsolationOf, defaultPermissionOf, newTaskId, normalizeTitle, type TaskRecord, type TaskLedger } from '../shared/protocol.ts'
+import { categoriesOf, categoryLabelMapOf } from '../shared/protocol.ts'
+import { categoryFromLabels } from '../shared/categories.ts'
 import type { TaskStore } from './store.ts'
 import type { ExternalConfig, ExternalSyncStatus, SyncResult } from '../shared/external.ts'
 import type { ExternalTaskProvider, ExternalProviderRegistry, ExternalWriteProvider } from './external-provider.ts'
@@ -42,6 +44,16 @@ function secureTextEqual(left: string, right: string): boolean {
   const a = createHash('sha256').update(left).digest()
   const b = createHash('sha256').update(right).digest()
   return timingSafeEqual(a, b)
+}
+
+/**
+ * Functional category for a freshly imported external item, derived from its
+ * remote labels through the configurable board mapping. Evaluated exactly once
+ * at ingestion; an existing card is never reclassified.
+ */
+function categoryForExternalItem(item: ExternalItem, settings: TaskLedger['settings']): string | undefined {
+  if (item.labels === undefined || item.labels.length === 0) return undefined
+  return categoryFromLabels(item.labels, categoryLabelMapOf(settings), categoriesOf(settings))
 }
 
 /** One normalized webhook decision, rendered by the route. */
@@ -623,7 +635,14 @@ export class ExternalSyncService {
                 continue
               }
               if (item.closed || (config.assigneeFilter === true && !(item.assignees ?? [item.assignedTo]).includes(config.account))) continue
+              // Functional category derived from the remote labels, ONCE at
+              // ingestion (never during a render, never on later syncs), and
+              // only when the card has no explicit category yet. The mapping is
+              // the board setting; precedence is documented in
+              // shared/categories.ts.
+              const category = categoryForExternalItem(item, ledger.settings)
               const created: TaskRecord = { id: newTaskId(), title: item.title, description: item.description, urgency: item.urgency,
+                ...(category !== undefined ? { category } : {}),
                 workspaceId, prompt: '', status: config.importStatus ?? 'backlog', blocked: false, execution: { mode: 'claim' },
                 isolation: defaultIsolationOf(ledger.settings), permission: defaultPermissionOf(ledger.settings),
                 model: ledger.settings?.defaultModel, presetId: ledger.settings?.defaultPresetId,

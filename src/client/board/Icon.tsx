@@ -19,6 +19,7 @@ export type IconName =
   | 'link' | 'comment' | 'subtask' | 'clock' | 'user' | 'bot'
   | 'folder' | 'lock' | 'file' | 'image' | 'hand' | 'play' | 'checklist'
   | 'external' | 'stale' | 'shieldCheck' | 'branch' | 'edit' | 'trash' | 'stop'
+  | 'search'
 
 /** Hand-drawn 16×16 line paths (stroke only). */
 const PATHS: Record<IconName, ReactNode> = {
@@ -52,6 +53,7 @@ const PATHS: Record<IconName, ReactNode> = {
   edit: <path d="M10.8 2.8 13.2 5.2 5.4 13H3v-2.4z" />,
   trash: <><path d="M3 4.5h10" /><path d="M6 4.5V3h4v1.5" /><path d="m4.5 4.5.7 8.5h5.6l.7-8.5" /><path d="M6.8 7v4M9.2 7v4" /></>,
   stop: <rect x="4.5" y="4.5" width="7" height="7" rx="1" />,
+  search: <><circle cx="7.2" cy="7.2" r="4.2" /><path d="m10.4 10.4 3.1 3.1" /></>,
 }
 
 /**
