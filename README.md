@@ -5,6 +5,8 @@
 
 # dsh-taskboard
 
+<p align="center"><img src="img/hero.png" alt="Task Board in the DeepSeek Pastel theme — five-column desktop board and the mobile status carousel (fictional demo data, no real project)" width="100%"></p>
+
 > **Contributing and pull requests**: branch from `dev` for features, fixes and documentation, and set your PR base to **`dev`**. `main` is the protected stable release branch; maintainers integrate releases through a `dev → main` PR. CI must pass before merging into `main`.
 
 A **task board plugin for DeepSeek Harness**: humans create cards, agents claim and execute them, humans review and accept. Tasks live on projects (= workspaces), support per-task model & preset selection, and can run manually or on a cron schedule — full two-way collaboration from card to sign-off.
@@ -19,8 +21,6 @@ A **task board plugin for DeepSeek Harness**: humans create cards, agents claim 
 - **Agent Board public contract v1**: optional bearer-authenticated API (discover work, atomic claim, failover, session handoff, reports, event stream). Task Board always owns the ledger and execution envelope, and `done` stays human-only; see [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md).
 
 **Zero configuration**: install and it works — no tokens, no API keys, no extra services or databases.
-
-<p align="center"><img src="img/hero.png" alt="Task Board in the DeepSeek Pastel theme — five-column desktop board and the mobile status carousel (demo data, no real project)" width="100%"></p>
 
 ## 0.12.0 — universal sync and Agent Board contract (development branch, unreleased)
 
@@ -51,13 +51,17 @@ This fork adds the following on top of upstream. Full design: [docs/dependencies
 - **DSH design system**: every color, radius and shadow comes from the `--dsw-*` tokens (light and dark). Native `<select>` elements are replaced by a themed, accessible `Select` (popup rendered on `<body>`, full keyboard support). The board uses a borderless layout (tone and elevation instead of outlines) and a monochrome SVG icon set instead of emoji.
 - **Robustness**: the ledger lock now treats transient Windows `EPERM`/`EACCES`/`ENOENT` like contention and retries.
 
-Tests: `npm run build && npm test` (90 files, 1223 tests at v0.12.0; 74 files, 1026 tests at v0.10.2; **99 files, 1358 tests on this branch**). CI passed on Node 22 and 26 before release. Coverage: `npm run test:coverage`; the [coverage report](./tests/qa/COVERAGE.md) records an earlier 975-test baseline (~88.6 % lines), not a fresh v0.10.2 measurement.
+Tests: `npm run build && npm test` (90 files, 1223 tests at v0.12.0; 74 files, 1026 tests at v0.10.2; **100 files, 1346 tests on `dev`**, measured 2026-11-15). CI passed on Node 22 and 26 before release. Coverage: `npm run test:coverage`; the [coverage report](./tests/qa/COVERAGE.md) records an earlier 975-test baseline (~88.6 % lines), not a fresh v0.10.2 measurement.
 
 ## Screenshots
 
-<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="Task board" width="880"></p>
+Five-column board, DeepSeek Pastel theme, desktop 1760 px (fictional demo data):
 
-<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/modal.png" alt="New task dialog" width="440"></p>
+<p align="center"><img src="img/board.png" alt="Task board — five columns coloured by category, grouped by the three fictional demo projects" width="880"></p>
+
+The new-task dialog, filled with demo values:
+
+<p align="center"><img src="img/modal.png" alt="New task dialog — title, project, model, urgency, category, description and execution prompt" width="440"></p>
 
 ## Mobile & responsive
 
@@ -70,7 +74,9 @@ The board is a first-class phone UI, not a shrunken desktop.
 - **Two-way sync**: the carousel is the source of truth. Swiping updates the selected tab; tapping a tab drives the carousel, with a one-second lock so the smooth scroll cannot bounce the selection back. Arrow keys, Home and End work with a hardware keyboard (`tablist` / `tab` / `tabpanel`, roving tab stop).
 - **Compact toolbar**: search, filters, sorting and the view actions move into bottom sheets, with one thumb-reachable create button (hidden while a task is open).
 - **Detail drawer**: the task detail becomes a bottom sheet; the acceptance checklist sits above the execution report (it is the gate a review is opened for) and the comment composer is a full-width 16 px field — no iOS auto-zoom — with its buttons on their own row.
-- **Desktop untouched**: above 760 px the five-column board, drag & drop and the inline toolbar behave exactly as before.`r`n`r`n## Table of Contents
+- **Desktop untouched**: above 760 px the five-column board, drag & drop and the inline toolbar behave exactly as before.
+
+## Table of Contents
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)

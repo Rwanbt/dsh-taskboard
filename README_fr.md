@@ -5,6 +5,8 @@
 
 # dsh-taskboard
 
+<p align="center"><img src="img/hero.png" alt="Tableau de tâches dans le thème DeepSeek Pastel — board desktop à cinq colonnes et carrousel mobile (données de démonstration fictives, aucun projet réel)" width="100%"></p>
+
 > **Contributions et pull requests** : créez une branche depuis `dev` pour les fonctionnalités, correctifs et changements de documentation, et fixez la branche de base de votre PR sur **`dev`**. `main` est la branche de publication stable protégée ; les mainteneurs intègrent les versions via une PR `dev → main`. La CI doit passer avant toute fusion dans `main`.
 
 Un **plugin de tableau de tâches pour DeepSeek Harness** : l'humain crée des cartes, les agents les prennent en charge et les exécutent, l'humain vérifie et valide. Les tâches sont rattachées à des projets (= espaces de travail), acceptent un choix de modèle et de preset par tâche, et peuvent s'exécuter manuellement ou selon une planification cron — une collaboration complète, de la carte à la validation.
@@ -19,8 +21,6 @@ Un **plugin de tableau de tâches pour DeepSeek Harness** : l'humain crée des c
 - **Contrat public Agent Board v1** : API optionnelle authentifiée par jeton Bearer (découverte du travail, prise en charge atomique, bascule en cas d'échec, passation de session, rapports, flux d'événements). Task Board reste toujours propriétaire du registre et de l'enveloppe d'exécution, et `done` reste réservé à l'humain ; voir [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md).
 
 **Zéro configuration** : installez et c'est prêt — aucun jeton, aucune clé API, aucun service ni base de données supplémentaires.
-
-<p align="center"><img src="img/hero.png" alt="Tableau de tâches dans le thème DeepSeek Pastel — board desktop à cinq colonnes et carrousel mobile (données de démonstration, aucun projet réel)" width="100%"></p>
 
 ## 0.12.0 — synchronisation universelle et contrat Agent Board (branche de développement, non publiée)
 
@@ -55,9 +55,13 @@ Tests : `npm run build && npm test` (90 fichiers, 1223 tests en v0.12.0 ; 74 fic
 
 ## Captures d'écran
 
-<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="Tableau de tâches" width="880"></p>
+Board à cinq colonnes, thème DeepSeek Pastel, desktop 1760 px (données de démonstration fictives) :
 
-<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/modal.png" alt="Boîte de dialogue nouvelle tâche" width="440"></p>
+<p align="center"><img src="img/board.png" alt="Tableau de tâches — cinq colonnes colorées par catégorie, regroupées par les trois projets fictifs de démonstration" width="880"></p>
+
+La boîte de dialogue de nouvelle tâche, remplie avec des valeurs de démonstration :
+
+<p align="center"><img src="img/modal.png" alt="Boîte de dialogue nouvelle tâche — titre, projet, modèle, urgence, catégorie, description et consigne d'exécution" width="440"></p>
 
 ## Mobile et responsive
 
@@ -69,7 +73,9 @@ Le board est une interface mobile à part entière, pas un desktop rétréci.
 - **Onglets de colonnes en mini-en-têtes** : même surface et même petit trait de statut que les en-têtes desktop (gris / bleu / ambre / violet / vert), compteur intégré, onglet actif plus large et plus contrasté, rangée défilante au lieu de cinq onglets compressés.
 - **Synchronisation dans les deux sens** : un balayage met à jour l'onglet ; un tap sur un onglet pilote le carrousel, avec un verrou d'une seconde pour éviter le rebond ; flèches, Home et End au clavier.
 - **Barre d'outils compacte et tiroir de détail** : recherche, filtres et actions dans des feuilles inférieures ; la checklist d'acceptation passe avant le rapport d'exécution et le champ de commentaire est pleine largeur (16 px, sans zoom iOS).
-- **Desktop inchangé** au-delà de 760 px.`r`n`r`n## Sommaire
+- **Desktop inchangé** au-delà de 760 px.
+
+## Sommaire
 
 - [Prérequis](#prérequis)
 - [Installation](#installation)
