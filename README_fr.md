@@ -1,7 +1,7 @@
 [![npm version](https://img.shields.io/npm/v/dsh-taskboard.svg)](https://www.npmjs.com/package/dsh-taskboard)
 [![License](https://img.shields.io/npm/l/dsh-taskboard.svg)](https://github.com/cloader/dsh-taskboard/blob/main/LICENSE)
 
-[English](./README_en.md) | **Français** | [简体中文](./README.md)
+[English](./README.md) | **Français** | [简体中文](./README_zh.md)
 
 # dsh-taskboard
 
@@ -19,6 +19,8 @@ Un **plugin de tableau de tâches pour DeepSeek Harness** : l'humain crée des c
 - **Contrat public Agent Board v1** : API optionnelle authentifiée par jeton Bearer (découverte du travail, prise en charge atomique, bascule en cas d'échec, passation de session, rapports, flux d'événements). Task Board reste toujours propriétaire du registre et de l'enveloppe d'exécution, et `done` reste réservé à l'humain ; voir [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md).
 
 **Zéro configuration** : installez et c'est prêt — aucun jeton, aucune clé API, aucun service ni base de données supplémentaires.
+
+<p align="center"><img src="img/hero.png" alt="Tableau de tâches dans le thème DeepSeek Pastel — board desktop à cinq colonnes et carrousel mobile (données de démonstration, aucun projet réel)" width="100%"></p>
 
 ## 0.12.0 — synchronisation universelle et contrat Agent Board (branche de développement, non publiée)
 
@@ -57,13 +59,24 @@ Tests : `npm run build && npm test` (90 fichiers, 1223 tests en v0.12.0 ; 74 fic
 
 <p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/modal.png" alt="Boîte de dialogue nouvelle tâche" width="440"></p>
 
-## Sommaire
+## Mobile et responsive
+
+Le board est une interface mobile à part entière, pas un desktop rétréci.
+
+<p align="center"><img src="img/phone.png" alt="Board mobile : onglets de statut en mini-en-têtes au-dessus du carrousel tactile" width="380"></p>
+
+- **Carrousel tactile** : les cinq colonnes deviennent des pages alignées par scroll-snap (`x mandatory`), une colonne par page en portrait, deux en paysage ; chaque colonne garde son propre défilement vertical.
+- **Onglets de colonnes en mini-en-têtes** : même surface et même petit trait de statut que les en-têtes desktop (gris / bleu / ambre / violet / vert), compteur intégré, onglet actif plus large et plus contrasté, rangée défilante au lieu de cinq onglets compressés.
+- **Synchronisation dans les deux sens** : un balayage met à jour l'onglet ; un tap sur un onglet pilote le carrousel, avec un verrou d'une seconde pour éviter le rebond ; flèches, Home et End au clavier.
+- **Barre d'outils compacte et tiroir de détail** : recherche, filtres et actions dans des feuilles inférieures ; la checklist d'acceptation passe avant le rapport d'exécution et le champ de commentaire est pleine largeur (16 px, sans zoom iOS).
+- **Desktop inchangé** au-delà de 760 px.`r`n`r`n## Sommaire
 
 - [Prérequis](#prérequis)
 - [Installation](#installation)
 - [Démarrage rapide](#démarrage-rapide)
 - [Référence des outils agent](#référence-des-outils-agent)
 - [Fonctionnalités](#fonctionnalités)
+- [Mobile et responsive](#mobile-et-responsive)
 - [Sécurité](#sécurité)
 - [Configuration et données](#configuration-et-données)
 - [FAQ](#faq)
