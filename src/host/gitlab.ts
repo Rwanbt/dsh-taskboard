@@ -105,6 +105,7 @@ export class GitlabProvider implements ExternalTaskProvider, ExternalWriteProvid
       description: typeof issue.description === 'string' ? issue.description : '',
       priority: labels.join(','), status: issue.state, assignedTo: assignees[0] ?? '',
       assignees, closed: issue.state === 'closed', urgency: this.urgency(labels), url,
+      ...(labels.length > 0 ? { labels } : {}),
       ...(typeof issue.updated_at === 'string' && issue.updated_at ? { revision: issue.updated_at } : {}),
     }
   }
@@ -199,3 +200,4 @@ export class GitlabProvider implements ExternalTaskProvider, ExternalWriteProvid
     return this.normalize(projectId, body as Record<string, unknown>)
   }
 }
+

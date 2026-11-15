@@ -192,9 +192,11 @@ describe('sticky project group headers', () => {
 
     expect(body).toContain('position: sticky')
     expect(body).toContain('top: 0')
-    // Stacked layer + opaque base: cards sliding under the label must not show
-    // through. A bare rgba tint (what the row used to carry) would.
-    expect(body).toContain('var(--dsw-alias-bg-base')
+    // Opaque fill: cards sliding under the label must not show through. The
+    // rule now paints the board's opaque column-surface token (a colour-mix
+    // over the host base published on <body>), which also keeps the header
+    // identical to the column behind it. A bare rgba tint would leak.
+    expect(body).toContain('var(--atb-surface-sunken')
     expect(body).not.toMatch(/background:\s*(transparent|none)\s*;/)
   })
 })

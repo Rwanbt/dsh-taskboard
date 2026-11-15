@@ -1,0 +1,2105 @@
+{
+  "label": "mobile-tabs-v2",
+  "generatedAt": "2026-11-14T22:00:43.842Z",
+  "base": "http://127.0.0.1:64941",
+  "browser": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+  "screenshots": [
+    "desktop-1440x900.png",
+    "portrait-tabs-390x844.png",
+    "portrait-todo-390x844.png",
+    "portrait-tab-in-review-390x844.png",
+    "portrait-after-scroll-390x844.png",
+    "portrait-vertical-scroll-390x844.png",
+    "portrait-detail-sheet-390x844.png",
+    "portrait-filters-sheet-390x844.png",
+    "portrait-actions-sheet-390x844.png",
+    "portrait-newtask-sheet-390x844.png",
+    "portrait-light-390x844.png",
+    "landscape-844x390.png",
+    "landscape-end-844x390.png",
+    "desktop-after-resize-1440x900.png"
+  ],
+  "checks": [
+    {
+      "name": "desktop keeps five side-by-side columns",
+      "ok": true,
+      "detail": "{\"focus\":\"none\",\"columns\":5,\"widths\":[236,236,236,236,236]}"
+    },
+    {
+      "name": "desktop columns are narrower than the rail (no carousel)",
+      "ok": true,
+      "detail": "[236,236,236,236,236]"
+    },
+    {
+      "name": "desktop keeps HTML5 drag on cards",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "desktop has no floating create button",
+      "ok": true,
+      "detail": "null"
+    },
+    {
+      "name": "desktop shows the inline filter cluster",
+      "ok": true,
+      "detail": "contents"
+    },
+    {
+      "name": "desktop hides the focus-mode header entirely",
+      "ok": true,
+      "detail": "none"
+    },
+    {
+      "name": "desktop has no page-level horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "desktop colour modes still colour cards by category",
+      "ok": true,
+      "detail": "12 distinct surfaces over 340 cards"
+    },
+    {
+      "name": "host shell leaves the board reachable (no overlay)",
+      "ok": true,
+      "detail": "{\"reachable\":true,\"hit\":\"DIV.dsh-atb-card\"}"
+    },
+    {
+      "name": "portrait switches to the focus carousel",
+      "ok": true,
+      "detail": "portrait"
+    },
+    {
+      "name": "portrait rail uses mandatory x scroll snapping",
+      "ok": true,
+      "detail": "x mandatory"
+    },
+    {
+      "name": "portrait columns are exactly one rail wide",
+      "ok": true,
+      "detail": "{\"widths\":[370,370,370,370,370],\"rail\":370}"
+    },
+    {
+      "name": "portrait keeps the five status pages",
+      "ok": true,
+      "detail": "5"
+    },
+    {
+      "name": "portrait status rail exposes five synchronised tabs",
+      "ok": true,
+      "detail": "{\"tabs\":5,\"selected\":[\"false\",\"true\",\"false\",\"false\",\"false\"]}"
+    },
+    {
+      "name": "portrait opens on the \"To do\" page",
+      "ok": true,
+      "detail": "{\"active\":\"todo\",\"counter\":\"2/5\"}"
+    },
+    {
+      "name": "portrait compacts the toolbar into icon buttons",
+      "ok": true,
+      "detail": "{\"actions\":\"flex\",\"filters\":\"none\",\"toolbarActions\":\"none\"}"
+    },
+    {
+      "name": "portrait hides the search field until asked",
+      "ok": true,
+      "detail": "none"
+    },
+    {
+      "name": "portrait shows the focus-mode header",
+      "ok": true,
+      "detail": "flex"
+    },
+    {
+      "name": "portrait shows the swipe cue and page counter",
+      "ok": true,
+      "detail": "{\"cue\":\"flex\",\"counter\":\"2/5\"}"
+    },
+    {
+      "name": "portrait offers a thumb-reachable create button",
+      "ok": true,
+      "detail": "{\"display\":\"grid\",\"rect\":{\"x\":320,\"y\":774,\"width\":54,\"height\":54}}"
+    },
+    {
+      "name": "portrait never scrolls the page horizontally",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "portrait cards keep the pastel surface",
+      "ok": true,
+      "detail": "12 distinct surfaces"
+    },
+    {
+      "name": "portrait card title stays readable (WCAG AA)",
+      "ok": true,
+      "detail": "contrast=10.39"
+    },
+    {
+      "name": "mobile tabs expose a label and an integrated counter",
+      "ok": true,
+      "detail": "[\"backlog:Backlog:334\",\"todo:To do:2\",\"in_progress:In progress:2\",\"in_review:In review:1\",\"done:Done:1\"]"
+    },
+    {
+      "name": "mobile tabs carry no dot chip (the top rule is the colour marker)",
+      "ok": true,
+      "detail": "[\"backlog:dot=false\",\"todo:dot=false\",\"in_progress:dot=false\",\"in_review:dot=false\",\"done:dot=false\"]"
+    },
+    {
+      "name": "every tab paints its status rule on the top edge",
+      "ok": true,
+      "detail": "[\"backlog:3px@11px/11px\",\"todo:3px@8px/8px\",\"in_progress:3px@11px/11px\",\"in_review:3px@11px/11px\",\"done:3px@11px/11px\"]"
+    },
+    {
+      "name": "tab accent colours match the desktop column-head rules",
+      "ok": true,
+      "detail": "{\"tabRules\":[\"backlog:{\\\"r\\\":172,\\\"g\\\":179,\\\"b\\\":184}\",\"todo:{\\\"r\\\":123,\\\"g\\\":170,\\\"b\\\":254}\",\"in_progress:{\\\"r\\\":245,\\\"g\\\":159,\\\"b\\\":10}\",\"in_review:{\\\"r\\\":166,\\\"g\\\":138,\\\"b\\\":250}\",\"done:{\\\"r\\\":34,\\\"g\\\":197,\\\"b\\\":94}\"],\"desktopRules\":{\"backlog\":{\"r\":172,\"g\":179,\"b\":184},\"todo\":{\"r\":123,\"g\":170,\"b\":254},\"in_progress\":{\"r\":245,\"g\":159,\"b\":10},\"in_review\":{\"r\":166,\"g\":138,\"b\":250},\"done\":{\"r\":34,\"g\":197,\"b\":94}}}"
+    },
+    {
+      "name": "the five status rules are visually distinct",
+      "ok": true,
+      "detail": "[\"backlog:{\\\"r\\\":172,\\\"g\\\":179,\\\"b\\\":184}\",\"todo:{\\\"r\\\":123,\\\"g\\\":170,\\\"b\\\":254}\",\"in_progress:{\\\"r\\\":245,\\\"g\\\":159,\\\"b\\\":10}\",\"in_review:{\\\"r\\\":166,\\\"g\\\":138,\\\"b\\\":250}\",\"done:{\\\"r\\\":34,\\\"g\\\":197,\\\"b\\\":94}\"]"
+    },
+    {
+      "name": "the active tab shows a stronger, wider rule",
+      "ok": true,
+      "detail": "{\"active\":{\"opacity\":\"1\",\"left\":\"8px\"},\"inactive\":[{\"opacity\":\"0.45\",\"left\":\"11px\"},{\"opacity\":\"0.45\",\"left\":\"11px\"},{\"opacity\":\"0.45\",\"left\":\"11px\"},{\"opacity\":\"0.45\",\"left\":\"11px\"}]}"
+    },
+    {
+      "name": "the active tab raises its surface above the inactive ones",
+      "ok": true,
+      "detail": "{\"active\":{\"r\":35,\"g\":35,\"b\":36},\"inactive\":[{\"r\":28,\"g\":29,\"b\":31},{\"r\":28,\"g\":29,\"b\":31},{\"r\":28,\"g\":29,\"b\":31},{\"r\":28,\"g\":29,\"b\":31}]}"
+    },
+    {
+      "name": "the active tab reinforces the text",
+      "ok": true,
+      "detail": "{\"active\":\"680\",\"inactive\":[\"640\",\"640\",\"640\",\"640\"]}"
+    },
+    {
+      "name": "tabs stay low but touch-friendly",
+      "ok": true,
+      "detail": "[\"backlog:103x34@11px\",\"todo:80x34@11px\",\"in_progress:108x34@11px\",\"in_review:97x34@11px\",\"done:78x34@11px\"]"
+    },
+    {
+      "name": "the tab rail scrolls horizontally rather than squeezing the tabs",
+      "ok": true,
+      "detail": "{\"clientWidth\":317,\"scrollWidth\":497,\"scrollLeft\":2,\"overflowX\":\"auto\",\"scrollSnapType\":\"x\"}"
+    },
+    {
+      "name": "tab click scrolls the rail to that page",
+      "ok": true,
+      "detail": "{\"scrollLeft\":1110,\"expected\":1110}"
+    },
+    {
+      "name": "tab click selects the tab",
+      "ok": true,
+      "detail": "{\"active\":\"in_review\",\"counter\":\"4/5\"}"
+    },
+    {
+      "name": "the carousel moves by whole pages",
+      "ok": true,
+      "detail": "{\"mechanism\":\"scrollBy (settled-swipe position)\",\"movedBy\":370,\"pageWidth\":370,\"attempts\":[{\"mechanism\":\"scrollBy\",\"direction\":1,\"before\":370,\"after\":740}]}"
+    },
+    {
+      "name": "the status tab follows the carousel scroll",
+      "ok": true,
+      "detail": "{\"before\":\"todo\",\"after\":\"in_progress\",\"counter\":\"3/5\"}"
+    },
+    {
+      "name": "the carousel rests on a snap page",
+      "ok": true,
+      "detail": "scrollLeft=740 page=370"
+    },
+    {
+      "name": "CSS scroll-snap re-settles an off-page offset",
+      "ok": true,
+      "detail": "{\"requested\":888,\"settled\":740}"
+    },
+    {
+      "name": "the tab follows the snapped position",
+      "ok": true,
+      "detail": "{\"settled\":740,\"active\":\"in_progress\"}"
+    },
+    {
+      "name": "the tallest column has its own vertical scroller",
+      "ok": true,
+      "detail": "{\"status\":\"backlog\",\"before\":0,\"after\":1200,\"scrollHeight\":54055,\"clientHeight\":651,\"others\":[0,0,0,0]}"
+    },
+    {
+      "name": "scrolling one column leaves the others untouched",
+      "ok": true,
+      "detail": "[0,0,0,0]"
+    },
+    {
+      "name": "vertical column scroll never flips the carousel page",
+      "ok": true,
+      "detail": "{\"before\":0,\"after\":0}"
+    },
+    {
+      "name": "board survived every gesture",
+      "ok": true,
+      "detail": "board still mounted"
+    },
+    {
+      "name": "a card is tappable in portrait",
+      "ok": true,
+      "detail": "{\"x\":195,\"y\":313}"
+    },
+    {
+      "name": "touch events reach the page",
+      "ok": true,
+      "detail": "{\"start\":1,\"move\":16,\"end\":1}"
+    },
+    {
+      "name": "a horizontal touch pan on a card never opens it",
+      "ok": true,
+      "detail": "null"
+    },
+    {
+      "name": "tap opens the detail pane",
+      "ok": true,
+      "detail": "{\"position\":\"fixed\",\"zIndex\":\"70\",\"width\":390,\"height\":732,\"bottom\":0,\"left\":0,\"radius\":\"18px\"}"
+    },
+    {
+      "name": "portrait detail is a bottom sheet",
+      "ok": true,
+      "detail": "{\"position\":\"fixed\",\"zIndex\":\"70\",\"width\":390,\"height\":732,\"bottom\":0,\"left\":0,\"radius\":\"18px\"}"
+    },
+    {
+      "name": "detail sheet closes again",
+      "ok": true,
+      "detail": "detail panel removed"
+    },
+    {
+      "name": "filters sheet keeps every filter control",
+      "ok": true,
+      "detail": "{\"selects\":3,\"chips\":3,\"reset\":1}"
+    },
+    {
+      "name": "filters sheet is a full-width bottom sheet",
+      "ok": true,
+      "detail": "{\"role\":\"dialog\",\"position\":\"static\",\"borderRadius\":\"20px\",\"width\":390,\"height\":479,\"bottom\":0,\"left\":0,\"handles\":1}"
+    },
+    {
+      "name": "actions sheet keeps grouping + every board action",
+      "ok": true,
+      "detail": "[\"group\",\"secondary\",\"settings\",\"diagnostics\",\"import\",\"export-json\",\"export-csv\"]"
+    },
+    {
+      "name": "create button opens the task sheet with the templates",
+      "ok": true,
+      "detail": "{\"sheet\":true,\"templates\":6,\"labels\":[\"Blank task\",\"New feature\",\"Bug fix\",\"Release check\"]}"
+    },
+    {
+      "name": "host light theme applied without a plugin override",
+      "ok": true,
+      "detail": "{\"dark\":false,\"scheme\":\"light\"}"
+    },
+    {
+      "name": "portrait light theme keeps the carousel",
+      "ok": true,
+      "detail": "{\"focus\":\"portrait\",\"widths\":[370,370,370,370,370]}"
+    },
+    {
+      "name": "portrait light theme paints light card surfaces",
+      "ok": true,
+      "detail": "luminance=0.681"
+    },
+    {
+      "name": "portrait light theme keeps the title readable (WCAG AA)",
+      "ok": true,
+      "detail": "contrast=10.39"
+    },
+    {
+      "name": "landscape switches to the two-up carousel",
+      "ok": true,
+      "detail": "landscape"
+    },
+    {
+      "name": "landscape shows two columns per page",
+      "ok": true,
+      "detail": "{\"widths\":[380,380,380,380,380],\"expected\":379.5}"
+    },
+    {
+      "name": "landscape rail snaps horizontally",
+      "ok": true,
+      "detail": "{\"clientWidth\":768,\"scrollWidth\":1934,\"scrollLeft\":389,\"snapType\":\"x mandatory\",\"overscrollX\":\"contain\",\"touchAction\":\"auto\"}"
+    },
+    {
+      "name": "landscape keeps the status tabs and the page cue",
+      "ok": true,
+      "detail": "{\"tabs\":5,\"cue\":\"flex\"}"
+    },
+    {
+      "name": "landscape hides the floating create button",
+      "ok": true,
+      "detail": "{\"display\":\"none\",\"rect\":{\"x\":0,\"y\":0,\"width\":0,\"height\":0}}"
+    },
+    {
+      "name": "landscape horizontal scrolling reaches the end of the rail",
+      "ok": true,
+      "detail": "{\"clientWidth\":768,\"scrollWidth\":1934,\"scrollLeft\":1166,\"snapType\":\"x mandatory\",\"overscrollX\":\"contain\",\"touchAction\":\"auto\"}"
+    },
+    {
+      "name": "landscape end of rail selects Done",
+      "ok": true,
+      "detail": "{\"active\":\"done\",\"counter\":\"5/5\"}"
+    },
+    {
+      "name": "landscape tab click returns to the first page",
+      "ok": true,
+      "detail": "{\"scrollLeft\":0,\"active\":\"backlog\"}"
+    },
+    {
+      "name": "desktop is restored after leaving focus mode",
+      "ok": true,
+      "detail": "{\"focus\":\"none\",\"columns\":5,\"draggable\":\"true\"}"
+    },
+    {
+      "name": "desktop filter cluster is back in the toolbar",
+      "ok": true,
+      "detail": "contents"
+    }
+  ],
+  "viewports": {
+    "desktop": {
+      "board": true,
+      "focus": "none",
+      "activeStatus": "todo",
+      "colorMode": "category",
+      "columnCount": 5,
+      "columnWidths": [
+        236,
+        236,
+        236,
+        236,
+        236
+      ],
+      "columnLefts": [
+        300,
+        548,
+        796,
+        1044,
+        1292
+      ],
+      "rail": {
+        "clientWidth": 1120,
+        "scrollWidth": 1228,
+        "scrollLeft": 0,
+        "snapType": "none",
+        "overscrollX": "auto",
+        "touchAction": "auto"
+      },
+      "cardsScrollTop": 0,
+      "cardsScrollHeight": 696,
+      "cardsClientHeight": 696,
+      "tabCount": 5,
+      "tabRoles": [
+        "tab",
+        "tab",
+        "tab",
+        "tab",
+        "tab"
+      ],
+      "tabSelected": [
+        "false",
+        "true",
+        "false",
+        "false",
+        "false"
+      ],
+      "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "3px",
+          "ruleLeft": "8px",
+          "ruleRight": "8px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 0,
+        "scrollWidth": 0,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "scrollSnapType": "none"
+      },
+      "pageCounter": "2/5",
+      "cueDisplay": "none",
+      "mobileHeadDisplay": "none",
+      "fab": null,
+      "searchfieldDisplay": "flex",
+      "mobileActionsDisplay": "none",
+      "toolbarFiltersDisplay": "contents",
+      "toolbarActionsDisplay": "contents",
+      "draggable": "true",
+      "pageOverflowX": 0,
+      "cardBg": {
+        "r": 69,
+        "g": 55,
+        "b": 45
+      },
+      "cardColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "titleColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "distinctCardSurfaces": 12,
+      "cardsVisible": 340
+    },
+    "portrait": {
+      "board": true,
+      "focus": "portrait",
+      "activeStatus": "todo",
+      "colorMode": "category",
+      "columnCount": 5,
+      "columnWidths": [
+        370,
+        370,
+        370,
+        370,
+        370
+      ],
+      "columnLefts": [
+        -360,
+        10,
+        380,
+        750,
+        1120
+      ],
+      "rail": {
+        "clientWidth": 370,
+        "scrollWidth": 1850,
+        "scrollLeft": 370,
+        "snapType": "x mandatory",
+        "overscrollX": "contain",
+        "touchAction": "auto"
+      },
+      "cardsScrollTop": 0,
+      "cardsScrollHeight": 651,
+      "cardsClientHeight": 651,
+      "tabCount": 5,
+      "tabRoles": [
+        "tab",
+        "tab",
+        "tab",
+        "tab",
+        "tab"
+      ],
+      "tabSelected": [
+        "false",
+        "true",
+        "false",
+        "false",
+        "false"
+      ],
+      "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 103,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 80,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "3px",
+          "ruleLeft": "8px",
+          "ruleRight": "8px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 108,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 97,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 78,
+          "height": 34,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 317,
+        "scrollWidth": 497,
+        "scrollLeft": 2,
+        "overflowX": "auto",
+        "scrollSnapType": "x"
+      },
+      "pageCounter": "2/5",
+      "cueDisplay": "flex",
+      "mobileHeadDisplay": "flex",
+      "fab": {
+        "display": "grid",
+        "rect": {
+          "x": 320,
+          "y": 774,
+          "width": 54,
+          "height": 54
+        }
+      },
+      "searchfieldDisplay": "none",
+      "mobileActionsDisplay": "flex",
+      "toolbarFiltersDisplay": "none",
+      "toolbarActionsDisplay": "none",
+      "draggable": "false",
+      "pageOverflowX": 0,
+      "cardBg": {
+        "r": 69,
+        "g": 55,
+        "b": 45
+      },
+      "cardColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "titleColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "distinctCardSurfaces": 12,
+      "cardsVisible": 340
+    },
+    "portraitDetail": {
+      "position": "fixed",
+      "zIndex": "70",
+      "width": 390,
+      "height": 732,
+      "bottom": 0,
+      "left": 0,
+      "radius": "18px"
+    },
+    "portraitFilters": {
+      "role": "dialog",
+      "position": "static",
+      "borderRadius": "20px",
+      "width": 390,
+      "height": 479,
+      "bottom": 0,
+      "left": 0,
+      "handles": 1
+    },
+    "portraitMenu": {
+      "items": [
+        "group",
+        "secondary",
+        "settings",
+        "diagnostics",
+        "import",
+        "export-json",
+        "export-csv"
+      ],
+      "sheet": {
+        "role": "dialog",
+        "position": "static",
+        "borderRadius": "20px",
+        "width": 390,
+        "height": 493,
+        "bottom": 0,
+        "left": 0,
+        "handles": 1
+      }
+    },
+    "portraitNewTask": {
+      "sheet": true,
+      "templates": 6,
+      "labels": [
+        "Blank task",
+        "New feature",
+        "Bug fix",
+        "Release check"
+      ]
+    },
+    "portraitLight": {
+      "theme": {
+        "dark": false,
+        "scheme": "light"
+      },
+      "metrics": {
+        "board": true,
+        "focus": "portrait",
+        "activeStatus": "todo",
+        "colorMode": "category",
+        "columnCount": 5,
+        "columnWidths": [
+          370,
+          370,
+          370,
+          370,
+          370
+        ],
+        "columnLefts": [
+          -360,
+          10,
+          380,
+          750,
+          1120
+        ],
+        "rail": {
+          "clientWidth": 370,
+          "scrollWidth": 1850,
+          "scrollLeft": 370,
+          "snapType": "x mandatory",
+          "overscrollX": "contain",
+          "touchAction": "auto"
+        },
+        "cardsScrollTop": 0,
+        "cardsScrollHeight": 651,
+        "cardsClientHeight": 651,
+        "tabCount": 5,
+        "tabRoles": [
+          "tab",
+          "tab",
+          "tab",
+          "tab",
+          "tab"
+        ],
+        "tabSelected": [
+          "false",
+          "true",
+          "false",
+          "false",
+          "false"
+        ],
+        "activeTabLabel": "To do2",
+        "tabChrome": [
+          {
+            "status": "backlog",
+            "active": false,
+            "label": "Backlog",
+            "count": "334",
+            "width": 103,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 128,
+              "g": 132,
+              "b": 140
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 128,
+              "g": 132,
+              "b": 140
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "todo",
+            "active": true,
+            "label": "To do",
+            "count": "2",
+            "width": 80,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "color": {
+              "r": 14,
+              "g": 17,
+              "b": 20
+            },
+            "fontWeight": "680",
+            "ruleColor": {
+              "r": 65,
+              "g": 118,
+              "b": 230
+            },
+            "ruleOpacity": "1",
+            "ruleHeight": "3px",
+            "ruleLeft": "8px",
+            "ruleRight": "8px",
+            "desktopRuleColor": {
+              "r": 65,
+              "g": 118,
+              "b": 230
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "in_progress",
+            "active": false,
+            "label": "In progress",
+            "count": "2",
+            "width": 108,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 245,
+              "g": 159,
+              "b": 10
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 245,
+              "g": 159,
+              "b": 10
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "in_review",
+            "active": false,
+            "label": "In review",
+            "count": "1",
+            "width": 97,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 125,
+              "g": 59,
+              "b": 237
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 125,
+              "g": 59,
+              "b": 237
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          },
+          {
+            "status": "done",
+            "active": false,
+            "label": "Done",
+            "count": "1",
+            "width": 78,
+            "height": 34,
+            "radius": "11px",
+            "surface": {
+              "r": 246,
+              "g": 247,
+              "b": 247
+            },
+            "color": {
+              "r": 97,
+              "g": 103,
+              "b": 106
+            },
+            "fontWeight": "640",
+            "ruleColor": {
+              "r": 34,
+              "g": 197,
+              "b": 94
+            },
+            "ruleOpacity": "0.45",
+            "ruleHeight": "3px",
+            "ruleLeft": "11px",
+            "ruleRight": "11px",
+            "desktopRuleColor": {
+              "r": 34,
+              "g": 197,
+              "b": 94
+            },
+            "hasDot": false,
+            "hasLabel": true,
+            "hasCount": true
+          }
+        ],
+        "tabbar": {
+          "clientWidth": 317,
+          "scrollWidth": 497,
+          "scrollLeft": 2,
+          "overflowX": "auto",
+          "scrollSnapType": "x"
+        },
+        "pageCounter": "2/5",
+        "cueDisplay": "flex",
+        "mobileHeadDisplay": "flex",
+        "fab": {
+          "display": "grid",
+          "rect": {
+            "x": 320,
+            "y": 774,
+            "width": 54,
+            "height": 54
+          }
+        },
+        "searchfieldDisplay": "none",
+        "mobileActionsDisplay": "flex",
+        "toolbarFiltersDisplay": "none",
+        "toolbarActionsDisplay": "none",
+        "draggable": "false",
+        "pageOverflowX": 0,
+        "cardBg": {
+          "r": 246,
+          "g": 208,
+          "b": 182
+        },
+        "cardColor": {
+          "r": 34,
+          "g": 38,
+          "b": 58
+        },
+        "titleColor": {
+          "r": 34,
+          "g": 38,
+          "b": 58
+        },
+        "distinctCardSurfaces": 12,
+        "cardsVisible": 340
+      }
+    },
+    "landscape": {
+      "board": true,
+      "focus": "landscape",
+      "activeStatus": "todo",
+      "colorMode": "category",
+      "columnCount": 5,
+      "columnWidths": [
+        380,
+        380,
+        380,
+        380,
+        380
+      ],
+      "columnLefts": [
+        -323,
+        66,
+        454,
+        843,
+        1231
+      ],
+      "rail": {
+        "clientWidth": 768,
+        "scrollWidth": 1934,
+        "scrollLeft": 389,
+        "snapType": "x mandatory",
+        "overscrollX": "contain",
+        "touchAction": "auto"
+      },
+      "cardsScrollTop": 0,
+      "cardsScrollHeight": 394,
+      "cardsClientHeight": 251,
+      "tabCount": 5,
+      "tabRoles": [
+        "tab",
+        "tab",
+        "tab",
+        "tab",
+        "tab"
+      ],
+      "tabSelected": [
+        "false",
+        "true",
+        "false",
+        "false",
+        "false"
+      ],
+      "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 90,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 69,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "6px",
+          "ruleRight": "6px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 95,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 85,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 67,
+          "height": 30,
+          "radius": "9px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "2.5px",
+          "ruleLeft": "9px",
+          "ruleRight": "9px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 681,
+        "scrollWidth": 681,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "scrollSnapType": "x"
+      },
+      "pageCounter": "2/5",
+      "cueDisplay": "flex",
+      "mobileHeadDisplay": "flex",
+      "fab": {
+        "display": "none",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        }
+      },
+      "searchfieldDisplay": "none",
+      "mobileActionsDisplay": "flex",
+      "toolbarFiltersDisplay": "none",
+      "toolbarActionsDisplay": "none",
+      "draggable": "false",
+      "pageOverflowX": 0,
+      "cardBg": {
+        "r": 69,
+        "g": 55,
+        "b": 45
+      },
+      "cardColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "titleColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "distinctCardSurfaces": 12,
+      "cardsVisible": 340
+    },
+    "desktopAfterResize": {
+      "board": true,
+      "focus": "none",
+      "activeStatus": "todo",
+      "colorMode": "category",
+      "columnCount": 5,
+      "columnWidths": [
+        236,
+        236,
+        236,
+        236,
+        236
+      ],
+      "columnLefts": [
+        300,
+        548,
+        796,
+        1044,
+        1292
+      ],
+      "rail": {
+        "clientWidth": 1120,
+        "scrollWidth": 1228,
+        "scrollLeft": 0,
+        "snapType": "none",
+        "overscrollX": "auto",
+        "touchAction": "auto"
+      },
+      "cardsScrollTop": 0,
+      "cardsScrollHeight": 696,
+      "cardsClientHeight": 696,
+      "tabCount": 5,
+      "tabRoles": [
+        "tab",
+        "tab",
+        "tab",
+        "tab",
+        "tab"
+      ],
+      "tabSelected": [
+        "false",
+        "true",
+        "false",
+        "false",
+        "false"
+      ],
+      "activeTabLabel": "To do2",
+      "tabChrome": [
+        {
+          "status": "backlog",
+          "active": false,
+          "label": "Backlog",
+          "count": "334",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 172,
+            "g": 179,
+            "b": 184
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "todo",
+          "active": true,
+          "label": "To do",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 35,
+            "g": 35,
+            "b": 36
+          },
+          "color": {
+            "r": 248,
+            "g": 250,
+            "b": 250
+          },
+          "fontWeight": "680",
+          "ruleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "ruleOpacity": "1",
+          "ruleHeight": "3px",
+          "ruleLeft": "8px",
+          "ruleRight": "8px",
+          "desktopRuleColor": {
+            "r": 123,
+            "g": 170,
+            "b": 254
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_progress",
+          "active": false,
+          "label": "In progress",
+          "count": "2",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 245,
+            "g": 159,
+            "b": 10
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "in_review",
+          "active": false,
+          "label": "In review",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 166,
+            "g": 138,
+            "b": 250
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        },
+        {
+          "status": "done",
+          "active": false,
+          "label": "Done",
+          "count": "1",
+          "width": 0,
+          "height": 0,
+          "radius": "11px",
+          "surface": {
+            "r": 28,
+            "g": 29,
+            "b": 31
+          },
+          "color": {
+            "r": 206,
+            "g": 211,
+            "b": 215
+          },
+          "fontWeight": "640",
+          "ruleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "ruleOpacity": "0.45",
+          "ruleHeight": "3px",
+          "ruleLeft": "11px",
+          "ruleRight": "11px",
+          "desktopRuleColor": {
+            "r": 34,
+            "g": 197,
+            "b": 94
+          },
+          "hasDot": false,
+          "hasLabel": true,
+          "hasCount": true
+        }
+      ],
+      "tabbar": {
+        "clientWidth": 0,
+        "scrollWidth": 0,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "scrollSnapType": "none"
+      },
+      "pageCounter": "2/5",
+      "cueDisplay": "none",
+      "mobileHeadDisplay": "none",
+      "fab": null,
+      "searchfieldDisplay": "flex",
+      "mobileActionsDisplay": "none",
+      "toolbarFiltersDisplay": "contents",
+      "toolbarActionsDisplay": "contents",
+      "draggable": "true",
+      "pageOverflowX": 0,
+      "cardBg": {
+        "r": 69,
+        "g": 55,
+        "b": 45
+      },
+      "cardColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "titleColor": {
+        "r": 244,
+        "g": 243,
+        "b": 253
+      },
+      "distinctCardSurfaces": 12,
+      "cardsVisible": 340
+    }
+  },
+  "gestures": {
+    "tabClick": {
+      "rail": {
+        "clientWidth": 370,
+        "scrollWidth": 1850,
+        "scrollLeft": 1110,
+        "snapType": "x mandatory",
+        "overscrollX": "contain",
+        "touchAction": "auto"
+      },
+      "active": "in_review",
+      "counter": "4/5"
+    },
+    "horizontalScroll": {
+      "mechanism": "scrollBy (settled-swipe position)",
+      "attempts": [
+        {
+          "mechanism": "scrollBy",
+          "direction": 1,
+          "before": 370,
+          "after": 740
+        }
+      ],
+      "before": {
+        "clientWidth": 370,
+        "scrollWidth": 1850,
+        "scrollLeft": 370,
+        "snapType": "x mandatory",
+        "overscrollX": "contain",
+        "touchAction": "auto"
+      },
+      "after": {
+        "clientWidth": 370,
+        "scrollWidth": 1850,
+        "scrollLeft": 740,
+        "snapType": "x mandatory",
+        "overscrollX": "contain",
+        "touchAction": "auto"
+      },
+      "active": "in_progress",
+      "counter": "3/5"
+    },
+    "snapEngine": {
+      "requested": 888,
+      "settled": 740
+    },
+    "verticalScroll": {
+      "probe": {
+        "status": "backlog",
+        "before": 0,
+        "after": 1200,
+        "scrollHeight": 54055,
+        "clientHeight": 651,
+        "others": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "cardsBefore": 0,
+      "cardsAfter": 1200,
+      "railBefore": 0,
+      "railAfter": 0
+    },
+    "touchPanOnCard": {
+      "touchCounts": {
+        "start": 1,
+        "move": 16,
+        "end": 1
+      },
+      "detail": null
+    },
+    "landscapeEnd": {
+      "steps": [
+        {
+          "moved": true,
+          "rail": 777
+        },
+        {
+          "moved": true,
+          "rail": 1166
+        },
+        {
+          "moved": false,
+          "rail": 1166
+        }
+      ],
+      "rail": {
+        "clientWidth": 768,
+        "scrollWidth": 1934,
+        "scrollLeft": 1166,
+        "snapType": "x mandatory",
+        "overscrollX": "contain",
+        "touchAction": "auto"
+      },
+      "active": "done",
+      "counter": "5/5"
+    }
+  },
+  "limitations": [
+    "Synthetic touch *scrolling* could not be produced in this headless Chromium build (no GPU compositor): Input.dispatchTouchEvent delivers touch events to the page but produces no scroll, Input.synthesizeScrollGesture is inert, and wheel events over the plugin panel do not scroll it (all probed on this machine). Scrolling is therefore exercised through real scroll positions (scrollBy / scrollLeft), which is exactly what a settled swipe leaves behind: the CSS snap engine, the scroll→tab sync and the resting page are then the browser's own behaviour. Touch events themselves are dispatched for real and prove gesture delivery and the swipe-vs-tap guard.",
+    "The 390×844 / 844×390 viewports are emulated with an exact CSS viewport + touch points and a desktop UA (the plugin answers to viewport media queries only). The DSH shell keeps its desktop chrome, which is a host concern and out of the plugin scope."
+  ],
+  "shellOverlays": {
+    "dismissed": true,
+    "steps": [
+      {
+        "text": "",
+        "x": 871,
+        "y": 382
+      }
+    ]
+  },
+  "shellReachable": {
+    "reachable": true,
+    "hit": "DIV.dsh-atb-card"
+  },
+  "tabs": {
+    "all": [
+      {
+        "status": "backlog",
+        "active": false,
+        "label": "Backlog",
+        "count": "334",
+        "width": 103,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 172,
+          "g": 179,
+          "b": 184
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 172,
+          "g": 179,
+          "b": 184
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "todo",
+        "active": true,
+        "label": "To do",
+        "count": "2",
+        "width": 80,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 35,
+          "g": 35,
+          "b": 36
+        },
+        "color": {
+          "r": 248,
+          "g": 250,
+          "b": 250
+        },
+        "fontWeight": "680",
+        "ruleColor": {
+          "r": 123,
+          "g": 170,
+          "b": 254
+        },
+        "ruleOpacity": "1",
+        "ruleHeight": "3px",
+        "ruleLeft": "8px",
+        "ruleRight": "8px",
+        "desktopRuleColor": {
+          "r": 123,
+          "g": 170,
+          "b": 254
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "in_progress",
+        "active": false,
+        "label": "In progress",
+        "count": "2",
+        "width": 108,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 245,
+          "g": 159,
+          "b": 10
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 245,
+          "g": 159,
+          "b": 10
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "in_review",
+        "active": false,
+        "label": "In review",
+        "count": "1",
+        "width": 97,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 166,
+          "g": 138,
+          "b": 250
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 166,
+          "g": 138,
+          "b": 250
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      },
+      {
+        "status": "done",
+        "active": false,
+        "label": "Done",
+        "count": "1",
+        "width": 78,
+        "height": 34,
+        "radius": "11px",
+        "surface": {
+          "r": 28,
+          "g": 29,
+          "b": 31
+        },
+        "color": {
+          "r": 206,
+          "g": 211,
+          "b": 215
+        },
+        "fontWeight": "640",
+        "ruleColor": {
+          "r": 34,
+          "g": 197,
+          "b": 94
+        },
+        "ruleOpacity": "0.45",
+        "ruleHeight": "3px",
+        "ruleLeft": "11px",
+        "ruleRight": "11px",
+        "desktopRuleColor": {
+          "r": 34,
+          "g": 197,
+          "b": 94
+        },
+        "hasDot": false,
+        "hasLabel": true,
+        "hasCount": true
+      }
+    ],
+    "tabbar": {
+      "clientWidth": 317,
+      "scrollWidth": 497,
+      "scrollLeft": 2,
+      "overflowX": "auto",
+      "scrollSnapType": "x"
+    }
+  }
+}

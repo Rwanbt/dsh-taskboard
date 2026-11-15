@@ -92,6 +92,7 @@ describe('GitLab provider reads', () => {
       projectId: 'group/project', type: 'issue', id: '1', title: 'Issue 1', description: 'Details',
       priority: 'bug,urgent', status: 'opened', assignedTo: 'alice', assignees: ['alice', 'bob'],
       closed: false, urgency: 'urgent', url: 'https://gitlab.com/group/project/-/issues/1', revision: '2026-01-03T04:05:06Z',
+      labels: ['bug', 'urgent'],
     })
     expect(calls[0]!.url).toBe('https://gitlab.com/api/v4/projects/group%2Fproject/issues?state=all&per_page=100&page=1&order_by=created_at&sort=asc')
     expect(calls[0]!.headers['private-token']).toBe('private-token')
@@ -204,3 +205,4 @@ describe('GitLab provider failures', () => {
       .rejects.toThrow('invalid GitLab project identity')
   })
 })
+

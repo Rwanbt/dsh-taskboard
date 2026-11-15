@@ -92,6 +92,7 @@ describe('Gitea/Forgejo provider reads', () => {
       projectId: 'owner/repo', type: 'issue', id: '1', title: 'Issue 1', description: 'Details',
       priority: 'bug,urgent', status: 'open', assignedTo: 'alice', assignees: ['alice', 'bob'],
       closed: false, urgency: 'urgent', url: 'https://gitea.com/owner/repo/issues/1', revision: '2026-01-03T04:05:06Z',
+      labels: ['bug', 'urgent'],
     })
     expect(calls[0]!.url).toBe('https://gitea.com/api/v1/repos/owner/repo/issues?state=all&type=issues&limit=50&page=1')
     expect(calls[0]!.headers.authorization).toBe('token private-token')
@@ -213,3 +214,4 @@ describe('Gitea/Forgejo provider failures', () => {
       .rejects.toThrow('invalid Gitea repository identity')
   })
 })
+

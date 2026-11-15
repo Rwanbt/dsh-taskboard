@@ -272,14 +272,35 @@ export function apply(ctx: Context): void {
           } catch { return undefined }
         },
         setPermission: (sessionId, permission) => {
-          try {
-            const permService = agentCtx.get('permissionPresets') as { set(session: unknown, name: string): void } | undefined
-            const sessions = agentCtx.get('sessions') as { get(id: string): unknown } | undefined
-            const session = sessions?.get(sessionId)
-            if (session !== undefined && permService !== undefined) {
-              permService.set(session, permission)
+          // SECURITY, not cosmetic: an execution's permission preset is a
+          // boundary. A missing service/session or a failed switch must surface
+          // to the caller, which refuses to start the run (see ExecutionService
+          // run()) instead of silently continuing under a broader default.
+          const permService = agentCtx.get('permissionPresets') as {
+            set(session: unknown, name: string): void
+            current?(session: unknown): string
+            resolve?(name: string): { sandbox?: string }
+          } | undefined
+          const sessions = agentCtx.get('sessions') as { get(id: string): unknown } | undefined
+          const session = sessions?.get(sessionId)
+          if (permService === undefined) throw new Error('permission service is unavailable')
+          if (session === undefined) throw new Error(`session ${sessionId} is not registered yet`)
+          permService.set(session, permission)
+          // Verify the effective preset when the service can report it. A
+          // custom-named preset is accepted when its sandbox mode matches.
+          if (typeof permService.current === 'function') {
+            const effective = permService.current(session)
+            // Only a RESOLVABLE different preset is a proven mismatch. A
+            // deployment-specific preset name or `custom` is not a failure by
+            // itself: `set()` already threw for an unknown preset.
+            if (effective !== permission && effective !== 'custom' && typeof permService.resolve === 'function') {
+              let sandbox: string | undefined
+              try { sandbox = permService.resolve(effective).sandbox } catch { sandbox = undefined }
+              if (sandbox !== undefined && sandbox !== permission) {
+                throw new Error(`permission ${permission} was not applied (effective preset: ${effective})`)
+              }
             }
-          } catch { /* cosmetic */ }
+          }
         },
         maxConcurrent,
       })

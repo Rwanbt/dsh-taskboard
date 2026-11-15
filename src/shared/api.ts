@@ -102,6 +102,12 @@ export type CreateTaskBody = {
   dependsOn?: string[]
   /** Optional hierarchy parent id (same workspace), validated atomically by the host (D6). */
   parentId?: string
+  /**
+   * Functional category: a category id or display name from the board
+   * categories (see Settings → Appearance). Unknown references are rejected;
+   * omitted = unclassified.
+   */
+  category?: string
 }
 
 /** Update-task request body (ifVersion mandatory). */
@@ -117,6 +123,8 @@ export type UpdateTaskBody = {
   waitingReason?: string | null
   /** Rebind the task to another project (GUI owner surface only). */
   workspaceId?: string
+  /** Functional category (id or display name); null clears it (unclassified). */
+  category?: string | null
   execution?: { mode?: string; cron?: string; runAt?: string | number; periodicCompletion?: 'rearm' | 'spawn'; reuseSessionId?: string; sessionReuseMode?: 'fresh' | 'reuse' }
   model?: TaskModel | null
   /** Change isolation; locked once the task has execution history. */

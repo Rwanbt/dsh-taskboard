@@ -46,6 +46,22 @@ ou un second orchestrateur. Aucun client ne lit les fichiers du ledger.
 `eligible=true` ne renvoie que les cartes `todo`, non bloquées, dont **toutes** les
 dépendances sont des prérequis `done` approuvés par un humain.
 
+### 3.1 Écritures de contenu (audit A03)
+
+Ces routes écrivent le **contenu** d'une carte (jamais son cycle de vie). Elles restent
+soumises au Bearer et ne permettent ni `done`, ni modification de `execution`, `model`
+ou `preset` (propriété de l'opérateur).
+
+| Méthode | Route | Corps | Effet |
+| --- | --- | --- | --- |
+| POST | `/tasks` | `{ workspaceId, title, description?, prompt?, urgency?, status?: "backlog"\|"todo", dependsOn?, parentId?, permission?, checklist?, actor? }` | crée une carte en mode `claim` (201) |
+| POST | `/tasks/:id/update` | `{ ifVersion, title?, description?, prompt?, urgency?, blocked?, waitingForHuman?, waitingReason?, checklist?, actor? }` | patch versionné (409 si version périmée ou carte terminale) |
+| POST | `/tasks/:id/comments` | `{ body, actor? }` | commentaire attribué à `actor` (201) |
+
+Contraintes : projet et prérequis existants et de même workspace ; `status` initial limité
+à `backlog`/`todo` ; `done` reste une action humaine ; une carte `done`/`archived` est
+immuable. `actor` est un identifiant de session (défaut `public-api`).
+
 ## 4. Cycle de vie d'exécution
 
 ### 4.1 Réserver (claim atomique)

@@ -68,10 +68,42 @@ describe('Icon — every declared name renders a decorative stroked SVG', () => 
     expect(svg.getAttribute('aria-hidden')).toBe('true')
     expect(svg.getAttribute('focusable')).toBe('false')
     expect(svg.classList.contains('dsh-atb-icon')).toBe(true)
-    // Every icon draws at least one shape.
+    // Every icon draws at least one shape. A single `<g>` is allowed as a
+    // container (a glyph drawn on another grid, scaled into the 16-unit box),
+    // but only for real shape children: no text, image, style or foreignObject.
     expect(svg.children.length).toBeGreaterThan(0)
-    const shapeTags = [...svg.children].map(child => child.tagName.toLowerCase())
+    const shapesOf = (root: Element): Element[] => {
+      const out: Element[] = []
+      for (const child of [...root.children]) {
+        if (child.tagName.toLowerCase() === 'g') out.push(...shapesOf(child))
+        else out.push(child)
+      }
+      return out
+    }
+    const shapeTags = shapesOf(svg).map(child => child.tagName.toLowerCase())
+    expect(shapeTags.length).toBeGreaterThan(0)
     for (const tag of shapeTags) expect(['path', 'circle', 'rect']).toContain(tag)
+  })
+
+  it('draws the settings glyph as a cog, not as detached brightness rays', () => {
+    // Regression: the first version of the icon was a ring with eight separate
+    // rays, which reads as a sun/brightness toggle. The settings action opens
+    // the appearance panel, so it must be a recognisable cog.
+    const svg = renderIcon('settings')
+    const shapes = [...svg.querySelectorAll('path, circle')]
+    expect(shapes.length).toBe(2)
+    const outline = shapes.find(shape => shape.tagName.toLowerCase() === 'path')
+    const hub = shapes.find(shape => shape.tagName.toLowerCase() === 'circle')
+    expect(outline).toBeDefined()
+    expect(hub).toBeDefined()
+    // One closed outline (Z) + one round hub: the classic cog silhouette.
+    expect(outline?.getAttribute('d')?.endsWith('z')).toBe(true)
+    expect(hub?.getAttribute('r')).toBe('3')
+    // The old sun glyph had a ring plus eight radial strokes; those are gone.
+    const markup = svg.outerHTML
+    for (const ray of ['M8 2.2v1.4', 'M8 12.4v1.4', 'M2.2 8h1.4', 'M12.4 8h1.4']) {
+      expect(markup).not.toContain(ray)
+    }
   })
 
   it('honours an explicit pixel size', () => {

@@ -1,0 +1,443 @@
+[![npm version](https://img.shields.io/npm/v/dsh-taskboard.svg)](https://www.npmjs.com/package/dsh-taskboard)
+[![License](https://img.shields.io/npm/l/dsh-taskboard.svg)](https://github.com/cloader/dsh-taskboard/blob/main/LICENSE)
+
+[English](./README.md) | [Français](./README_fr.md) | **简体中文**
+
+# dsh-taskboard
+
+> **贡献与 PR**：日常功能、修复和文档改动请从 `dev` 创建开发分支，提交 PR 时将目标分支（base）设为 **`dev`**。`main` 是受保护的稳定发布分支，维护者通过 `dev → main` 的 PR 集成发布；合入 `main` 前须通过 CI。
+
+DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、人验收。任务挂项目（workspace）、可指定模型与 preset、支持手动与定时执行，全流程双向协作。
+
+- **闭环协作**：人建卡 → agent 认领执行 → 结构化报告 → 人验收（✓ 完成 / ✗ 退回附原因）
+- **11 个 `taskboard_*` agent 工具** + 代码级协议闸：agent 永远移不到 done、任务被持有时不可抢、跨项目不可认领
+- **执行**：手动、一次性定时或 cron 定期执行（host 侧调度，浏览器关了照跑）；定时任务可选择复用当前项目的已有会话；定期任务可选择每轮回到待办，或保留待验收并自动新建下一轮待办卡
+- **Git Worktree 隔离**：每次执行独立 worktree + 任务分支（分支命名可按看板预设或任务级自定义，0.9.11），验收时一键合并；并列多仓库工作区整区镜像隔离（0.6.3）；非 git 项目自动降级
+- **验收效率**：DoD 验收清单（agent 勾选附证据）、结构化执行报告（摘要/改动文件/自验/产物/风险）、看板内 diff 查看器
+- **实时看板**：SSE 实时刷新、五列流转、筛选排序持久化、JSON 导入导出、任务模板
+- **外部任务同步**：ZenTao、TAPD、GitHub、GitLab、Gitea/Forgejo、Jira、Linear；多连接、项目映射、显式双向写回、字段级冲突、同步预览与签名 Webhook。配置说明见下文「外部任务同步」，能力矩阵见 [docs/ADAPTER-CONTRACT.md](./docs/ADAPTER-CONTRACT.md)。
+- **Agent Board 公共契约 v1**：可选的 Bearer 认证 API（发现任务、原子认领、失败转移、会话交接、报告与事件流），Task Board 始终拥有台账与执行信封，`done` 仅限人工；见 [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md)。
+
+**零配置**：安装即用——无需 Token、无需 API Key、无需额外服务或数据库。
+
+## 0.12.0 — 通用同步与 Agent Board 契约（开发分支，未发布）
+
+本分支在 v0.10.2 之上实现「任务、代码 forge、计划平台与执行」的统一同步层。**0.12.0 尚未打标签或发布**；稳定发布仍为 v0.10.2。
+
+- **适配器契约 v1**：每个提供方声明版本、操作、方向、事件与限制；实例化时校验「声明的操作必须真实实现、写能力必须声明」，寄存器拒绝未知版本/操作。新增 GitLab、Gitea/Forgejo、Jira Cloud、Linear；ZenTao/TAPD 仍为只读；Bitbucket、Azure DevOps、Trello、GitHub Projects、GitLab Boards **未实现，也未宣称支持**。
+- **多连接**：最多 10 条独立连接，旧 `{config}` 文件自动迁移；每条连接独立映射、方向、凭据与同步记录，可按连接同步、启用/停用、编辑或删除。
+- **双向同步为默认**：声明写能力的提供方默认 `direction: "bidirectional"` 并每 15 分钟自动同步；只读提供方与旧连接文件保持 `inbound`。选择「只读」可关闭回写，间隔设为 0 即改为手动。`/external/preview` 在写入前预览新建/关联/更新/冲突/推送。标题、描述、优先级默认三方合并，状态与处理人以本地为准；冲突持久化并阻止该字段推送。
+- **规范外部身份**：`externalRefs` 允许一张卡片关联多个外部条目（系统、实例、类型、项目、ID、URL、修订、状态、来源），`task.external` 仍为同步主来源；旧台账加载时自动补齐。
+- **签名 Webhook**：GitHub/GitLab/Gitea/Forgejo 支持 HMAC/共享密钥校验与 delivery 去重；载荷仅触发一次拉取，重复或乱序投递不会污染状态。
+- **Agent Board 公共 API v1**：`/dsh-taskboard/public/v1` 使用 `DSH_TASKBOARD_PUBLIC_TOKEN` Bearer 认证（未配置则 503），覆盖项目/任务/依赖/执行/事件读取与 claim、幂等键、attempt、fencing handoff、report、complete/interrupt，以及 `POST /tasks`、`POST /tasks/:id/update`、`POST /tasks/:id/comments` 三类卡片内容写入（不改 execution/model/preset）；成功只进入 `in_review`，`done` 仍仅限人工。
+- **测试**：适配器契约、多连接、预览、Webhook、公共 API、安全回归与多连接 UI；`npm run build && npm test` 通过。
+
+## Rwanbt 分支 — v0.10.2
+
+稳定版本：[v0.10.2](https://github.com/Rwanbt/dsh-taskboard/releases/tag/v0.10.2)。改动已合入本分支的 `main` 与 `dev`；上游 `cloader/dsh-taskboard` 未修改。上方 npm 徽章与下方 npm 安装命令指向上游；安装本分支请参阅[安装指南](./docs/INSTALL-FORK.md)。
+
+- **用户显式审批（0.10.1）**：agent 可直接增加前置依赖，但移除依赖或删除仍被依赖的任务仅生成带理由的审批请求。用户在 GUI 批准前约束保持有效，agent 可继续其他工作。请求计入「待我处理」（包括已完成任务）；拒绝 agent 跨项目修改、删除或移动任务。
+- **Worktree 结算（0.10.2）**：agent 应尽可能自行提交；沙箱阻止提交时，宿主在收集证据前以 `dsh-taskboard` 身份提交任务分支上的剩余改动。hook 拒绝会记录错误并保留工作，多仓库镜像逐仓处理。
+- **不限定模型供应商**：看板工具面向 DSH 会话，受会话 preset 与项目权限约束，不要求使用 DeepSeek 账户。真实宿主测试覆盖 Claude/Anthropic、GPT/Codex、Gemini/Google、Mistral、GLM/OpenCode；Gemini 成功记录请求后触发供应商配额限制。
+- **真实宿主验证**：依赖阻塞、审批与拒绝、跨项目拒绝、周期 cron 延迟重放、worktree 隔离、合并与清理见 [E2E 报告](./docs/E2E-REAL-HOST-0.10.1.md)。这些是有限场景验证，不代表穷尽所有生产情况。
+
+本分支在上游基础上新增以下能力。完整设计见 [docs/dependencies-lite.md](./docs/dependencies-lite.md)，审计与验收标准见 [docs/fork-audit.md](./docs/fork-audit.md)，安装说明见 [docs/INSTALL-FORK.md](./docs/INSTALL-FORK.md)。
+
+- **任务依赖**：任务可声明同项目前置任务（`dependsOn`）；在所有前置任务经人验收为 `done` 之前不可认领、执行或调度。拒绝环、自引用与跨项目依赖。前置任务被删除时自动解除依赖并写入审计评论，任务不会被永久阻塞。
+- **子任务**：`parentId` 构成任务树（最深 8 层，无环）。卡片显示 `完成/总数` 进度，详情显示面包屑与子任务列表。
+- **前置任务选择器**：可按标题或 ID 搜索、支持键盘操作的组合框，引用缺失时给出提示。
+- **DSH 设计规范**：颜色、圆角、阴影全部取自 `--dsw-*` 设计令牌（亮/暗主题）。原生 `<select>` 替换为主题化、可访问的 `Select`（弹层挂载到 `<body>`，完整键盘支持）。看板采用无边框布局（以色调与阴影区分层级），图标统一为单色 SVG，不再使用 emoji。
+- **健壮性**：台账锁在 Windows 上遇到瞬时 `EPERM`/`EACCES`/`ENOENT` 时按争用处理并重试。
+
+测试：`npm run build && npm test`（v0.12.0：90 个文件、1223 个用例全部通过；v0.10.2 为 74 个文件、1026 个用例），发布前 CI 在 Node 22 与 26 上通过。覆盖率：`npm run test:coverage`；[覆盖率报告](./tests/qa/COVERAGE.md)记录的是较早的 975 用例基线（行覆盖约 88.6%），并非 v0.10.2 的重新测量。
+
+## 界面
+
+<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="任务看板" width="880"></p>
+
+<p align="center"><img src="img/hero.png" alt="Task Board in the DeepSeek Pastel theme — five-column desktop board and the mobile status carousel (demo data, no real project)" width="100%"></p>
+
+<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/modal.png" alt="新建任务" width="440"></p>
+
+## 移动端与响应式
+
+看板在手机上是一等公民，而不是缩小的桌面版。
+
+<p align="center"><img src="img/phone.png" alt="移动端：状态标签以迷你列头呈现，位于横向轮播上方" width="380"></p>
+
+- **滑动轮播**：五列变为横向吸附分页（`x mandatory`），竖屏一列一页、横屏两列一页，每列保留自己的纵向滚动位置。
+- **列标签即迷你列头**：与桌面列头同样的表面与顶部状态短线（灰 / 蓝 / 橙 / 紫 / 绿），内置计数；激活时更醒目，标签行可横向滚动而不是压缩。
+- **双向同步**：滑动更新标签，点击标签驱动轮播（1 秒锁定，避免回弹）；方向键、Home、End 可用。
+- **紧凑工具栏与详情抽屉**：搜索、筛选与操作收进底部面板；验收清单位于执行报告之前，评论输入框为整行 16 px（避免 iOS 自动放大）。
+- 760 px 以上桌面布局完全不变。
+
+## 目录
+
+- [环境要求](#环境要求)
+- [安装](#安装)
+- [快速开始](#快速开始)
+- [Agent 工具参考](#agent-工具参考)
+- [功能特性](#功能特性)
+- [移动端与响应式](#移动端与响应式)
+- [安全](#安全)
+- [配置与数据](#配置与数据)
+- [常见问题](#常见问题)
+- [开发](#开发)
+- [升级日志](#升级日志)
+
+## 环境要求
+
+| 依赖 | 要求 | 说明 |
+| --- | --- | --- |
+| DeepSeek Harness | ≥ 0.1.7 | 需要官方面板支持与 web profile |
+| Node.js | ≥ 22 | 本地开发和源码构建环境 |
+| git | 可选 | Worktree 隔离需要；缺失时自动降级原目录执行 |
+
+> **0.9.8 起的面板要求**：看板入口和页面统一交给 DSH 官方面板管理，不再支持旧版挂载方式。使用旧版 DSH 时请先升级。
+
+## 安装
+
+插件已发布到 [npm](https://www.npmjs.com/package/dsh-taskboard)，包含预构建产物，无需本地编译。
+
+```bash
+dsh plugin --profile web add dsh-taskboard
+```
+
+安装后**重启 `dsh web` 并刷新页面**：侧边栏出现「任务看板」入口即成功。无需任何后续配置。
+
+卸载：`dsh plugin --profile web remove dsh-taskboard`（台账数据保留在当前数据目录，见[配置与数据](#配置与数据)）。
+
+> 官方 `@deepseek-ai/dsh-*` 包只写进 profile 的 `bundles` 列表，不要 `plugin add` 进 dependencies（避免 SDK 双实例遮蔽）。
+
+## 快速开始
+
+**第 1 步 · 建卡**：看板右上「+ 新建任务」——选项目、紧急度、执行方式（认领/一次性定时/定期 cron）、模型与 preset、Git 隔离开关、验收清单；一次性定时任务可新建会话或选择当前项目的既有会话。定期任务则可独立选择「每次新建会话」「首次新建、后续复用」或既有会话，并选择完成后「移回待办」或「新建待办」；可勾「⚡ 立即执行」。
+
+**第 2 步 · agent 执行**：三种触发方式任选——
+
+1. GUI「立即执行」/「↻ 续跑」（详情页或表单）
+2. cron 定时（host 侧调度，无需开浏览器）
+3. 任意会话里让 agent 用 `taskboard_*` 工具认领：`按看板上的任务 t-xxxxx 执行`
+
+**第 3 步 · 人验收**：待验收列「✓ 完成」一键验收；「✗ 退回」退回待办并附原因（agent 下轮开工前会读）。
+
+一次完整的 agent 工作流（协议由插件在执行开场自动下达）：
+
+```text
+你：执行看板任务 t-ab12cd
+agent：
+  taskboard_list                # 查板：项目内 todo 任务
+  taskboard_get t-ab12cd        # 读需求、评论、验收清单
+  taskboard_move → in_progress  # 认领（代码闸：被持有/跨项目会被拒绝）
+  ……编码 / 测试……
+  taskboard_checklist check     # 逐项勾验收清单，附证据 note
+  taskboard_execution_report    # 结构化报告：摘要/改动文件/自验/产物/风险
+  taskboard_comment_add         # 交接说明
+  taskboard_move → in_review    # 移待验收
+你：看板待验收列 ✓ 完成   # done 永远只属于人——agent 调用会被代码闸拒绝
+```
+
+## Agent 工具参考
+
+任何会话可用；项目边界：只有属于任务所在项目的会话才能认领或执行。
+
+| 工具 | 作用 |
+| --- | --- |
+| `taskboard_list` | 查板（按项目/状态/紧急度过滤，紧凑摘要） |
+| `taskboard_get` | 读单卡全文：描述、prompt、评论流、清单、执行记录 |
+| `taskboard_comments` | 列出任务评论（视为最新需求，先读后动） |
+| `taskboard_create` | 建卡（workspaceId、紧急度、清单、preset、隔离、定时） |
+| `taskboard_update` | 改标题/描述/prompt/紧急度/清单（model/execution 只读） |
+| `taskboard_move` | 移卡：todo→in_progress→in_review（**到不了 done**） |
+| `taskboard_comment_add` | 追加评论（交接、风险、进展） |
+| `taskboard_delete` | 软删除（可 purge；执行中不可删） |
+| `taskboard_checklist` | 验收清单 add / check（附证据）/ uncheck |
+| `taskboard_execution_report` | 提交结构化执行报告，自动挂到当前执行 |
+| `taskboard_external_sync` | 运行已配置的外部同步（拉取 + GitHub 回写）；传 `taskId` 只推送单张卡片 |
+
+**项目参数（0.9.5）**：`taskboard_list` 与 `taskboard_create` 的 `workspaceId` 可传项目 ID，或已注册项目根目录的绝对路径（例如 `D:\work\my-project`）。相对路径与未注册的子目录不能代替项目根目录；创建任务始终保存项目 ID。未知项目返回 `not_found` 并附带纠错提示；已注册但无任务的项目仍返回零条，省略列表的项目参数仍查询全部项目。
+
+## 功能特性
+
+**看板协作**
+- 五列看板（待规划 / 待办 / 进行中 / 待验收 / 已完成）+ 受阻标记，SSE 实时刷新
+- 任务挂项目：认领校验会话归属，跨项目不可抢
+- 紧急度三色（紧急/一般/不急）筛选与色条；搜索（标题/ID）与列内排序，筛选排序持久化
+- 列头状态色圆点：待规划灰 / 待办蓝 / 进行中橙 / 待验收紫 / 已完成绿 / 已删除红
+- **项目分组折叠（0.8.10）**：点击项目名称行收起／展开当前列中的任务卡片，名称与数量保持可见；按状态列与项目独立记忆，刷新后恢复；主看板及取消／归档／回收站均支持，保留吸顶效果，支持键盘操作
+- **列内滚动钉住项目分组头（0.8.9）**：长列滚动时项目分组头（工作区名称行）钉在列顶不再随卡片滚走，长列阅读分组始终有标签；底色为三层叠加的完全不透明填充，卡片滑过不透字
+- **已完成列折叠与显示上限（0.8.8）**：看板设置可配置已完成列的显示上限（默认 50，10–500，搜索自动豁免截断）；列头可整体折叠（状态持久化、仍可拖放投放），收起时后端按需省略已完成任务并回传总数；已完成列最新在前、按工作区分组排序，缓解历史卡片过多时的渲染卡顿
+- 新建/编辑弹窗：项目、模型（含思考强度）、紧急度、执行方式、cron 实时校验与下次运行预览、定期任务完成策略和独立会话策略、执行隔离开关、验收清单编辑
+- 详情面板：状态流转（done 仅限人工；清单未全勾时完成需二次确认并显示未勾数）、agent/用户评论流、执行记录（倒序，最新在最上；会话 ID 点击跳转打开该执行会话；已删除/已归档分开提示）、停止执行、Worktree 隔离块（分支 / 提交 / 改动统计 / 合并与清理）、执行报告块、验收清单块；点击面板外任意看板空白区域可快速收起详情（0.8.8）
+- 待验收列卡片快捷操作：「✓ 完成」一键验收、「✗ 退回」退回待办并可附退回原因（agent 开工前会读）
+- **图片附件（0.7.0）**：任务描述与评论可选择、粘贴或拖放 PNG/JPEG/GIF/WebP，自动插入 Markdown；详情中显示缩略图，点击灯箱放大。图片保存在本机数据目录，单文件上限 5 MiB
+- **双栏宽屏任务弹窗 + Slash 补全（0.6.0）**：新建/编辑弹窗左右双栏（左栏核心字段与执行配置，右栏描述与 Prompt）；描述/Prompt 输入 `/` 即弹出命令与技能补全（↑↓/Enter/Tab/Esc 键盘导航，宿主动态发现与内置清单合并）；描述与 Prompt 中的 Markdown 图片渲染为缩略图，点击灯箱放大
+- **执行权限（0.6.0）**：任务级三档执行权限（📁 可写入工作区 / 🔒 仅可查看 / ⚡ 完全权限），表单选择 + 看板设置默认执行权限；卡片、详情、模板列表显示权限徽章
+- **界面语言（0.9.7；0.14.0 起八语）**：与 DSH 同款八种语言——简体中文、English、Русский、Français、Deutsch、Español、日本語、Português (Brasil)。默认「跟随 DSH」：DSH 用哪种语言，看板就用哪种，无需任何配置；也可在「看板设置 → 通用设置 → 界面语言」手动指定，立即生效并自动保存在当前浏览器，切回跟随时使用 DSH 的当前语言。仅改变看板界面，不修改 DSH 的语言设置；无 locale 服务时按页面 `lang` 或浏览器语言降级（按主语言子标签匹配：`pt-PT`→pt、`zh-TW`→zh、`de-AT`→de）；DSH 装了看板未内置的外部语言包时回退 English，与 DSH 自身回退一致。内置模板内容仍只有中文/英文两套，其他语言使用英文内容。
+- **外部会话自动同步（0.5.5）**：看板设置开启「🔄 自动纳入会话」后，工作区直接新建的会话自动在看板生成任务卡片（按会话工作目录映射项目，取首条消息作标题/描述）——运行中进「进行中」并绑定会话（可一键跳转）、成功结算自动流转「待验收」、异常退回「待办」；自动过滤看板内部执行会话（0.6.0 起连同子代理会话一并过滤），多轮续跑延续同一张卡片；占位标题（会话 xxxxxxxx）拿到真实标题后自动回填（0.8.8）；出厂默认关闭
+- **一键跳转执行会话（0.5.4；0.8.8 起双击直达）**：**双击任务卡片**直接打开对应执行会话（看板自动收起；单击选中卡片，250ms 防抖互不误触）；详情页顶部「🤖 跳转会话 ↗」按钮与持有者 Chip 同样可点——进行中优先、其次最近一次执行对应的会话；**在会话里创建、也在同一会话里干完的卡（没有执行记录）同样能跳回那个会话**；已归档 / 已删除 / 会话服务不可用分别精准提示
+- **记住上次模型（0.5.4）**：新建任务自动带出上次选用的模型与思考强度（模板预填与编辑不受影响）
+- **验收清单 DoD（0.4.0）**：建卡时定验收条件（≤30 项）；agent 用 `taskboard_checklist` 增补/勾选（附证据 note）；用户在详情页直接勾选；待验收时未完成项红色高亮 + 卡片「☑ n/m」角标（未全勾显红）；清单编辑在表单中整组管理（勾选状态与证据保留）
+- **结构化执行报告（0.4.0）**：agent 收尾用 `taskboard_execution_report` 提交（摘要 / 改动文件 / 自验 / 产物 / 剩余风险），自动挂到当前执行记录；待验收详情页分栏渲染；开场框架行明示提交时序（报告 → 评论 → 移待验收）
+- **JSON 导入（0.4.0）**：顶栏「⬆ 导入」选择备份文件 → 干跑预览（新增 / 覆盖 / 无效分类明细）→ 合并（按 id upsert）或整册替换（自动先备份当前台账 + 二次确认）；⬇ JSON 导出的文件即同格式可直接恢复
+- **任务模板（0.4.0）**：「+ 新建任务 ▼」下拉（空白 / 按类别分组的模板列表 / 管理模板）一键预填表单（标题/描述/Prompt/紧急度/定时/隔离/preset/清单）；任务表单与详情页均可「⌗ 存为模板」沉淀常用配置（0.8.8 表单直存，表单不关闭可继续建卡）；模板随台账保存在当前数据目录，改名/分类/删除在管理弹窗，自建模板行内编辑类别、内置模板自带「开发/运维」类别（0.8.8）
+- **Diff 查看器（0.4.0）**：隔离块提交行、未提交修改文件行点击即在看板内展开 diff（提交 `git show` / 文件 `git diff`，128KB·2000 行封顶标注截断）；worktree 已删时回落主仓（仅限提交与带基线的范围 diff）
+
+**Agent 工具（taskboard_\*）**
+- 11 个工具：查板 / 建卡 / 改卡 / 移卡 / 评论 / 软删除 / 验收清单 / 执行报告，任何会话可用
+- 代码级协议闸：agent 永远移不到 done（清单全勾也不行）；任务被持有时不可抢占；model/execution 对 agent 只读
+
+**执行**
+- 手动执行新建会话。定时任务默认在首次执行时新建会话，后续沿用该任务的对话；也可指定当前项目的已有会话，继续使用原有上下文。指定的会话不可用时会明确提示，不会擅自换成新会话。
+- **定期任务完成策略（0.8.2）**：在任务表单的「定期任务完成后」选择行为。默认「完成后新建待办」会保留本轮待验收，并由宿主创建一张继承 cron、prompt 和配置的新 todo 卡；「完成后移回待办」则把同一张卡复位为 todo，等待下次 cron。选择会存入任务配置，模板与后继卡会继承；宿主结算强制执行，不依赖 agent 自行移卡。未配置的既有 cron 任务同样采用默认的新建待办策略。
+- **任务级 preset（0.3.3）**：新建/编辑表单「执行模式（preset）」下拉——执行会话按该 preset 组合（工具集与人设由此而来，对齐 GUI 新会话的组合方式）；默认预选部署默认 preset，也可选「跟随部署默认」；preset 损坏时执行直接失败并把原因写进执行记录（不产出半组合会话）；随时可改，下轮执行生效
+- **Git Worktree 隔离执行（0.3.0）**：任务级开关（0.5.0 起新建任务的默认值由「看板设置」统一决定，出厂默认原目录执行），每次执行在 `<项目>/.dsh-worktrees/<任务ID>` 独立 worktree 上进行，分支默认 `task/<标题>+<任务ID>`，命名可配置（0.9.11）——看板设置四预设（`task/标题+ID` / `task/ID` / `前缀/ID` / `前缀/标题+ID`，带实时示例预览），任务表单可显式指定完整分支名覆盖（默认跟随看板规则并随标题联动，手动改停跟随、清空恢复；允许 `feat/login` 多级；首次创建后定死，改名不改；冲突自动回退备用分支）；执行会话归属项目根目录（分组、工具与文件沙箱完整可用——DSH 要求会话 cwd 即工作区根，0.3.2 修正），worktree 路径与边界纪律在开场指令中明确下达；结算自动采集提交列表 / 未提交修改警告 / 改动统计；非 git 项目或 git 不可用时自动降级原目录执行（执行记录注明降级原因，台账与执行主流程永不因 git 失败而失败）；验收时详情页一键 `--no-ff` 合并到主工作区（主区脏或冲突原样报告，不自动解决）、删除 worktree（有未提交修改时拒绝）、可选删分支；支持「↻ 续跑」在现有 worktree/分支上继续执行（保留上次改动与提交）
+- **多仓库镜像隔离（0.6.3）**：工作区内并列多个 git 仓库时（根仓库 + 嵌套独立仓库），worktree 模式自动升级为「任务镜像」——有界扫描发现全部仓库（深度 ≤3、上限 8 个、60s 缓存；submodule 与 linked worktree 形态跳过），每仓库各自建立同名任务分支的 worktree，按相对路径挂进 `<项目>/.dsh-worktrees/<任务ID>/` 形成结构同构镜像；执行引导逐仓库给出镜像路径与分支并声明边界纪律（未镜像仓库禁改）；提交证据、diff 查看（`?repo=` 按仓库）与合并（逐仓库 `--no-ff`，一仓冲突不阻断他仓，按仓库汇总）均分仓库进行；镜像清理聚合全部仓库的未提交检查后「先子后根」删除；任务与执行记录新增 `branches` / `repos` 附加字段，单仓库行为与旧数据零变化；根仓库以 gitlink（embedded repo）形式跟踪子仓的容器工作区同样完全可用——嵌套子镜像在根镜像 status 中的结构性噪音（未跟踪目录 / gitlink 漂移）已在证据采集、合并检查与镜像清理中自动豁免；新建任务表单在多仓库工作区显示「将镜像 N 个仓库」提示，纯容器工作区（根非仓库、只有并列子仓）同样可选 Worktree 隔离
+- **看板设置**：顶栏「🛠 设置」——统一配置新建任务的默认模型、推理强度、Agent preset、执行隔离、权限与已完成列显示上限。推理强度随模型保存，切换模型时重置为跟随模型默认。任务或模板的显式选择优先；GUI 与 `taskboard_create` 创建时将默认值存入新任务，后续改设置不影响已有任务。未配置看板模型时，GUI 保留原有的上次模型选择记忆；新建表单也可主动选择跟随部署默认。配置随台账持久化并支持 JSON 导入导出。
+  通用设置同时提供界面语言和默认新建项目。界面语言、默认新建项目各自采用「左侧标签＋右侧下拉框」布局，说明文字放在下方，设置分区之间增加横线以便区分。语言偏好独立保存在当前浏览器，不随台账 JSON 导入导出；选择后自动保存，其他任务默认值仍需点击「保存设置」。切换语言会保留其他未保存的设置草稿。
+  > Worktree 隔离是协作约定而非沙箱：执行会话拥有完整工具权限，隔离依赖分支约定，不适用于运行不可信代码的场景。
+- host 侧调度：关掉浏览器照常触发；错过窗口跳过不补跑
+- 乐观并发（ifVersion）+ 完整归因（谁改的、哪个会话执行的）
+- ⚙ 健康诊断：台账基本项 + 遗留 worktree（台账无主但目录存在）一键清理
+
+### 人工等待与交付验收
+
+- 工具栏「待我处理」按当前项目、搜索和紧急度条件筛选等待人工的任务。自动推断会标注「疑似」，不会仅凭“登录”“验证码”等业务词就判定需要人工。
+- 任务详情可填写所需操作、明确标记或解除人工等待，也可恢复自动识别。明确解除会覆盖自动推断；人工等待与普通「阻塞」分别保存，解除其中一项不会清除另一项。已完成、已取消、已归档和回收站任务不进入人工等待筛选。
+- Agent 可通过 `taskboard_update` 的 `waitingForHuman` 和 `waitingReason` 报告或解除等待。原因只写需要用户完成的操作，请勿填写密钥、验证码等凭据。JSON 备份保留这些状态；HTTP 更新传 `waitingForHuman: null` 可恢复自动识别。
+- 待验收、已完成卡片展示最新执行的交付概览，详情将最新报告与验收清单前置，旧报告放入历史记录。验证说明是 Agent 提交的证据文字，不等同于全部验证通过；未登记文件也可能表示本任务无需修改文件。
+
+## 安全
+
+- **验收权只属于人**：agent 把任务移到 done 的调用被代码级协议闸直接拒绝（不是提示词约定）；任务被持有时不可抢占，跨项目不可认领。
+- **Worktree 隔离是协作约定而非沙箱**：执行会话拥有完整工具权限，隔离依赖分支约定，不适用于运行不可信代码的场景。
+- **数据本地**：台账、模板和图片附件全部存本机，可在看板设置中迁移数据目录；不外发任何数据，无需 Token / API Key。
+
+## 配置与数据 
+
+开箱即用，全部配置项如下（均为可选）：
+
+| 环境变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `DSH_TASKBOARD_MAX_CONCURRENT` | `3` | 全局同时执行的会话数上限 |
+| `DSH_HOME` | `~/.dsh` | DSH 主目录，也是未自定义时的数据目录及位置引导文件所在目录 |
+| `ATB_TRACE` | 未设置 | `=1` 时 host 打印工具调用跟踪（调试用） |
+
+数据目录默认是 `DSH_HOME`，可在「🛠 设置 → 数据存储位置」中检查并迁移到其他绝对路径。三个数据项始终一起迁移；卸载插件不删除数据。
+
+| 文件 | 内容 |
+| --- | --- |
+| `dsh-taskboard.json` | 任务台账（全部任务/执行/评论） |
+| `dsh-taskboard-templates.json` | 任务模板 |
+| `dsh-taskboard-assets/` | 图片附件（按内容哈希去重） |
+| `dsh-taskboard.json.backup-<时间戳>` | 整册导入替换前的自动备份 |
+| `DSH_HOME/dsh-taskboard-storage.json` | 自定义数据目录的位置引导文件；固定留在 DSH 主目录 |
+| `<项目>/.dsh-worktrees/<任务ID>/` | 任务执行 worktree（多仓库工作区：整区任务镜像，每仓库一个子 worktree） |
+
+随时可顶栏「⬇ JSON」备份台账、「⬇ CSV」导出任务清单（带 BOM，Excel 直接打开）。图片附件不在 JSON 内；完整备份需复制设置页显示的数据目录中的 `dsh-taskboard-assets/` 文件夹。
+
+**台账读取失败时**：看板会显示错误及文件位置，保留原文件，暂停写入、迁移和附件清理。请先停止 DSH，备份整个数据目录，再修复或用可靠备份恢复 `dsh-taskboard.json`，然后重启。旧版遗留的 `.corrupt-*` 文件也会在原台账缺失时触发保护；不要把它们当成可随手删除的临时文件（[#84](https://github.com/cloader/dsh-taskboard/issues/84)）。
+
+## 常见问题
+
+**侧边栏没有「任务看板」入口？**
+刷新页面；仍没有则确认插件已装进当前 profile 并重启 `dsh web`（宿主半区在进程启动时加载）。三代 shell 均支持：`data-pane`（dev）、哈希类名（官方布局，0.4.2 起）、DSH Desktop 非兼容 extended frame（0.5.2 起）。
+
+**任务数据存在哪？怎么备份？**
+见[配置与数据](#配置与数据)。GUI「⬇ JSON」可导出、恢复台账；图片附件还需备份 `dsh-taskboard-assets/` 文件夹。
+
+**浏览器关了，定时任务还跑吗？**
+跑。调度在 host 进程侧，与浏览器无关；错过的时间窗口跳过不补跑。
+
+**定期任务完成后为什么停在「待验收」？如何自动继续？**
+默认会保留本轮供验收并由系统创建下一轮 todo 卡。若希望复用同一张卡，在任务表单的「定期任务完成后」选择「完成后移回待办」即可。两种策略不依赖 agent 的状态操作；未配置的既有 cron 任务也会采用默认的新建待办策略。
+
+**项目不是 git 仓库，能用吗？**
+能。Worktree 隔离自动降级为原目录执行，执行记录注明降级原因；其余功能不受影响。
+
+**多个项目怎么协作？**
+任务挂项目（= DSH workspace）。认领校验会话归属：只有任务所在项目内的会话能认领/执行，跨项目不可抢。
+
+**agent 会把任务直接标成「已完成」吗？**
+不会。这是代码级协议闸（不是提示词约定）：`taskboard_move` 到 done 的调用被直接拒绝，验收永远由人在看板完成。
+
+**和 dsh-better-sidebar 并存，看板顶栏右侧按钮被遮住？**
+0.6.5 起已自动避让：better-sidebar 收起时其右上角常驻按钮簇（展开底部面板 / 展开侧边栏）占据视口右上 10~70px，看板激活时会为工具条右侧预留这块区域（镜像 better-sidebar 对 DSH 原生会话头的避让契约），任何窗口宽度都不再重叠；未安装 better-sidebar 或其侧栏展开时无任何影响（[#19](https://github.com/cloader/dsh-taskboard/issues/19)）。
+
+**Windows 版 DSH Desktop 的窗口按钮与看板顶栏重叠？**
+0.6.6 的修复会根据看板距窗口顶部的实际位置，为原生窗口控制按钮预留顶部空间；已有独立标题栏时保持原间距，窗口缩放和布局变化时重新计算。该问题已通过 Windows 实机验收（[#20 评论](https://github.com/cloader/dsh-taskboard/issues/20#issuecomment-5597498727)）。
+
+**编辑任务时 DoD 勾选框占位过多，把文本输入框挤出去？**
+0.6.6 已将 checkbox 排除在弹窗的整行输入框样式之外，恢复勾选框的 15px 宽度及文本输入区域（[#20](https://github.com/cloader/dsh-taskboard/issues/20)）。
+
+## 开发
+
+```bash
+git clone https://github.com/cloader/dsh-taskboard.git
+cd dsh-taskboard
+npm install && npm run build    # host ESM + client CJS 双构建
+npm test                        # vitest 全量（含真实 git 镜像集成测试）
+npm run test:coverage           # v8 覆盖率（text-summary + json-summary）
+node tests/manual-git-e2e.mjs   # 真 git 端到端手测（worktree 全链路 + 续跑 + diff 查看器）
+```
+
+`npm run build` 在构建前清理 `lib/` 的旧产物，再生成 host ESM 和客户端注册模块 `lib/client.js`。`npm run build:host`、`npm run build:client` 只重建对应部分并保留另一部分产物；发布前请运行完整构建。
+
+本地开发时，先完成构建，再用 `dsh plugin --profile web add "link:/path/to/dsh-taskboard"` 挂载本地仓库。修改客户端后重新构建并刷新页面；修改宿主侧代码后还需重启 `dsh web`。
+
+**加一门语言 / 改文案**：界面文案在 `src/client/i18n/<locale>.ts`，每种语言一份，键集必须与 `zh.ts` 完全一致（少键/多键是编译错误）。加新语言＝新增字典 + 在 `runtime.ts` 的 `SHIPPED_LOCALES` / `LOCALE_LABELS` / `DICTS` 登记；`tests/i18n.spec.ts` 会逐键校验键集、占位符集合（`{n}`、`{{lastExecution}}` 等）、空值与零宽字符，并扫描客户端所有 `t('…')` 字面量，因此漏译会在 CI 直接失败。
+
+## 外部任务同步
+
+ZenTao 支持按「关联项目」或「关联执行/迭代」同步缺陷、研发需求和任务；TAPD 支持缺陷、需求、任务；GitHub/GitLab/Gitea/Forgejo 同步 Issues；Jira Cloud 与 Linear 同步 Issue。两种禅道模式已在真实环境进行只读验证；TAPD、GitHub、GitLab、Gitea、Jira、Linear 目前以本地模拟服务器验证为主（无真实凭据，不宣称生产兼容性已验证）。
+
+设置中可保存**最多 10 条连接**，每条连接独立选择提供方、认证、同步范围、项目映射与同步方向。连接列表显示启用状态、最近同步/错误，并支持单独同步、启用/停用、编辑与删除。旧版单连接配置会自动迁移。
+
+1. 打开设置，选择「外部同步」。禅道填写安装地址（不含 `/api.php/v1`）、登录用户名和密码，默认同步此登录账号的任务，也可指定其他处理人。TAPD 使用 API Basic Auth 或 Bearer Token，单独填写处理人成员昵称。
+2. 在「同步范围」中勾选缺陷、需求、任务，至少选择一项。在「导入到」选择待规划或待办；自动同步间隔为 0 时关闭，开启范围为 5～1440 分钟。
+3. 禅道「项目映射方式」默认「关联项目」；也可选择「关联执行/迭代」。点击「同步项目/执行迭代清单」，列出当前账号可访问的全部对应范围，清单获取不受同步范围勾选影响。
+4. 每行显示名称、ID 和本地项目下拉框。执行项包含所属项目名称。默认「不关联」，默认只同步已关联行；多个外部范围可以关联同一个本地项目。刷新清单保留已有选择，查不到的已关联项保留并标记不可用，需重新获取或取消关联。切换映射方式会清空当前映射草稿，保存前不改变已保存配置。
+5. 「测试连接」测试当前面板配置，无需先保存；点击「保存配置」后再立即同步任务；允许保存空映射，未开启同步未关联项时不导入卡片。任务同步使用已保存配置，自动同步要求宿主运行。
+
+项目模式读取项目下的缺陷和需求；任务通过分页遍历该项目下所有执行汇总，同一工作项在该项目范围内去重。执行模式直接读取该执行下勾选的类型。只请求选中的同步范围，不把整个产品的工作项混入项目。新导入项仍按处理人和结束状态筛选。
+
+可勾选「同步未关联项目」或「同步未关联执行/迭代」（文案随映射方式变化，默认关闭）。开启后，每轮手动或定时同步都会重新获取当前账号可访问的对应范围；清单中不关联本地项目的项，以及后来新增、尚未配置映射的项，也会导入和更新卡片。新卡片的工作项目为空，已关联项仍导入指定本地项目；已有卡片的本地项目为空时，后续关联并保存后，下次同步自动补上本地项目；已有非空项目不被覆盖，已归档和回收站卡片保持不动。开启时允许不配置任何本地关联。取消勾选后停止未关联项的后续同步，已有卡片保留。
+
+任务来源标识包含映射范围。同一需求关联多个执行时，可以按各执行映射在不同本地项目分别建卡；切换映射模式不合并或删除旧卡片。相同映射重复同步不重复创建，已有卡片的非空本地项目和执行状态不自动移动。标题、描述和优先级采用三方合并；进行中/待验收内容受保护，已完成/已取消只更新来源状态和处理人，已归档停止更新。删除忽略记录也按映射范围生效。
+
+### GitHub Issues
+
+选择「GitHub」，填写 API 地址（`https://api.github.com`；GitHub Enterprise 为 `https://<host>/api/v3`）和令牌：经典 PAT 需 `repo` 权限（公开仓库可用 `public_repo`），细粒度令牌需「Issues: 读写」。同步账号为 GitHub 登录名（用于筛选导入议题），点击「识别当前账号」可由令牌自动填入。勾选「Issues」类型、起始日期、导入目标和自动同步间隔（0 关闭），点击「同步项目清单」，把每个 `owner/repo` 仓库关联到本地项目。接口返回的 Pull Request 会被忽略。
+
+同步把「分配给同步账号」的未关闭议题导入为不自动执行的卡片，后续同步更新已关联卡片；远端标题/描述变更沿用与禅道相同的三方合并与冲突规则。取消勾选「只导入分配给同步账号的工作项」可导入仓库中的全部议题（很多议题并未分配处理人）。
+
+「复用现有卡片」（GitHub 默认开启，由 provider 声明）用于避免重复：卡片标题中的议题编号（`#123` 或 `(#123)`）、描述中**第一个**议题链接，或与议题标题规范化后完全一致的标题，都会把该卡片直接关联到议题，而不是再建一张。描述中后续的链接视为交叉引用并忽略；多张卡片命中时按标题相似度择优，仍无法判定则跳过并在结果中计数，而不是猜测。卡片原有内容会记为推送基线，因此被复用的卡片在本地修改标题/描述之前不会回写远端。
+
+状态回写按次开启，在每轮同步末尾只对已关联议题的卡片（含复用卡片）执行：本地标题或描述有修改时推送；`done` 以 *completed* 关闭议题，`canceled` 以 *not planned* 关闭，且仅当卡片状态自上次成功推送后发生变化。不会自动重开远端议题；卡片有执行中的运行或存在未解决冲突时不推送。未关联卡片可在详情面板逐张推送（「创建外部议题」，同一项目映射多个仓库时可选择目标仓库）；agent 可调用 `taskboard_external_sync`（整轮同步）或带 `taskId` 的单卡推送。评论、处理人、标签以及看板以外的远端状态变更不会回写；同步结果会分别显示拉取/新建/复用/歧义/推送计数。
+
+### GitLab、Gitea / Forgejo、Jira Cloud、Linear
+
+- **GitLab**：API 根地址默认 `https://gitlab.com/api/v4`（自建实例填 `https://<host>/api/v4`），Personal Access Token 使用 `PRIVATE-TOKEN`；映射 `group/project`（支持子组），同步 Issue 与 MR 分离（MR 永远不会被导入），可选创建/修改/关闭。
+- **Gitea / Forgejo**：API 根地址默认 `https://gitea.com/api/v1`，Token 连接；映射 `owner/repo`，忽略 Pull Request，可选写回。
+- **Jira Cloud**：REST v3，Basic 认证（邮箱 + API Token），映射项目 Key（如 `ABC`）；描述在 ADF 与纯文本间转换，关闭使用工作流中 `done` 类别的 transition。仅 Jira Cloud（Server/DC 的 wiki markup 不支持）。
+- **Linear**：GraphQL，API Key（无需 `Bearer`），映射团队 Key（如 `ENG`）；分页 cursor，按状态类型判断完成/取消，可选创建与更新。
+
+三种 forge 都支持可选的签名 Webhook：`POST /dsh-taskboard/external/webhook/<connectionId>`，GitHub 用 `X-Hub-Signature-256`、Gitea/Forgejo 用 `X-Gitea-Signature`、GitLab 用 `X-Gitlab-Token`。Webhook 只触发拉取，远端 API 始终是权威；重复 delivery 会被去重，乱序事件不会覆盖较新状态。Webhook 密钥通过连接配置的 `credentials.webhookSecret` 保存（不会返回到前端）。
+
+### 写回、预览与冲突
+
+每条连接默认启用：每 **15 分钟**自动同步一次，并向声明写能力的提供方回写（`bidirectional`）。同步末尾只回写已关联卡片：仅推送自上次成功推送后修改的标题/描述；`done` 关闭为 *completed*、`canceled` 关闭为 *not planned*；不自动重开远端，执行中的卡片不推送，冲突字段不推送。只读提供方（禅道、TAPD）始终保持 `inbound`；选择「只读」即可关闭回写，把同步间隔设为 0 即改为手动。`POST /dsh-taskboard/external/preview` 可在同步前预览新建/关联/更新/冲突/推送数量与样本，预览不写入任何一侧。
+
+**旧配置处理**：缺少新映射方式的旧禅道配置暂停自动同步，保留凭据和已有任务，并提示重新关联项目或执行/迭代。旧产品 ID 不会被自动解释为项目 ID；重新获取清单、关联并保存后恢复。
+
+连接凭据保存在活动 DSH_HOME 的 `dsh-taskboard-external.json`（权限 `0600`，host 专用明文文件，需妥善保护），密码、Token 和 Webhook 密钥不返回前端、不进入任务导出、不出现在错误或日志中。禅道自动获取内存 Token，不支持旧 Token 认证配置。任务与同步记录原子保存，失败不提交部分任务。暂不包含截图/附件同步与评论双向同步；Bitbucket、Azure DevOps、Trello、GitHub Projects、GitLab Boards 未实现。
+
+2026-10-16 实测：项目模式读取 4 个缺陷、4 条项目需求和 8 个开发任务；执行模式读取到相同范围的数据。两种模式分别按 admin 导入 2 个缺陷、2 个任务，第二轮均无新增和更新；需求未分配给该账号，因此未导入，需求按处理人导入另有模拟集成测试覆盖。测试仅写入临时本地账本，不修改禅道业务数据。
+
+接口依据：[项目需求](https://www.zentao.net/book/api/692.html)、[执行需求](https://www.zentao.net/book/api/693.html)、[项目下执行清单](https://www.zentao.net/book/api/710.html)、[执行任务](https://www.zentao.net/book/api/715.html)。
+
+## Agent Board 公共契约（v1）
+
+Task Board 仍是任务台账与执行信封的唯一所有者；Agent Board（或任何授权编排器）是只读/受控消费者，不能读取台账文件，也不能把任务移入 `done`。
+
+```bash
+# 宿主启动前设置；未设置时公共 API 返回 503，其余功能照常工作
+export DSH_TASKBOARD_PUBLIC_TOKEN="long-random-token"
+
+curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
+  http://127.0.0.1:<port>/dsh-taskboard/public/v1/meta
+curl -H "Authorization: Bearer $DSH_TASKBOARD_PUBLIC_TOKEN" \
+  "http://127.0.0.1:<port>/dsh-taskboard/public/v1/tasks?eligible=true"
+```
+
+端点：`/meta`、`/projects`、`/tasks`、`/tasks/:id`、`/tasks/:id/dependencies`、`/executions/:id`、`/events`（SSE：`/events/stream`）；生命周期：`POST /executions/claim`、`:id/session`、`:id/attempts`、`:id/handoff`、`:id/report`、`:id/complete`、`:id/interrupt`。完整字段、错误码、幂等与 fencing 语义见 [docs/AGENT-BOARD-CONTRACT.md](./docs/AGENT-BOARD-CONTRACT.md)。没有 Agent Board 时 Task Board 完全独立运行；不配置 Token 即彻底关闭该接口。
+
+## 升级日志
+
+### 0.14.0
+
+- **八语界面，自动跟随用户语言**：看板语言从 3 种扩展到 DSH 自带的 8 种，新增 Français / Deutsch / Español / 日本語 / Português (Brasil)。默认仍为「跟随 DSH」，因此 DSH 用什么语言看板就用什么语言，无需任何配置；手动选择仍可固定某一种，并保存在当前浏览器。
+- **探测与 DSH 对齐**：页面 `lang` 与浏览器语言按主语言子标签匹配（`pt-PT`→pt、`zh-TW`→zh、`de-AT`→de）；DSH 侧选用看板未内置的外部语言包时回退 English，与 DSH 自身回退一致。
+- **护栏**：8 种语言的键集与占位符逐键比对，空值与非标准字符拒绝，客户端 `t('…')` 键扫描覆盖全部字典。
+
+### 0.9.11
+
+- **看板级分支命名预设**：看板设置新增「分支命名」——四预设（`task/标题+ID` 默认 / `task/ID` / `前缀/ID` / `前缀/标题+ID`）+ 条件前缀输入与实时示例预览，中文标题也能生成纯英文分支（[#98](https://github.com/cloader/dsh-taskboard/issues/98)）。
+- **任务级分支名覆盖**：任务表单（Worktree 隔离时）新增可选「分支名」字段，默认显示并跟随看板规则派生的分支名（改标题联动重算）；手动修改即停止跟随，清空恢复跟随；两个态的占位符都是规则的实时预览。首次执行后与隔离方式一样锁定（分支已 pin）。`taskboard_create` 工具与任务模板同步支持。
+- **历史数据零迁移**：默认预设逐字节复刻原 `task/<标题>+<任务ID>`；首次执行 pin、分支冲突回退、多仓库镜像逐仓 pin、后继卡不继承分支等既有语义不变。
+
+### 0.9.10
+
+- **周期任务隔离**：修复「完成后新建待办」的周期任务从第二轮起因继承分支而降级为原目录执行的问题。后继卡使用独立分支；旧卡遇到分支占用时改用备用分支，并正确保存分支、采集执行证据、续跑和合并，支持多仓库镜像（[#94](https://github.com/cloader/dsh-taskboard/issues/94)）。
+- **一次性定时任务编辑**：任务执行结算、错过触发窗口或被清出队列后恢复为认领模式，旧数据也可正常保存编辑；未消费的到期任务及排队、派发中的任务保留原调度状态，普通编辑不会取消或重新定时。明确修改触发时间时仍要求未来时间，并隐藏已失效的定时标识（[#95](https://github.com/cloader/dsh-taskboard/issues/95)）。
+
+感谢 [@timacek](https://github.com/timacek) 的报告与复现分析。
+
+### 0.9.9
+
+- **窄屏任务详情**：修复手机和桌面窄面板中，操作按钮挤压任务标题、导致逐字换行的问题。标题区保留合理宽度，空间不足时操作区移到下方，按钮在面板内换行；覆盖中间宽度和较长的俄语文案，宽屏布局保持不变（[#91](https://github.com/cloader/dsh-taskboard/issues/91)、[#92](https://github.com/cloader/dsh-taskboard/pull/92)，感谢 [@reysonk](https://github.com/reysonk) 的报告与排查；修复由 [@cloader](https://github.com/cloader) 完成）。
+
+### 0.9.8
+
+- **完整导出**：JSON 备份和 CSV 导出始终获取完整台账，折叠「已完成」列后也不会遗漏任务；读取失败时提示错误，不生成残缺文件（[#89](https://github.com/cloader/dsh-taskboard/pull/89)）。
+- **停止外部会话**：自动纳入看板的外部会话支持真正停止 Agent，等待停止后再标记取消；停止失败会重试，避免卡片显示已取消但会话仍在执行（[#89](https://github.com/cloader/dsh-taskboard/pull/89)）。
+- **留言执行保护**：留言唤醒后立即跟踪执行，投递标记保存失败时随结算重试，避免执行无人结算，并防止同一批已入队留言重复投递（[#89](https://github.com/cloader/dsh-taskboard/pull/89)，贡献者 [@cloader](https://github.com/cloader)）。
+- **认领保护**：阻止其他会话删除已认领的进行中任务，避免工作被打断（[#85](https://github.com/cloader/dsh-taskboard/issues/85)、[#86](https://github.com/cloader/dsh-taskboard/pull/86)）。
+- **数据保护**：台账读取失败时明确提示，保留原文件与图片，阻止空台账覆盖原数据（[#84](https://github.com/cloader/dsh-taskboard/issues/84)、[#87](https://github.com/cloader/dsh-taskboard/pull/87)）。
+- **看板面板**：统一使用 DSH 官方面板切换，移除旧版挂载方式；需要 DSH 0.1.7 或更新版本（[#82](https://github.com/cloader/dsh-taskboard/pull/82)）。
+- **导入预览**：快速切换文件时，预览与实际导入内容保持一致（[#72](https://github.com/cloader/dsh-taskboard/issues/72)、[#75](https://github.com/cloader/dsh-taskboard/pull/75)）。感谢 [@timacek](https://github.com/timacek) 的贡献。
+- **执行更稳定**：修复存储异常导致 DSH 退出的问题，执行结果保存失败时会自动重试（[#74](https://github.com/cloader/dsh-taskboard/issues/74)、[#80](https://github.com/cloader/dsh-taskboard/pull/80)）。
+- **工作目录保护**：无法确认修改状态时停止删除，保留未提交的文件（[#73](https://github.com/cloader/dsh-taskboard/issues/73)、[#81](https://github.com/cloader/dsh-taskboard/pull/81)）。
+- **安装说明**：统一使用 npm 安装，移除无法直接使用的 GitHub 安装说明（[#76](https://github.com/cloader/dsh-taskboard/issues/76)、[#79](https://github.com/cloader/dsh-taskboard/pull/79)）。
+- **开发环境**：修复 Node 26 下的测试兼容问题（[#71](https://github.com/cloader/dsh-taskboard/issues/71)、[#78](https://github.com/cloader/dsh-taskboard/pull/78)）。
+
+### 0.9.7
+
+- **看板语言设置**：通用设置新增「跟随 DSH（默认）／简体中文／English／Русский」选项，立即生效并在当前浏览器中保存；手动选择不受 DSH 语言切换影响，恢复跟随后使用 DSH 的最新语言。
+- **设置页布局**：界面语言、默认新建项目各自采用「左侧标签＋右侧下拉框」的横向布局，说明文字保留在下方；各设置分区底部增加横线，方便区分。切换语言保留其他未保存的设置草稿。
+- **俄语界面（ru）（[#67](https://github.com/cloader/dsh-taskboard/pull/67)，感谢 [@reysonk](https://github.com/reysonk)）**：新增 `src/client/i18n/ru.ts`（664 个键，与 zh/en 完全对齐），`LocaleId` 扩展为 `'zh' | 'en' | 'ru'`，字典与 `<html lang>`/`navigator` 回退检测支持 `ru`。内置模板正文仍复用英文内容（本 PR 不翻译模板）。
+- **任务详情显示 ID（[#68](https://github.com/cloader/dsh-taskboard/pull/68)，感谢 [@reysonk](https://github.com/reysonk)）**：详情头部在「更新 … · 最近操作 …」之后显示任务 ID，等宽字体、点击即复制并短暂提示「已复制」/「复制失败」。此前 ID 只用于搜索匹配和会话内部，界面从未展示，无法在对话、日志或问题报告里指认具体卡片。
+- **待规划与待办列折叠（[#65](https://github.com/cloader/dsh-taskboard/pull/65)，感谢 [@jw5555555555](https://github.com/jw5555555555)；集成修复 [#69](https://github.com/cloader/dsh-taskboard/pull/69)）**：支持将两列收起为紧凑侧栏，保留任务计数和拖放流转；折叠状态在刷新后恢复，并与项目分组折叠独立保存，支持中英俄提示。
+- **弱化待验收提示（[#66](https://github.com/cloader/dsh-taskboard/issues/66)，[3054eba](https://github.com/cloader/dsh-taskboard/commit/3054eba6741a635966a0f5d593da8138bffc19ac)）**：将待验收卡片中的「缺少自验/验收记录」提示由红色调整为浅蓝色 `#78a9d6`，保留提示文字，减少视觉干扰。
+- **回归覆盖**：三语键集一致性、值非空、枚举映射、语言探测与占位符替换、模板回退及客户端翻译键扫描；任务 ID 渲染与复制反馈；语言偏好持久化、跟随 DSH 与手动选择切换、存储异常降级及设置草稿保留；整列与项目分组折叠组合使用及刷新恢复。
+
+### 0.9.6
+
+- **关联工作区认领（[#62](https://github.com/cloader/dsh-taskboard/pull/62)，感谢 [@reysonk](https://github.com/reysonk)）**：新增看板全局设置 `allowClaimFromLinkedRoots`，默认关闭；开启后，会话可以认领其已挂载关联工作区中的任务，任务归属保持不变。需要多根工作区插件，服务缺失或调用抛错时退回主根认领规则。
+- **协议与边界说明**：同步 Agent 协议和中英文设置提示；跨主根认领后须使用任务所属项目目录，并遵守原有文件权限。创建规则不变，仍支持通过已注册项目 ID 或可解析的项目目录创建任务。
+- **回归覆盖**：覆盖关联根认领、默认拒绝、服务不可用、错误提示、跨项目创建和协议约束；44 个测试文件、583 个测试通过。
+
+### 0.9.5
+
+- **项目路径与纠错提示（#58 / #59）**：`taskboard_list` 和 `taskboard_create` 的 `workspaceId` 支持已注册项目根目录的绝对路径，创建任务时仍保存项目 ID。未知项目继续返回 `not_found`；错误详情提供本会话所属项目的可重试 ID，无法识别所属项目时最多列出 8 个项目 ID。感谢 [@Ausli](https://github.com/Ausli) 的贡献。
+
+### 0.9.4
+
+- **留言唤醒会话（#51）**：待验收卡的评论框新增「留言并让 agent 处理」——点击后把留言与所有未投递留言合并成一条用户消息投递给任务会话，卡片回到进行中；执行中的会话直接追加，否则续聊卡片关联会话（不可用时新建并记录原因）。worktree 隔离任务唤醒时强制续跑，不重置上次工作；投递成功的留言标记「已投递」并可跳转会话，agent/系统评论永不触发投递，仅待验收卡可唤醒（路由与执行闸门双层校验）。
+- **评论归属与可读性**：系统评论标注来源会话、投递判定排除系统评论，不再被误标为「用户 · 待投递」；agent 标签可点击跳转会话，执行记录区默认折叠。
+
+### 0.9.3
+
+- **崩溃后台账锁恢复（#53）**：宿主崩溃后遗留的台账锁会被立即回收（锁内记录 pid，争用时探活确认）；存活或无法确认的持有者不会因锁龄被抢锁。干净启动不再申请写锁，启动恢复失败仅告警并保留台账——修复了「崩溃后重启也起不来」的崩溃循环。
+- **人工等待（承接 #54，感谢 [@monkey-sking](https://github.com/monkey-sking)）**：补齐共享协议与持久化，明确标记、明确解除、自动识别三种状态相互独立，不再误伤普通阻塞。卡片正面琥珀色「需人工」徽章与「待我处理」一键过滤；自动推断显示为疑似提示，排除终态与常见业务词，原因文案支持中英文。请勿在等待原因中填写凭据。
+- **交付验收（承接 #54）**：卡片与详情前置最新执行的交付报告与验收清单，历史报告折叠并标注执行轮次；区分 Agent 自报文件与 Git 统计，验证记录使用中性标识；改动文件路径一键复制。
+- **默认项目（#56）**：看板设置新增「默认项目」；新建任务在没有看板筛选时默认选中它，不再固定回落到工作区列表第一项。保存时校验项目仍已注册，悬空引用自动跳过。
+- **质量检查**：CI 增加独立类型检查；补充锁恢复、人工等待、筛选、报告历史与默认项目的回归测试；发布前自动构建并跑测试（prepublishOnly）。
+
+### 0.9.2
+
+- **列表过滤校验（#52，感谢 [@Ausli](https://github.com/Ausli)）**：`taskboard_list` 的过滤参数不再静默过滤为空——未注册的 workspaceId 返回 `not_found`，拼错的 status/urgency 返回 `invalid_input` 并列出合法值。
+
+### 0.9.1
+
+- 禅道支持按项目或执行/迭代关联，独立选择缺陷、需求、任务；同步清单后逐行选择本地项目。
+- 可选同步未关联和新增范围，生成空工作项目卡片；旧产品配置保留凭据和任务，重新关联后恢复同步。
+- 测试连接使用当前表单，支持保存空映射；优化设置布局与提示。
+- 修复卡片会话跳转与无运行中执行的进行中卡片重跑（#50）。
+
+### 0.9.0
+
+- 新增禅道/TAPD 外部任务同步及通用 Provider 接口；禅道已实测。设置增加左侧菜单，支持禅道登录账号复用、冲突处理、持久化同步状态及请求节流。
+- 定时任务绑定会话不可用时自动创建新会话继续执行（#49）。
+
+> 📜 更早版本的完整更新历史见 [changelog.md](changelog.md)。

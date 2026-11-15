@@ -1,11 +1,17 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
+  asPermission,
+  asUrgency,
   canTransition,
   newCommentId,
   newExecutionId,
+  newTaskId,
   normalizeBody,
+  normalizeChecklist,
   normalizeExecutionReport,
+  normalizePrompt,
+  normalizeTitle,
   syncClaim,
   type ExecutionAttempt,
   type ExecutionRecord,
@@ -60,6 +66,13 @@ class PublicApiError extends Error {
 
 function fail(code: PublicErrorCode, message: string, status: number): never {
   throw new PublicApiError(code, message, status)
+}
+
+/** Field validators throw plain Errors; surface them as a 400, not a 500. */
+function invalidInput<T>(operation: () => T): T {
+  try { return operation() } catch (error) {
+    fail('invalid_input', error instanceof Error ? error.message : 'invalid input', 400)
+  }
 }
 
 function json(res: ServerResponse, payload: unknown, status = 200): void {
@@ -220,7 +233,7 @@ export class PublicApiService {
       ok(res, {
         apiVersion: PUBLIC_API_VERSION, name: 'dsh-taskboard', eventTypes: [...PUBLIC_EVENT_TYPES], auth: 'bearer',
         writePolicy: 'explicit', donePolicy: 'user-only',
-        features: { claim: true, attempts: true, handoff: true, reports: true, events: 'replay+resync', worktree: true, externalSync: true },
+        features: { claim: true, attempts: true, handoff: true, reports: true, events: 'replay+resync', worktree: true, externalSync: true, taskWrite: true },
         taskStatuses: ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled', 'archived'],
       })
       return
@@ -236,6 +249,13 @@ export class PublicApiService {
     match = /^\/executions\/([^/]+)$/.exec(path)
     if (method === 'GET' && match?.[1] !== undefined) { ok(res, this.executionOf(this.decode(match[1]))); return }
     if (method === 'POST' && path === '/executions/claim') { ok(res, await this.claim(body), 201); return }
+    // Board content writes (audit A03): create / edit / comment. Execution
+    // config, model and preset stay operator-owned; `done` is unreachable.
+    if (method === 'POST' && path === '/tasks') { ok(res, await this.createTask(body), 201); return }
+    match = /^\/tasks\/([^/]+)\/update$/.exec(path)
+    if (method === 'POST' && match?.[1] !== undefined) { ok(res, await this.updateTask(this.decode(match[1]), body)); return }
+    match = /^\/tasks\/([^/]+)\/comments$/.exec(path)
+    if (method === 'POST' && match?.[1] !== undefined) { ok(res, await this.commentTask(this.decode(match[1]), body), 201); return }
     match = /^\/executions\/([^/]+)\/(session|attempts|handoff|complete|interrupt|report)$/.exec(path)
     if (method === 'POST' && match?.[1] !== undefined && match[2] !== undefined) {
       const executionId = this.decode(match[1])
@@ -332,6 +352,162 @@ export class PublicApiService {
     if (actor === undefined) fail('invalid_input', 'actor is required (1..200 chars)', 400)
     return actor
   }
+
+  /** Actor of a board write: the calling engine's session, or the API itself. */
+  private writerActor(body: Record<string, unknown> | null): string {
+    return str(body?.actor, 200) ?? 'public-api'
+  }
+
+  /**
+   * Create one card (audit A03). Deliberately narrow: the operator-owned
+   * execution config (cron/runAt/model/preset) is NOT settable through this
+   * route; an engine creates claim-mode work only. `done` is unreachable.
+   */
+  private async createTask(body: Record<string, unknown> | null): Promise<PublicTaskView> {
+    const titleRaw = str(body?.title, 200)
+    if (titleRaw === undefined) fail('invalid_input', 'title is required (1..200 chars)', 400)
+    const workspaceId = str(body?.workspaceId, 200)
+    if (workspaceId === undefined) fail('invalid_input', 'workspaceId is required', 400)
+    if (this.options.workspaces.get(workspaceId) === undefined) fail('invalid_input', 'unknown workspace', 400)
+    const status = body?.status === 'backlog' ? 'backlog' as const : 'todo' as const
+    const urgency = typeof body?.urgency === 'string' ? invalidInput(() => asUrgency(body.urgency as string)) : 'normal' as const
+    const actor = this.writerActor(body)
+    const now = this.now()
+    const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 20_000) : ''
+    const prompt = normalizePrompt(typeof body?.prompt === 'string' ? body.prompt : undefined)
+    const checklist = Array.isArray(body?.checklist) ? normalizeChecklist(body.checklist) : undefined
+    const dependsOnRaw = Array.isArray(body?.dependsOn) ? body.dependsOn : []
+    const dependsOn = [...new Set(dependsOnRaw.filter((value): value is string => typeof value === 'string' && value.length > 0))].slice(0, 50)
+    const parentId = typeof body?.parentId === 'string' && body.parentId !== '' ? body.parentId : undefined
+    const permission = typeof body?.permission === 'string' ? invalidInput(() => asPermission(body.permission as string)) : undefined
+    let created: TaskRecord | undefined
+    await this.options.store.mutate('task-created', ledger => {
+      const live = ledger.tasks.filter(task => task.trashedAt === undefined)
+      for (const dependency of dependsOn) {
+        const prerequisite = live.find(task => task.id === dependency)
+        if (prerequisite === undefined || prerequisite.workspaceId !== workspaceId) {
+          fail('invalid_input', `invalid prerequisite ${dependency} (same workspace, existing task required)`, 400)
+        }
+      }
+      if (parentId !== undefined) {
+        const parent = live.find(task => task.id === parentId)
+        if (parent === undefined || parent.workspaceId !== workspaceId) {
+          fail('invalid_input', 'parent must be an existing task of the same workspace', 400)
+        }
+      }
+      const task: TaskRecord = {
+        id: newTaskId(),
+        title: invalidInput(() => normalizeTitle(titleRaw)),
+        description,
+        prompt,
+        workspaceId,
+        urgency,
+        status,
+        blocked: false,
+        ...(dependsOn.length > 0 ? { dependsOn } : {}),
+        ...(parentId === undefined ? {} : { parentId }),
+        execution: { mode: 'claim' },
+        ...(permission === undefined ? {} : { permission }),
+        ...(checklist !== undefined && checklist.length > 0 ? { checklist } : {}),
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: { kind: 'agent', sessionId: actor },
+        updatedBy: { kind: 'agent', sessionId: actor },
+        comments: [],
+        executions: [],
+      }
+      ledger.tasks.push(task)
+      created = task
+      return [task]
+    })
+    return this.taskView(created!.id)
+  }
+
+  /** Edit a card's content. `ifVersion` is mandatory; terminal cards are immutable. */
+  private async updateTask(id: string, body: Record<string, unknown> | null): Promise<PublicTaskView> {
+    const ifVersion = numeric(body?.ifVersion)
+    if (ifVersion === undefined || !Number.isInteger(ifVersion)) fail('invalid_input', 'ifVersion is required', 400)
+    const actor = this.writerActor(body)
+    const now = this.now()
+    await this.options.store.mutate('task-updated', ledger => {
+      const task = ledger.tasks.find(candidate => candidate.id === id && candidate.trashedAt === undefined)
+      if (task === undefined) fail('not_found', 'no such task', 404)
+      if (task.version !== ifVersion) fail('version_conflict', `task is at version ${task.version}`, 409)
+      if (task.status === 'archived' || task.status === 'done') fail('invalid_input', 'terminal tasks are immutable', 409)
+      if (body?.title !== undefined) {
+        if (typeof body.title !== 'string') fail('invalid_input', 'title must be a string', 400)
+        task.title = invalidInput(() => normalizeTitle(body.title as string))
+      }
+      if (body?.description !== undefined) {
+        if (typeof body.description !== 'string') fail('invalid_input', 'description must be a string', 400)
+        task.description = body.description.trim().slice(0, 20_000)
+      }
+      if (body?.prompt !== undefined) {
+        if (typeof body.prompt !== 'string') fail('invalid_input', 'prompt must be a string', 400)
+        task.prompt = normalizePrompt(body.prompt)
+      }
+      if (body?.urgency !== undefined) {
+        if (typeof body.urgency !== 'string') fail('invalid_input', 'urgency must be a string', 400)
+        task.urgency = invalidInput(() => asUrgency(body.urgency as string))
+      }
+      if (body?.blocked !== undefined) task.blocked = body.blocked === true
+      if (body?.waitingForHuman !== undefined) {
+        // An engine may ASK for a human decision, but it may never clear a wait
+        // the user set: that would bypass the barrier it just respects.
+        if (task.waitingForHuman === true && body.waitingForHuman !== true) {
+          fail('forbidden', 'a human wait can only be cleared by the user', 403)
+        }
+        if (body.waitingForHuman === null) delete task.waitingForHuman
+        else task.waitingForHuman = body.waitingForHuman === true
+      }
+      if (body?.waitingReason !== undefined) {
+        if (body.waitingReason === null) delete task.waitingReason
+        else if (typeof body.waitingReason === 'string') task.waitingReason = body.waitingReason.trim().slice(0, 500)
+        else fail('invalid_input', 'waitingReason must be a string or null', 400)
+      }
+      if (body?.checklist !== undefined) {
+        if (!Array.isArray(body.checklist)) fail('invalid_input', 'checklist must be an array', 400)
+        const checklist = normalizeChecklist(body.checklist)
+        if (checklist.length > 0) task.checklist = checklist
+        else delete task.checklist
+      }
+      task.version += 1
+      task.updatedAt = now
+      task.updatedBy = { kind: 'agent', sessionId: actor }
+      return [task]
+    })
+    return this.taskView(id)
+  }
+
+  /** Append one agent comment to a card. */
+  private async commentTask(id: string, body: Record<string, unknown> | null): Promise<{ taskId: string; commentId: string; version: number }> {
+    if (typeof body?.body !== 'string' || body.body.trim().length === 0) fail('invalid_input', 'body is required', 400)
+    const actor = this.writerActor(body)
+    const now = this.now()
+    let commentId = ''
+    let version = 0
+    await this.options.store.mutate('task-updated', ledger => {
+      const task = ledger.tasks.find(candidate => candidate.id === id && candidate.trashedAt === undefined)
+      if (task === undefined) fail('not_found', 'no such task', 404)
+      if (task.status === 'archived') fail('invalid_input', 'archived tasks are immutable', 409)
+      const comment = {
+        id: newCommentId(),
+        body: normalizeBody(body.body as string),
+        threadId: actor,
+        version: 1,
+        createdAt: now,
+      }
+      task.comments.push(comment)
+      task.version += 1
+      task.updatedAt = now
+      task.updatedBy = { kind: 'agent', sessionId: actor }
+      commentId = comment.id
+      version = task.version
+      return [task]
+    })
+    return { taskId: id, commentId, version }
+  }
   private guardClaim(task: TaskRecord, actor: string): void {
     if (task.claimedBy !== undefined && task.claimedBy !== actor) fail('already_claimed', `task is held by ${task.claimedBy}`, 409)
   }
@@ -368,13 +544,19 @@ export class PublicApiService {
       }
       if (task.status !== 'todo') { failure = new PublicApiError('version_conflict', `task is ${task.status}, not todo`, 409); return undefined }
       if (task.blocked) { failure = new PublicApiError('version_conflict', 'task is blocked', 409); return undefined }
+      // A card explicitly waiting for a human decision is not claimable by an
+      // automatic engine: the wait is a real execution barrier (audit A08).
+      if (task.waitingForHuman === true) {
+        failure = new PublicApiError('version_conflict', 'task is waiting for a human decision', 409)
+        return undefined
+      }
       const dependency = dependencyState(task, ledger.tasks)
       if (!dependency.ready) {
         failure = new PublicApiError('dependency_blocked', `unsatisfied dependencies: ${dependency.pendingIds.join(', ')}`, 409)
         return undefined
       }
       const execution: ExecutionRecord = {
-        id: newExecutionId(), trigger: 'manual', startedAt: now, outcome: 'running', managedBy: 'external',
+        id: newExecutionId(), trigger: 'manual', startedAt: now, lastActivityAt: now, outcome: 'running', managedBy: 'external',
         fencingToken: 1, attempts: [{ n: 1, startedAt: now, outcome: 'running', ...(sessionId === undefined ? {} : { sessionId }) }],
         externalActor: actor,
         ...(sessionId === undefined ? {} : { sessionId }),
@@ -441,6 +623,7 @@ export class PublicApiService {
           fail('version_conflict', 'execution already has a different session; use attempts or handoff', 409)
         }
         execution.sessionId = sessionId
+        execution.lastActivityAt = now
         this.currentAttempt(execution).sessionId = sessionId
         task.version += 1; task.updatedAt = now
         return [task]
@@ -469,6 +652,7 @@ export class PublicApiService {
         const next: ExecutionAttempt = { n: previous.n + 1, startedAt: now, outcome: 'running',
           ...(sessionId === undefined ? {} : { sessionId }) }
         execution.attempts = [...(execution.attempts ?? []), next]
+        execution.lastActivityAt = now
         if (sessionId !== undefined) execution.sessionId = sessionId
         else delete execution.sessionId
         execution.fencingToken = (execution.fencingToken ?? 1) + 1
@@ -503,6 +687,7 @@ export class PublicApiService {
         const next: ExecutionAttempt = { n: previous.n + 1, sessionId: toSessionId, startedAt: now, outcome: 'running' }
         execution.attempts = [...(execution.attempts ?? []), next]
         execution.sessionId = toSessionId
+        execution.lastActivityAt = now
         execution.fencingToken = (execution.fencingToken ?? 1) + 1
         task.comments.push({ id: newCommentId(), body: normalizeBody(`[handoff] ${fromSessionId} → ${toSessionId}: ${request.reason ?? ''}`.trim()),
           threadId: request.actor, version: 1, createdAt: now })

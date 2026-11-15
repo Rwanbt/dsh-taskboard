@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { BoardController } from '../controller.ts'
 import type { TaskTemplateSpec } from '../../shared/api.ts'
 import type { ChecklistItem, IsolationMode, PermissionMode, PeriodicCompletion, TaskRecord, Urgency } from '../../shared/protocol.ts'
-import { MAX_CHECKLIST_ITEMS, asPermission, branchNameModeOf, branchNamePrefixOf, buildBranchName, defaultIsolationOf, defaultPermissionOf, nextCronTime, parseCron } from '../../shared/protocol.ts'
+import { MAX_CHECKLIST_ITEMS, asPermission, branchNameModeOf, branchNamePrefixOf, buildBranchName, categoriesOf, defaultIsolationOf, defaultPermissionOf, nextCronTime, parseCron } from '../../shared/protocol.ts'
 import { fmtTime, initialWorkspaceId } from './format.ts'
 import { dependencyState } from '../../shared/dependencies.ts'
 import { useT, type Translate } from '../i18n/runtime.ts'
@@ -192,6 +192,8 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
     initialWorkspaceId({ editing: task?.workspaceId, filter: state.filters.workspaceId, settings: state.ledger.settings, workspaces: state.workspaces }),
   )
   const [urgency, setUrgency] = useState<Urgency>(task?.urgency ?? (prefill?.urgency === 'urgent' || prefill?.urgency === 'relaxed' ? prefill.urgency : 'normal'))
+  // Functional category (descriptive): '' = unclassified.
+  const [categoryId, setCategoryId] = useState<string>(task?.category ?? '')
   const initExec = task?.execution ?? prefill?.execution
   // A scheduled one-shot whose trigger is fully consumed (runAt/queuedRunAt/
   // dispatchingRunAt all cleared — it already fired, #95) edits as a plain
@@ -434,6 +436,8 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
         description,
         prompt,
         urgency,
+        // '' clears the category (unclassified); the host validates the id.
+        category: categoryId === '' ? null : categoryId,
         workspaceId,
         execution: executionPayload(),
         // '' in edit mode clears the pinned model back to the default.
@@ -451,6 +455,7 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
         title,
         workspaceId,
         urgency,
+        ...(categoryId !== '' ? { category: categoryId } : {}),
         description: description.length > 0 ? description : undefined,
         prompt: prompt.length > 0 ? prompt : undefined,
         execution: executionPayload(),
@@ -690,6 +695,18 @@ export function TaskFormModal({ controller, task }: { controller: BoardControlle
                   value={urgency}
                   onChange={v => setUrgency(v as Urgency)}
                   options={urgencyOptions(t).map(o => ({ value: o.value, label: o.label }))}
+                />
+              </Field>
+              <Field label={t('form.category.label')}>
+                <Select
+                  full
+                  ariaLabel={t('form.category.label')}
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  options={[
+                    { value: '', label: t('form.category.none') },
+                    ...categoriesOf(state.ledger.settings).map(category => ({ value: category.id, label: category.name })),
+                  ]}
                 />
               </Field>
             </div>
@@ -935,3 +952,4 @@ interface TaskRecordLike {
   checklist?: ChecklistItem[]
   executions?: unknown[]
 }
+

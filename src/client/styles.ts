@@ -115,17 +115,210 @@ button[class*="panelRow"]:has(.dsh-atb-pglyph) { position: relative; }
   white-space: pre-line; pointer-events: none; transform: translateY(-50%);
 }
 
-.dsh-atb-search { width: 130px; }
+/* =====================================================================
+   DeepSeek Pastel — the board's own appearance tokens.
+
+   The eight pastel tones are declared with light-dark(): DSH publishes
+   color-scheme on &lt;html&gt; from the active theme, so the surfaces follow
+   the host light/dark palette without reading host internals and without
+   ever touching &lt;html&gt;/&lt;body&gt;. Everything is scoped to .dsh-atb-board, so
+   no host style or sibling plugin is affected.
+
+   --atb-vibrancy is the user's colour-intensity percentage (25–100 %):
+   the card background is the tone mixed over the host surface, so the
+   lowest values keep a hint of hue while staying neutral. Densities only
+   swap spacing tokens: the layout code below never changes per density.
+   ===================================================================== */
+.dsh-atb-board {
+  --atb-card-radius: 15px;
+  --atb-card-pad: 16px;
+  --atb-card-gap: 12px;
+  --atb-vibrancy: 100%;
+  --atb-card-base: var(--atb-bg-1);
+  --atb-card-text: light-dark(#22263a, #f4f2fc);
+  --atb-card-text-2: light-dark(#4a4f63, #d1cfe1);
+  --atb-card-border: light-dark(#252d4610, #ffffff14);
+  --atb-card-shadow: 0 0 0 .5px light-dark(#252d460d, #ffffff0a), 0 4px 16px light-dark(#35406412, #00000040);
+  --atb-card-hover-shadow: 0 0 0 .5px light-dark(#252d461a, #ffffff14), 0 10px 24px light-dark(#242c4822, #00000066);
+  /* Full pastel surfaces (dark theme values from the reference mockup). */
+  --atb-tone-violet: light-dark(#e9e3fb, #34304d);
+  --atb-tone-sky: light-dark(#dfeef9, #283d50);
+  --atb-tone-mint: light-dark(#dff2e8, #2d4642);
+  --atb-tone-peach: light-dark(#f9e7d9, #4a3a33);
+  --atb-tone-pink: light-dark(#f7e3ed, #4b3443);
+  --atb-tone-ink: light-dark(#e0e8f4, #323c4f);
+  --atb-tone-yellow: light-dark(#f7edcf, #49412e);
+  --atb-tone-lavender: light-dark(#e6e0f8, #3b3454);
+  /* Readable accents for the project label, the tone dot and the progress fill. */
+  --atb-tone-accent-violet: light-dark(#674a9e, #c3aafc);
+  --atb-tone-accent-sky: light-dark(#316a96, #a2d5fa);
+  --atb-tone-accent-mint: light-dark(#357566, #a0dfc8);
+  --atb-tone-accent-peach: light-dark(#96684d, #f2c09f);
+  --atb-tone-accent-pink: light-dark(#96557c, #f2b3d5);
+  --atb-tone-accent-ink: light-dark(#47679f, #aec5fa);
+  --atb-tone-accent-yellow: light-dark(#78661f, #efdb91);
+  --atb-tone-accent-lavender: light-dark(#674f9f, #c7bcfc);
+}
+.dsh-atb-board[data-atb-density="compact"] { --atb-card-radius: 11px; --atb-card-pad: 11px; --atb-card-gap: 8px; }
+.dsh-atb-board[data-atb-density="comfortable"] { --atb-card-radius: 15px; --atb-card-pad: 16px; --atb-card-gap: 12px; }
+.dsh-atb-board[data-atb-density="spacious"] { --atb-card-radius: 18px; --atb-card-pad: 20px; --atb-card-gap: 16px; }
+
+.dsh-atb-searchfield {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-width: 170px; max-width: 260px; flex: 1 1 190px; height: 34px;
+  padding: 0 10px; border-radius: var(--atb-radius-sm);
+  background: var(--atb-hover); color: var(--atb-text-3);
+}
+.dsh-atb-searchfield:focus-within { box-shadow: 0 0 0 1px var(--atb-accent), var(--atb-focus); }
+.dsh-atb-search { flex: 1; min-width: 0; width: 100%; height: 100%; border: 0; outline: none; background: transparent; color: var(--atb-text); font: inherit; font-size: 12px; }
+.dsh-atb-search::placeholder { color: var(--atb-text-3); }
 .dsh-atb-badge[data-kind="stale"] { background: rgba(217,130,43,.15); color: var(--atb-warn); }
 
-.dsh-atb-board { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 12px 16px; gap: 10px; box-sizing: border-box; }
+.dsh-atb-board { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 16px 20px 20px; gap: 12px; box-sizing: border-box; }
 .dsh-atb-panel-root[data-dsh-atb-windows] > .dsh-atb-board {
   padding-top: max(12px, calc(env(titlebar-area-y, 0px) + env(titlebar-area-height, 36px) + 8px - var(--dsh-atb-viewport-top, 0px)));
 }
-.dsh-atb-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dsh-atb-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.dsh-atb-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-right: 62px; }
-.dsh-atb-title { font-size: 15px; font-weight: 600; margin: 0; }
-.dsh-atb-count { font-size: 12px; color: var(--atb-text-2, gray); }
+.dsh-atb-toolbar-divider { width: 1px; height: 22px; flex: none; margin: 0 3px; background: var(--atb-border-2); }
+.dsh-atb-title { font-size: 19px; font-weight: 720; letter-spacing: -.45px; margin: 0; line-height: 1.2; }
+.dsh-atb-count {
+  font-size: 11px; color: var(--atb-text-2); background: var(--atb-hover);
+  border-radius: 7px; padding: 4px 9px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.dsh-atb-grouptoggle[aria-pressed="true"] { background: color-mix(in srgb, var(--atb-accent) 14%, transparent); color: var(--atb-text); }
+/* ---------------------------------------------------------------------
+   Focus-mode scaffolding (mobile carousel): inert above 760px where the
+   five columns are laid out side by side. The two media queries at the
+   bottom of this sheet activate it; they are the exact queries exported by
+   board/mobile.ts (a test asserts both strings stay in this sheet).
+   --------------------------------------------------------------------- */
+.dsh-atb-mobileactions { display: none; align-items: center; gap: 2px; flex: none; }
+.dsh-atb-iconbtn {
+  position: relative; width: 34px; height: 34px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 10px;
+  background: transparent; color: var(--atb-text-2); cursor: pointer; font: inherit;
+}
+.dsh-atb-iconbtn:hover { background: var(--atb-hover); color: var(--atb-text); }
+.dsh-atb-iconbtn:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 2px; }
+.dsh-atb-iconbtn[data-on="true"] { color: var(--atb-text); background: var(--atb-hover); }
+.dsh-atb-iconbtn[data-on="true"]::after {
+  content: ""; position: absolute; top: 5px; right: 5px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--atb-accent);
+}
+/* The two clusters are transparent wrappers on desktop: their children stay
+   direct flex items of the toolbar (no layout change at all). */
+.dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: contents; }
+/* ---------------------------------------------------------------------
+   Desktop toolbar densities. The board measures its own toolbar and
+   publishes data-atb-bar (board/compact.ts); the header must stay on two
+   rows, so the row sheds its labels before it is allowed to wrap onto a
+   third line. Every control keeps its icon, its accessible name and its
+   tooltip: only the visible text is dropped.
+   --------------------------------------------------------------------- */
+.dsh-atb-chip-count { font-variant-numeric: tabular-nums; }
+.dsh-atb-head { gap: 8px; }
+/* Title row: the action cluster drops its words first (icon + tooltip + name). */
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-btn-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-btn-label { display: none; }
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-btn,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-btn {
+  width: 34px; height: 30px; padding: 0; gap: 0; justify-content: center;
+}
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-newmenu-caret,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-newmenu-caret { display: none; }
+/* Filter row: the urgency chips keep their words as long as any laptop fits. */
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar .dsh-atb-searchfield { flex: 0 1 180px; min-width: 130px; max-width: 200px; }
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar .dsh-atb-sel { max-width: 168px; }
+/* Tight: colour dots + icon-only counters, and the title row loses the version
+   pill and the grouping label. Everything keeps its tooltip and accessible name. */
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar { gap: 4px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-searchfield { flex: 0 1 150px; min-width: 104px; max-width: 170px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-sel { max-width: 128px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-chip-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-toolbar-divider { display: none; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-chip { padding: 3px 7px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-grouptoggle { width: 34px; padding: 0; gap: 0; justify-content: center; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-grouptoggle-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-ver { display: none; }
+/* The focus-mode header (status tab rail + swipe cue) is a zero-cost box on
+   desktop: hidden entirely, so the board body keeps its exact previous layout. */
+.dsh-atb-mobilehead { display: none; align-items: center; gap: 8px; min-width: 0; }
+/* Narrow-viewport column navigation: hidden until the five columns stop fitting.
+   The rail is a horizontal scroller, so a long label set scrolls instead of
+   being squeezed. */
+.dsh-atb-mobilebar {
+  display: none; gap: 6px; flex: 1; min-width: 0;
+  overflow-x: auto; scrollbar-width: none; padding: 2px 2px 1px;
+}
+.dsh-atb-mobilebar::-webkit-scrollbar { display: none; }
+/* Mobile column tabs are miniature column heads, not filter chips: the same
+   sober surface as a desktop column, one short status rule on the top edge
+   (see .dsh-atb-colhead::before), a plain label and an integrated counter.
+   Height stays low (34 px) while the padding keeps a comfortable touch target. */
+.dsh-atb-mobilebar-btn {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 11px; border-radius: 11px; cursor: pointer;
+  border: 1px solid var(--atb-border); background: var(--atb-surface-sunken);
+  color: var(--atb-text-2); font: inherit;
+  font-size: 12px; font-weight: 640; letter-spacing: -.1px; white-space: nowrap;
+  scroll-snap-align: start;
+  transition: background .16s ease, color .16s ease, border-color .16s ease,
+    box-shadow .16s ease, transform .12s ease;
+}
+/* The status rule: a short coloured bar inset on the top edge. Inactive tabs
+   keep it visible but muted; the active one widens it and turns it opaque. */
+.dsh-atb-mobilebar-btn::before {
+  content: ""; position: absolute; top: 0; left: 11px; right: 11px; height: 3px;
+  border-radius: 0 0 5px 5px; background: var(--atb-status, var(--atb-text-3));
+  opacity: .45;
+  transition: opacity .16s ease, left .16s ease, right .16s ease, height .16s ease;
+}
+.dsh-atb-mobilebar-btn:hover { color: var(--atb-text); }
+.dsh-atb-mobilebar-btn:active { transform: translateY(1px); background: var(--atb-hover); }
+.dsh-atb-mobilebar-btn:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 2px; }
+.dsh-atb-mobilebar-btn[data-active="true"] {
+  color: var(--atb-text); background: var(--atb-bg-1); font-weight: 680;
+  border-color: color-mix(in srgb, var(--atb-status, var(--atb-accent)) 40%, var(--atb-border));
+  box-shadow: 0 1px 2px light-dark(#0f172a0f, #00000040), 0 5px 14px -8px light-dark(#0f172a26, #00000066);
+}
+.dsh-atb-mobilebar-btn[data-active="true"]::before { opacity: 1; left: 8px; right: 8px; }
+/* Same status palette as the desktop columns (single source of truth). */
+.dsh-atb-mobilebar-btn[data-status="backlog"] { --atb-status: var(--atb-text-3); }
+.dsh-atb-mobilebar-btn[data-status="todo"] { --atb-status: var(--atb-accent); }
+.dsh-atb-mobilebar-btn[data-status="in_progress"] { --atb-status: var(--atb-warn); }
+.dsh-atb-mobilebar-btn[data-status="in_review"] { --atb-status: var(--dsw-alias-state-done-primary, #7c3aed); }
+.dsh-atb-mobilebar-btn[data-status="done"] { --atb-status: var(--atb-success); }
+.dsh-atb-mobilebar-label { white-space: nowrap; }
+.dsh-atb-mobilebar-count {
+  font-size: 10.5px; font-weight: 500; padding: 1px 6px; border-radius: 6px;
+  background: var(--atb-hover); color: var(--atb-text-3);
+  font-variant-numeric: tabular-nums;
+  transition: background .16s ease, color .16s ease;
+}
+.dsh-atb-mobilebar-btn[data-active="true"] .dsh-atb-mobilebar-count { background: var(--atb-active, var(--atb-hover)); color: var(--atb-text-2); }
+.dsh-atb-swipecue {
+  display: none; align-items: center; gap: 6px; flex: none;
+  font-size: 10.5px; color: var(--atb-text-3); white-space: nowrap;
+}
+.dsh-atb-swipecue-arrow { opacity: .6; }
+.dsh-atb-swipecue-page { color: var(--atb-text-2); font-variant-numeric: tabular-nums; }
+/* One primary creation action on a phone, thumb-reachable, inside the panel. */
+.dsh-atb-fab {
+  position: absolute; z-index: 20; right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  width: 54px; height: 54px; display: none; place-items: center;
+  border: none; border-radius: 18px; cursor: pointer;
+  background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary, #1f2328));
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  box-shadow: var(--atb-elevation-prominent), 0 10px 22px -10px rgba(8, 12, 20, .5);
+}
+.dsh-atb-fab:hover { filter: brightness(1.08); }
+.dsh-atb-fab:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 3px; }
+.dsh-atb-board-body { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
 .dsh-atb-ver {
   font-size: 11px; color: var(--atb-text-2, gray);
   font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
@@ -183,17 +376,22 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
 .dsh-atb-btn[data-primary="true"] { background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary, #1f2328)); border-color: transparent; color: var(--dsw-alias-label-primary-foreground, #fff); }
 .dsh-atb-btn[data-danger="true"] { color: var(--dsw-alias-state-error-primary, var(--atb-error)); border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, var(--atb-error)) 45%, transparent); }
 
-.dsh-atb-columns { display: flex; gap: 10px; flex: 1; min-height: 0; overflow-x: auto; }
+.dsh-atb-columns { display: flex; gap: 12px; flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; scrollbar-width: thin; }
 
 .dsh-atb-detailpanel {
   display: flex; flex-direction: column;
-  flex: none; max-height: 55%; min-height: 180px; overflow: hidden;
-  border: 1px solid var(--atb-border-2, rgba(128,128,128,.25)); border-radius: 12px;
-  background: var(--atb-bg-1, var(--atb-bg-1, rgba(128,128,128,.05)));
-  padding: 10px 12px; box-shadow: 0 -4px 18px rgba(0,0,0,.12);
+  flex: none; max-height: 58%; min-height: 200px; overflow: hidden;
+  border: 1px solid var(--atb-border); border-radius: var(--atb-radius-lg);
+  background: var(--atb-bg-1);
+  padding: 14px 18px; box-shadow: var(--atb-elevation-prominent);
 }
 .dsh-atb-detailpanel .dsh-atb-detail { flex: 1; min-height: 0; }
-.dsh-atb-column { display: flex; flex-direction: column; flex: 1 1 0; min-width: 200px; min-height: 0; border-radius: 10px; background: var(--atb-surface-sunken); padding: 8px; gap: 8px; transition: flex-basis .15s ease, min-width .15s ease, max-width .15s ease; }
+.dsh-atb-column { display: flex; flex-direction: column; flex: 1 1 0; min-width: 234px; min-height: 0; border-radius: 15px; background: var(--atb-surface-sunken); border: 1px solid var(--atb-border); overflow: hidden; transition: flex-basis .15s ease, min-width .15s ease, max-width .15s ease; }
+.dsh-atb-column[data-status="backlog"] { --atb-status: var(--atb-text-3); }
+.dsh-atb-column[data-status="todo"] { --atb-status: var(--atb-accent); }
+.dsh-atb-column[data-status="in_progress"] { --atb-status: var(--atb-warn); }
+.dsh-atb-column[data-status="in_review"] { --atb-status: var(--dsw-alias-state-done-primary, #7c3aed); }
+.dsh-atb-column[data-status="done"] { --atb-status: var(--atb-success); }
 .dsh-atb-column[data-collapsed="true"] {
   flex: 0 0 42px;
   min-width: 42px;
@@ -206,8 +404,22 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
 .dsh-atb-column[data-collapsed="true"]:hover {
   background: var(--atb-hover, rgba(128,128,128,.12));
 }
-.dsh-atb-colhead { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 2px 4px; }
-.dsh-atb-colcount { font-size: 11px; font-weight: 400; color: var(--atb-text-2, gray); }
+.dsh-atb-colhead {
+  position: relative; display: flex; align-items: center; gap: 7px;
+  flex: none; min-height: 54px; padding: 14px 14px 10px;
+  font-size: 12.5px; font-weight: 680; letter-spacing: -.1px;
+}
+/* Status accent rule: a short bar at the very top of the column head, the
+   one place status colour is used as decoration (never on a card). */
+.dsh-atb-colhead::before {
+  content: ""; position: absolute; top: 0; left: 14px; width: 16px; height: 3px;
+  border-radius: 0 0 5px 5px; background: var(--atb-status, var(--atb-text-3)); opacity: .9;
+}
+.dsh-atb-colcount {
+  font-size: 10.5px; font-weight: 500; color: var(--atb-text-2);
+  background: var(--atb-hover); border-radius: 6px; padding: 3px 7px;
+  font-variant-numeric: tabular-nums;
+}
 .dsh-atb-colfoldbtn {
   display: inline-flex;
   align-items: center;
@@ -217,7 +429,7 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
   cursor: pointer;
   color: var(--atb-text-2, gray);
   padding: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
   margin-left: auto;
   line-height: 1;
 }
@@ -253,25 +465,21 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
 .dsh-atb-selrow { display: flex; align-items: flex-start; gap: 4px; }
 .dsh-atb-selrow .dsh-atb-card, .dsh-atb-selrow > div { flex: 1; min-width: 0; }
 .dsh-atb-selbox { flex: none; margin: 4px 0 0 0; cursor: pointer; }
-.dsh-atb-cards { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 0; flex: 1; padding: 2px; }
-.dsh-atb-ws-group { display: flex; flex-direction: column; gap: 6px; }
-.dsh-atb-ws-group + .dsh-atb-ws-group { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--atb-border-2, rgba(128,128,128,.2)); }
+.dsh-atb-cards { display: flex; flex-direction: column; gap: var(--atb-card-gap); overflow-y: auto; min-height: 0; flex: 1; padding: 1px 11px 12px; scrollbar-width: thin; }
+.dsh-atb-ws-group { display: flex; flex-direction: column; gap: var(--atb-card-gap); }
+.dsh-atb-ws-group + .dsh-atb-ws-group { margin-top: 4px; }
 .dsh-atb-ws-group-head {
   border: none; width: 100%; box-sizing: border-box; font-family: inherit; text-align: left; cursor: pointer;
-  display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 6px;
-  font-size: 11.5px; font-weight: 600; color: var(--atb-text-2, inherit);
+  display: flex; align-items: center; gap: 5px; padding: 7px 4px; border-radius: 6px;
+  font-size: 11px; font-weight: 650; color: var(--atb-text-2, inherit);
   /* Sticky project header: the column head above never scrolls (it
      lives outside the scroller), but the project row used to ride up with its
      cards — on a long column the project name left the screen first. Pin it to
      the top of the card scroller so the group you are reading stays labelled.
-     The fill must be OPAQUE: three stacked layers reproduce exactly what sits
-     behind the row (board base + column inset + hover tint), so cards passing
-     underneath never bleed through the label. */
+     The fill must be OPAQUE and match the column surface exactly, so cards
+     passing underneath never bleed through the label. */
   position: sticky; top: 0; z-index: 2;
-  background:
-    linear-gradient(var(--atb-hover, rgba(128,128,128,.08)), var(--atb-hover, rgba(128,128,128,.08))),
-    linear-gradient(var(--atb-bg-inset, rgba(128,128,128,.07)), var(--atb-bg-inset, rgba(128,128,128,.07))),
-    var(--dsw-alias-bg-base, #fff);
+  background: var(--atb-surface-sunken);
   user-select: none;
 }
 .dsh-atb-ws-group-icon { display: inline-flex; align-items: center; justify-content: center; opacity: .8; line-height: 1; }
@@ -286,78 +494,159 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
 }
 .dsh-atb-ws-group-cards { display: flex; flex-direction: column; gap: 8px; }
 
+/* ---------------------------------------------------------------------
+   Cards — a fully tinted pastel surface (no priority stripe on the left).
+   Tone and priority are independent: --atb-card-tone comes from the stable
+   id hash (or the user's manual pick), while urgency keeps its own label
+   and dot in the footer. The base border shorthand stays 1px solid and
+   transparent so no outline is ever painted; depth comes from the shadow.
+   --------------------------------------------------------------------- */
 .dsh-atb-card {
-  position: relative; border-radius: 9px; padding: 8px 10px 8px 13px; cursor: pointer;
-  background: var(--atb-bg-1, rgba(128,128,128,.1));
-  border: 1px solid var(--atb-border-2, rgba(128,128,128,.25));
-  font-size: 13px; text-align: left; color: inherit; width: 100%; box-sizing: border-box;
-}
-.dsh-atb-card:hover { border-color: var(--atb-border-2, rgba(128,128,128,.55)); }
-.dsh-atb-card[draggable="true"] { cursor: grab; }
-.dsh-atb-card[data-dragging] { opacity: .45; }
-.dsh-atb-column[data-dragover] { outline: 2px dashed var(--atb-border-2, rgba(128,128,128,.55)); outline-offset: -2px; background: var(--atb-hover, rgba(128,128,128,.12)); }
-.dsh-atb-card::before {
-  content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 3.5px; border-radius: 3px;
-}
-.dsh-atb-card[data-urgency="urgent"]::before { background: var(--atb-error); }
-.dsh-atb-card[data-urgency="normal"]::before { background: var(--dsw-alias-state-done-primary, #7c3aed); }
-.dsh-atb-card[data-urgency="relaxed"]::before { background: var(--atb-accent); }
-.dsh-atb-card-title { font-weight: 550; line-height: 1.35; word-break: break-word; }
-.dsh-atb-card-meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--atb-text-2, gray); flex-wrap: wrap; }
-.dsh-atb-badge { font-size: 10.5px; padding: 1px 6px; border-radius: 5px; background: rgba(128,128,128,.18); }
-.dsh-atb-badge[data-kind="blocked"] { background: rgba(229,72,77,.18); color: var(--atb-error); }
-.dsh-atb-badge[data-kind="scheduled"] { background: rgba(62,99,221,.16); color: var(--atb-accent); }
-.dsh-atb-badge[data-kind="trashed"] { background: rgba(229,72,77,.14); color: var(--atb-error); text-decoration: line-through; }
-.dsh-atb-badge[data-kind="done"] { background: rgba(46,160,67,.16); color: var(--atb-success); }
-.dsh-atb-badge[data-kind="running"] { background: rgba(229,152,42,.16); color: #e69842; }
-.dsh-atb-badge[data-kind="session"] {
-  background: rgba(142, 78, 198, 0.12);
-  color: var(--dsw-alias-state-business-primary, #7c3aed);
-  border: 1px solid rgba(142, 78, 198, 0.25);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  max-width: 160px;
+  position: relative; box-sizing: border-box; width: 100%;
+  border-radius: var(--atb-card-radius);
+  padding: var(--atb-card-pad);
+  cursor: pointer; text-align: left;
+  border: 1px solid transparent;
+  background: color-mix(in oklab, var(--atb-card-bg, var(--atb-tone-violet)) var(--atb-vibrancy), var(--atb-card-base));
+  color: var(--atb-card-text);
+  font-size: 13px;
+  box-shadow: var(--atb-card-shadow);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: all .15s ease;
 }
-.dsh-atb-badge[data-kind="session"]:hover {
-  background: rgba(142, 78, 198, 0.22);
-  border-color: rgba(142, 78, 198, 0.45);
+.dsh-atb-card:hover { transform: translateY(-2px); box-shadow: var(--atb-card-hover-shadow); }
+.dsh-atb-card:active { transform: scale(.995); }
+.dsh-atb-card:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 3px; }
+.dsh-atb-card[draggable="true"] { cursor: grab; }
+.dsh-atb-card[data-dragging] { opacity: .38; cursor: grabbing; }
+.dsh-atb-column[data-dragover] { outline: 2px dashed var(--atb-accent); outline-offset: -3px; }
+.dsh-atb-card[data-tone="violet"] { --atb-card-bg: var(--atb-tone-violet); --atb-tone-accent: var(--atb-tone-accent-violet); }
+.dsh-atb-card[data-tone="sky"] { --atb-card-bg: var(--atb-tone-sky); --atb-tone-accent: var(--atb-tone-accent-sky); }
+.dsh-atb-card[data-tone="mint"] { --atb-card-bg: var(--atb-tone-mint); --atb-tone-accent: var(--atb-tone-accent-mint); }
+.dsh-atb-card[data-tone="peach"] { --atb-card-bg: var(--atb-tone-peach); --atb-tone-accent: var(--atb-tone-accent-peach); }
+.dsh-atb-card[data-tone="pink"] { --atb-card-bg: var(--atb-tone-pink); --atb-tone-accent: var(--atb-tone-accent-pink); }
+.dsh-atb-card[data-tone="ink"] { --atb-card-bg: var(--atb-tone-ink); --atb-tone-accent: var(--atb-tone-accent-ink); }
+.dsh-atb-card[data-tone="yellow"] { --atb-card-bg: var(--atb-tone-yellow); --atb-tone-accent: var(--atb-tone-accent-yellow); }
+.dsh-atb-card[data-tone="lavender"] { --atb-card-bg: var(--atb-tone-lavender); --atb-tone-accent: var(--atb-tone-accent-lavender); }
+
+.dsh-atb-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin-bottom: 10px; }
+.dsh-atb-card-project {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--atb-tone-accent, var(--atb-card-text-2));
 }
-.dsh-atb-card-session {
-  font: inherit; font-size: 10.5px; line-height: 1; padding: 2px 6px; border-radius: 5px;
-  border: 1px solid var(--atb-border-2, rgba(128,128,128,.3));
-  background: var(--atb-bg-1, rgba(128,128,128,.14));
-  color: var(--atb-text-2, inherit);
-  cursor: pointer; display: inline-flex; align-items: center; gap: 3px;
-  transition: all .15s ease;
+.dsh-atb-card-project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-atb-card-tone-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; background: var(--atb-tone-accent, var(--atb-card-text-2)); }
+.dsh-atb-card-id { flex: none; font-size: 10px; font-variant-numeric: tabular-nums; color: var(--atb-card-text-2); opacity: .8; }
+.dsh-atb-card-title { font-size: 13px; font-weight: 710; line-height: 1.47; letter-spacing: -.09px; overflow-wrap: anywhere; }
+.dsh-atb-board[data-atb-density="spacious"] .dsh-atb-card-title { font-size: 13.5px; }
+.dsh-atb-card-desc {
+  margin: 7px 0 0; font-size: 11.25px; line-height: 1.55; color: var(--atb-card-text-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.dsh-atb-card-session:hover {
-  border-color: var(--dsw-alias-brand-primary, #1f2328);
-  background: var(--atb-hover, rgba(128,128,128,.24));
-  color: var(--dsw-alias-label-primary, inherit);
+.dsh-atb-board[data-atb-density="compact"] .dsh-atb-card-desc { -webkit-line-clamp: 1; }
+.dsh-atb-card-external { display: block; margin-top: 7px; font-size: 10.5px; color: var(--atb-card-text-2); opacity: .9; overflow-wrap: anywhere; }
+.dsh-atb-card-flags { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 11px; font-size: 10px; color: var(--atb-card-text-2); }
+.dsh-atb-card-flags:empty { display: none; }
+.dsh-atb-card-divider { height: 1px; background: var(--atb-card-border); margin: 13px 0 10px; }
+.dsh-atb-card-flags:empty + .dsh-atb-card-divider { display: none; }
+.dsh-atb-card-bottom { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dsh-atb-card-category { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 10px; color: var(--atb-card-text-2); }
+.dsh-atb-card-category-dot { width: 6px; height: 6px; border-radius: 2px; flex: none; background: var(--atb-tone-accent, var(--atb-card-text-2)); }
+.dsh-atb-card-category-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 116px; }
+.dsh-atb-card-priority {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--atb-card-text-2); white-space: nowrap;
+  padding: 2px 6px; border-radius: 6px; background: light-dark(#ffffff6b, #ffffff12);
+}
+.dsh-atb-card-priority .dsh-atb-dot { width: 7px; height: 7px; }
+.dsh-atb-card-priority[data-urgent="true"] { color: light-dark(#9f1620, #ffb3b8); font-weight: 650; }
+.dsh-atb-card-time { margin-left: auto; font-size: 10.5px; color: var(--atb-card-text-2); opacity: .8; white-space: nowrap; }
+
+/* Badges sit on a pastel surface: translucent white chips keep every tone
+   readable, and semantic kinds keep a distinct, AA-contrast colour. */
+.dsh-atb-card .dsh-atb-badge {
+  background: light-dark(#ffffff94, #ffffff12); color: var(--atb-card-text-2);
+  border: 0; border-radius: 6px; padding: 3px 6px; font-size: 10px;
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+}
+.dsh-atb-card .dsh-atb-badge .dsh-atb-icon { width: 12px; height: 12px; }
+.dsh-atb-card .dsh-atb-badge[data-kind="blocked"],
+.dsh-atb-card .dsh-atb-badge[data-kind="trashed"] {
+  background: color-mix(in srgb, var(--atb-error) 17%, transparent);
+  color: light-dark(#9f1620, #ffb3b8);
+}
+.dsh-atb-card .dsh-atb-badge[data-kind="approval"],
+.dsh-atb-card .dsh-atb-badge[data-kind="needs-human"],
+.dsh-atb-card .dsh-atb-badge[data-kind="stale"],
+.dsh-atb-card .dsh-atb-badge[data-kind="urgent"] {
+  background: color-mix(in srgb, var(--atb-warn) 20%, transparent);
+  color: light-dark(#8a5a0c, #ffd79a);
+}
+.dsh-atb-card .dsh-atb-badge[data-kind="done"] {
+  background: color-mix(in srgb, var(--atb-success) 18%, transparent);
+  color: light-dark(#1c6b3a, #9fe8b4);
+}
+.dsh-atb-card .dsh-atb-badge[data-kind="running"] {
+  background: color-mix(in srgb, var(--atb-warn) 22%, transparent);
+  color: light-dark(#8a5a0c, #ffd79a);
+}
+.dsh-atb-card .dsh-atb-badge[data-kind="session"] {
+  background: light-dark(#ffffff8a, #ffffff1a); color: var(--atb-tone-accent, var(--atb-card-text-2));
+  cursor: pointer; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dsh-atb-card .dsh-atb-badge[data-kind="session"]:hover { filter: brightness(1.15); }
+.dsh-atb-card .dsh-atb-badge[data-kind="dependency"],
+.dsh-atb-card .dsh-atb-badge[data-kind="subtasks"],
+.dsh-atb-card .dsh-atb-badge[data-kind="scheduled"],
+.dsh-atb-card .dsh-atb-badge[data-kind="comments"],
+.dsh-atb-card .dsh-atb-badge[data-kind="checklist"] {
+  background: light-dark(#ffffff94, #ffffff12);
+  /* The legacy single-kind rule below sets the host secondary label colour;
+     re-assert the card token here (higher specificity) so the chip keeps the
+     same AA contrast as every other card badge. */
+  color: var(--atb-card-text-2);
+}
+.dsh-atb-card .dsh-atb-badge[data-kind="dependency"][data-ready="true"],
+.dsh-atb-card .dsh-atb-badge[data-kind="subtasks"][data-ready="true"] {
+  color: light-dark(#1c6b3a, #9fe8b4);
 }
 
-.dsh-atb-quick { display: flex; gap: 6px; margin-top: 7px; }
-.dsh-atb-quickbtn {
-  flex: 1; font-size: 11.5px; padding: 3px 8px; border-radius: 6px; cursor: pointer;
-  border: 1px solid var(--atb-border-2, rgba(128,128,128,.3));
-  background: var(--atb-bg-1, rgba(128,128,128,.12)); color: inherit;
+/* Deliverable block (in review / done): a soft inset well on the tone. */
+.dsh-atb-card-deliverable {
+  margin-top: 11px; padding: 9px 10px; border-radius: 9px;
+  background: light-dark(#ffffff70, #0000001f);
+  font-size: 10.5px; line-height: 1.6; color: var(--atb-card-text-2);
+  display: flex; flex-direction: column; gap: 3px;
 }
-.dsh-atb-quickbtn:hover { border-color: var(--atb-border-2, rgba(128,128,128,.6)); }
-.dsh-atb-quickbtn[data-act="done"] { background: rgba(46,160,67,.14); color: var(--atb-success); border-color: rgba(46,160,67,.4); }
-.dsh-atb-quickbtn[data-act="done"]:hover { background: rgba(46,160,67,.22); }
-.dsh-atb-quickbtn[data-act="reject"] { background: rgba(229,152,42,.12); color: var(--atb-warn); border-color: rgba(229,152,42,.4); }
-.dsh-atb-quickbtn[data-act="reject"]:hover { background: rgba(229,152,42,.2); }
+.dsh-atb-card-deliv-row { display: flex; align-items: baseline; gap: 5px; overflow: hidden; }
+.dsh-atb-card-deliv-tag { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; color: var(--atb-card-text); opacity: .88; }
+.dsh-atb-card-deliv-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dsh-atb-deliv-warn { color: light-dark(#9f1620, #ffb3b8); font-weight: 600; }
+.dsh-atb-deliv-muted { display: inline-flex; align-items: center; gap: 4px; color: var(--atb-card-text-2); opacity: .9; }
+.dsh-atb-card-deliv-summary {
+  margin-top: 3px; font-size: 10.5px; line-height: 1.5; color: var(--atb-card-text-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.dsh-atb-card-progress { height: 4px; margin-top: 7px; border-radius: 5px; overflow: hidden; background: light-dark(#ffffff95, #ffffff22); }
+.dsh-atb-card-progress > span { display: block; height: 100%; border-radius: 5px; background: var(--atb-tone-accent, var(--atb-card-text-2)); }
+
+/* Quick review actions: tinted, always readable on the pastel tone. */
+.dsh-atb-quick { display: flex; gap: 7px; margin-top: 10px; }
+.dsh-atb-quickbtn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  font: inherit; font-size: 10.5px; font-weight: 680; padding: 7px 6px; border-radius: 8px; cursor: pointer;
+  border: 0; color: var(--atb-card-text); background: light-dark(#ffffff78, #ffffff1b);
+}
+.dsh-atb-quickbtn:hover { filter: brightness(1.12); }
+.dsh-atb-quickbtn[data-act="done"] { background: light-dark(#b4e3c4, #7fc7a234); color: light-dark(#1b5836, #c3f9d7); }
+.dsh-atb-quickbtn[data-act="reject"] { background: light-dark(#ffe0be, #f0b0702b); color: light-dark(#74461f, #ffd29f); }
 .dsh-atb-quick-reject { display: flex; gap: 6px; margin-top: 7px; align-items: stretch; }
-.dsh-atb-quick-note { flex: 1; min-width: 0; font-size: 11.5px; padding: 3px 8px; }
+.dsh-atb-quick-note { flex: 1; min-width: 0; font-size: 11px; padding: 4px 8px; }
 
 .dsh-atb-error { font-size: 12px; color: var(--atb-error); padding: 4px 8px; border-radius: 6px; background: rgba(229,72,77,.1); }
-.dsh-atb-empty { font-size: 12px; color: var(--atb-text-2, gray); padding: 10px 4px; }
+.dsh-atb-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 34px 12px; font-size: 11.5px; line-height: 1.55; color: var(--atb-text-3); }
+.dsh-atb-empty .dsh-atb-icon { opacity: .55; }
+.dsh-atb-empty-title { font-weight: 550; color: var(--atb-text-2); }
 .dsh-atb-done-foldbar {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 6px; padding: 8px 10px; margin-top: 4px; border-radius: 8px;
@@ -898,8 +1187,13 @@ color: var(--dsw-alias-state-business-primary, var(--atb-accent));
 .dsh-atb-cl-item[data-alert="true"] {
   border-color: rgba(229,72,77,.45); background: rgba(229,72,77,.06);
 }
-.dsh-atb-cl-text { flex: 1; min-width: 0; font-size: 12.5px; word-break: break-word; }
-.dsh-atb-cl-meta { flex-shrink: 0; font-size: 10.5px; color: var(--atb-text-3, gray); display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+.dsh-atb-cl-text { flex: 1 1 140px; min-width: 0; font-size: 12.5px; word-break: break-word; }
+/* The checker/evidence column must never eat the item text: it used to be
+   flex-shrink 0 with a 280px nowrap evidence note, which squeezed the label
+   to zero and printed it one character per line in the mobile drawer (found on
+   a real phone). It now shrinks and caps at 42% of the row, ellipsizing its own
+   note, so the label always keeps a readable width. */
+.dsh-atb-cl-meta { flex: 0 1 auto; min-width: 0; max-width: 42%; font-size: 10.5px; color: var(--atb-text-3, gray); display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
 .dsh-atb-cl-note { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dsw-alias-label-secondary, inherit); }
 
 .dsh-atb-rpt-summary { font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin-bottom: 8px; }
@@ -1196,66 +1490,20 @@ color: var(--dsw-alias-state-business-primary, var(--atb-accent));
 .dsh-atb-badge[data-kind="needs-human"] {
   white-space: normal;
   overflow-wrap: anywhere;
-  background: rgba(245, 158, 11, 0.18) !important;
-  color: #d97706 !important;
-  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: color-mix(in srgb, var(--atb-warn) 22%, transparent);
+  color: light-dark(#8a5a0c, #ffd79a);
   font-weight: 600;
 }
+/* Human wait is a state, not a tone: a warm inset ring on top of whatever
+   pastel tone the card carries (the surface itself is never recoloured). */
 .dsh-atb-card[data-needs-human="true"] {
-  border-color: rgba(245, 158, 11, 0.55);
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
-  background: linear-gradient(to right, rgba(245, 158, 11, 0.06), var(--atb-bg-1, rgba(128,128,128,.1)));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--atb-warn) 62%, transparent), var(--atb-card-shadow);
 }
-.dsh-atb-card[data-needs-human="true"]::before {
-  background: #f59e0b !important;
-  width: 4.5px;
+.dsh-atb-card[data-needs-human="true"]:hover {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--atb-warn) 72%, transparent), var(--atb-card-hover-shadow);
 }
-.dsh-atb-card-deliverable {
-  margin-top: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(128, 128, 128, 0.08);
-  border: 1px dashed var(--atb-border-2, rgba(128, 128, 128, 0.25));
-  font-size: 11.5px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.dsh-atb-card-deliv-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dsh-atb-card-deliv-tag {
-  font-weight: 600;
-  color: var(--atb-text-2, #71717a);
-  flex-shrink: 0;
-}
-.dsh-atb-card-deliv-val {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dsh-atb-deliv-warn {
-  color: var(--atb-error);
-  font-weight: 550;
-}
-.dsh-atb-deliv-muted {
-  color: #78a9d6;
-}
-.dsh-atb-card-deliv-summary {
-  font-size: 11px;
-  color: var(--atb-text-2, #71717a);
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin-top: 2px;
-}
+/* The card deliverable block is declared with the card appearance tokens
+   above (tone-aware). The detail pane keeps its own boxes below. */
 .dsh-atb-reviewdesk {
   border: 1.5px solid var(--dsw-alias-brand-primary, var(--atb-accent)) !important;
   background: linear-gradient(to bottom, rgba(99, 102, 241, 0.04), var(--atb-bg-1, rgba(128,128,128,.1))) !important;
@@ -1460,25 +1708,25 @@ color: var(--dsw-alias-state-business-primary, var(--atb-accent));
 .dsh-atb-toggle-caret { transition: transform .14s ease; }
 .dsh-atb-toggle-caret[data-open="true"] { transform: rotate(90deg); }
 
-/* Cards: white on the neutral column, separated by a soft shadow. */
+/* Cards: a tone surface on the neutral column, depth from the shadow only
+   (the surface itself is declared with the appearance tokens above). */
 .dsh-atb-card {
-  border-color: transparent; border-radius: var(--atb-radius-md);
-  box-shadow: 0 0 0 .5px #0000000f, 0 1px 2px #0000000a;
-  transition: box-shadow .14s ease, transform .14s ease;
+  border-color: transparent;
+  box-shadow: var(--atb-card-shadow);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
 }
-.dsh-atb-card:hover { border-color: transparent; box-shadow: 0 0 0 .5px #00000014, 0 4px 12px #0000000f; }
+.dsh-atb-card:hover { border-color: transparent; box-shadow: var(--atb-card-hover-shadow); }
 .dsh-atb-column { border-radius: var(--atb-radius-lg); }
-.dsh-atb-colhead { padding: 4px 6px 2px; }
 
 /* Buttons, chips, pills: filled, no outline. */
 .dsh-atb-btn, .dsh-atb-chip, .dsh-atb-detail-edit, .dsh-atb-detail-session, .dsh-atb-movebtn,
-.dsh-atb-quickbtn, .dsh-atb-image-add, .dsh-atb-card-session, .dsh-atb-file-copybtn,
+.dsh-atb-image-add, .dsh-atb-card-session, .dsh-atb-file-copybtn,
 .dsh-atb-ver, .dsh-atb-detail-id, button.dsh-atb-chip2.dsh-atb-chip-btn,
 .dsh-atb-external button, .dsh-atb-cron-preset, .dsh-atb-mode-opt, .dsh-atb-perm-opt {
   border-color: transparent; background: var(--atb-hover);
 }
 .dsh-atb-btn:hover, .dsh-atb-chip:hover, .dsh-atb-detail-edit:hover, .dsh-atb-detail-session:hover,
-.dsh-atb-movebtn:hover, .dsh-atb-quickbtn:hover, .dsh-atb-image-add:hover:not(:disabled),
+.dsh-atb-movebtn:hover, .dsh-atb-image-add:hover:not(:disabled),
 .dsh-atb-card-session:hover, .dsh-atb-file-copybtn:hover, .dsh-atb-ver:hover, .dsh-atb-detail-id:hover,
 button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-atb-mode-opt:hover {
   border-color: transparent; background: var(--atb-active); color: var(--atb-text);
@@ -1493,9 +1741,8 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
 }
 .dsh-atb-cron-preset[data-on="true"] { background: var(--atb-brand); color: var(--dsw-alias-label-primary-foreground, #fff); }
 /* Semantic actions keep their meaning through a tint, not an outline. */
-.dsh-atb-movebtn[data-to="done"], .dsh-atb-quickbtn[data-act="done"] { border-color: transparent; background: color-mix(in srgb, var(--atb-success) 12%, transparent); color: var(--atb-success); }
+.dsh-atb-movebtn[data-to="done"] { border-color: transparent; background: color-mix(in srgb, var(--atb-success) 12%, transparent); color: var(--atb-success); }
 .dsh-atb-movebtn[data-to="blocked"] { border-color: transparent; background: color-mix(in srgb, var(--atb-error) 9%, transparent); color: var(--atb-error); }
-.dsh-atb-quickbtn[data-act="reject"] { border-color: transparent; background: color-mix(in srgb, var(--atb-warn) 12%, transparent); }
 .dsh-atb-movebtn[data-to="needs-human-active"] { border-color: transparent; }
 .dsh-atb-detail-id[data-state="copied"], .dsh-atb-detail-id[data-state="failed"] { border-color: transparent; }
 
@@ -1543,8 +1790,8 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
 .dsh-atb-iso-repo[data-multi="true"] { border-top: none; }
 
 /* Sticky project header follows the restored neutral column tone. */
-.dsh-atb-ws-group-head { background: linear-gradient(var(--atb-hover), var(--atb-hover)), var(--atb-surface-sunken); border-radius: var(--atb-radius-sm); }
-.dsh-atb-ws-group-count { background: var(--atb-bg); }
+.dsh-atb-ws-group-head { background: var(--atb-surface-sunken); border-radius: var(--atb-radius-sm); }
+.dsh-atb-ws-group-count { background: var(--atb-hover); }
 
 /* Approval requests (0.10.1): warm tint so a pending decision stands out. */
 .dsh-atb-approval { display: flex; flex-direction: column; gap: 8px; }
@@ -1552,8 +1799,424 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
 .dsh-atb-badge[data-kind="approval"] { background: color-mix(in srgb, var(--atb-warn) 16%, transparent); color: var(--atb-warn); }
 .dsh-atb-detail-run:disabled { opacity: .45; cursor: not-allowed; filter: none; }
 
-/* Drop target: tint, no dashed frame. */
-.dsh-atb-column[data-dragover] { outline: none; background: var(--atb-active); }
+/* Drop target: a tint plus an inset accent ring (no dashed frame). */
+.dsh-atb-column[data-dragover] { outline: none; background: color-mix(in srgb, var(--atb-accent) 8%, var(--atb-surface-sunken)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--atb-accent) 60%, transparent); }
+
+/* =====================================================================
+   DeepSeek Pastel — detail pickers, preference controls, responsive
+   rules and motion policy. Everything here is new surface owned by this
+   design pass; no host style is touched.
+   ===================================================================== */
+.dsh-atb-tone-pick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.dsh-atb-tone-pick-label { font-size: 10.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--atb-text-3); }
+.dsh-atb-tone-swatch {
+  width: 22px; height: 22px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--atb-border-2);
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.dsh-atb-tone-swatch:hover { border-color: var(--atb-text-3); }
+.dsh-atb-tone-swatch:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 2px; }
+.dsh-atb-tone-swatch[data-on="true"] { border-color: var(--atb-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--atb-accent) 34%, transparent); }
+.dsh-atb-tone-swatch-dot { width: 15px; height: 15px; border-radius: 50%; background: var(--atb-tone-violet); }
+.dsh-atb-tone-swatch[data-tone="violet"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-violet); }
+.dsh-atb-tone-swatch[data-tone="sky"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-sky); }
+.dsh-atb-tone-swatch[data-tone="mint"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-mint); }
+.dsh-atb-tone-swatch[data-tone="peach"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-peach); }
+.dsh-atb-tone-swatch[data-tone="pink"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-pink); }
+.dsh-atb-tone-swatch[data-tone="ink"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-ink); }
+.dsh-atb-tone-swatch[data-tone="yellow"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-yellow); }
+.dsh-atb-tone-swatch[data-tone="lavender"] .dsh-atb-tone-swatch-dot { background: var(--atb-tone-lavender); }
+.dsh-atb-tone-auto-glyph {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: conic-gradient(from 210deg, var(--atb-tone-violet), var(--atb-tone-mint), var(--atb-tone-peach), var(--atb-tone-sky), var(--atb-tone-violet));
+}
+
+/* Settings → Appearance: the same visual language as the board. */
+.dsh-atb-setting { padding: 14px 0; border-bottom: 1px solid var(--atb-border); }
+.dsh-atb-setting:last-child { border-bottom: 0; padding-bottom: 4px; }
+.dsh-atb-setting-title { margin: 0 0 6px; font-size: 13.5px; font-weight: 700; letter-spacing: -.2px; }
+.dsh-atb-setting-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 12px; font-weight: 650; color: var(--atb-text); }
+.dsh-atb-setting-value { font-size: 11px; font-weight: 500; color: var(--atb-text-2); font-variant-numeric: tabular-nums; }
+.dsh-atb-setting-hint { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--atb-text-3); }
+.dsh-atb-setting-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.dsh-atb-switchrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; cursor: pointer; }
+.dsh-atb-switchrow .dsh-atb-setting-label { margin-bottom: 0; }
+.dsh-atb-switch {
+  position: relative; display: inline-flex; flex: none; width: 36px; height: 20px;
+  border-radius: 999px; background: var(--atb-hover); border: 1px solid var(--atb-border-2);
+  transition: background .16s ease, border-color .16s ease;
+}
+.dsh-atb-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.dsh-atb-switch-track {
+  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--atb-text-2); transition: left .16s ease, background .16s ease; pointer-events: none;
+}
+.dsh-atb-switch:has(input:checked) { background: var(--atb-accent); border-color: transparent; }
+.dsh-atb-switch input:checked + .dsh-atb-switch-track { left: 18px; background: #fff; }
+.dsh-atb-switch input:focus-visible + .dsh-atb-switch-track { box-shadow: var(--atb-focus); }
+.dsh-atb-range { width: 100%; accent-color: var(--atb-accent); }
+
+/* Visible keyboard focus for every interactive surface this plugin renders. */
+.dsh-atb-board button:focus-visible,
+.dsh-atb-board [role="button"]:focus-visible,
+.dsh-atb-modal button:focus-visible,
+.dsh-atb-modal input:focus-visible,
+.dsh-atb-modal textarea:focus-visible,
+.dsh-atb-modal select:focus-visible {
+  outline: 2px solid var(--atb-accent); outline-offset: 2px;
+}
+
+/* =====================================================================
+   Colour modes, category manager and live preview (Settings → Appearance).
+   The appearance panel carries the .dsh-atb-preview class so it resolves the same
+   tone tokens as the board without inheriting any board layout.
+   ===================================================================== */
+.dsh-atb-colormodes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.dsh-atb-colormode {
+  display: flex; align-items: center; gap: 9px; text-align: left; padding: 9px 10px;
+  border-radius: 9px; cursor: pointer; font: inherit; color: var(--atb-text);
+  border: 1px solid var(--atb-border-2); background: var(--atb-hover);
+}
+.dsh-atb-colormode[data-on="true"] {
+  border-color: transparent; background: color-mix(in srgb, var(--atb-accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--atb-accent);
+}
+.dsh-atb-colormode-swatch { width: 26px; height: 26px; border-radius: 8px; flex: none; }
+.dsh-atb-colormode-swatch[data-mode="card"] { background: conic-gradient(from 210deg, #a9c8f2, #c5b2ef, #f1abb4, #9ed9c6, #a9c8f2); }
+.dsh-atb-colormode-swatch[data-mode="project"] { background: linear-gradient(135deg, #c5b2ef 0 50%, #9ed9c6 50% 100%); }
+.dsh-atb-colormode-swatch[data-mode="category"] { background: linear-gradient(135deg, #a9c8f2 0 33%, #f1abb4 33% 66%, #eadd95 66% 100%); }
+.dsh-atb-colormode-swatch[data-mode="priority"] { background: linear-gradient(90deg, #f1abb4 0 33%, #c5b2ef 33% 66%, #a9c8f2 66% 100%); }
+.dsh-atb-colormode-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dsh-atb-colormode-name { font-size: 12px; font-weight: 650; }
+.dsh-atb-colormode-hint { font-size: 10px; color: var(--atb-text-3); line-height: 1.35; }
+
+.dsh-atb-tone-palette { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.dsh-atb-tone-chip { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--atb-border-2); }
+.dsh-atb-tone-chip[data-tone="violet"] { background: var(--atb-tone-violet); }
+.dsh-atb-tone-chip[data-tone="sky"] { background: var(--atb-tone-sky); }
+.dsh-atb-tone-chip[data-tone="mint"] { background: var(--atb-tone-mint); }
+.dsh-atb-tone-chip[data-tone="peach"] { background: var(--atb-tone-peach); }
+.dsh-atb-tone-chip[data-tone="pink"] { background: var(--atb-tone-pink); }
+.dsh-atb-tone-chip[data-tone="ink"] { background: var(--atb-tone-ink); }
+.dsh-atb-tone-chip[data-tone="yellow"] { background: var(--atb-tone-yellow); }
+.dsh-atb-tone-chip[data-tone="lavender"] { background: var(--atb-tone-lavender); }
+
+.dsh-atb-cat-manager { display: flex; flex-direction: column; gap: 8px; }
+.dsh-atb-cat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dsh-atb-cat-row {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; align-items: center; gap: 8px;
+  padding: 6px; border-radius: 8px; background: var(--atb-surface-sunken);
+}
+.dsh-atb-cat-color {
+  width: 28px; height: 28px; padding: 0; cursor: pointer; box-sizing: border-box;
+  border: 1px solid var(--atb-border-2); border-radius: 7px; background: transparent;
+}
+.dsh-atb-cat-name { height: 30px; min-width: 0; }
+.dsh-atb-cat-id { font-size: 10px; color: var(--atb-text-3); font-variant-numeric: tabular-nums; }
+.dsh-atb-cat-actions { display: flex; gap: 2px; }
+.dsh-atb-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+  border: none; border-radius: 6px; background: transparent; color: var(--atb-text-2); cursor: pointer;
+}
+.dsh-atb-iconbtn:hover:not(:disabled) { background: var(--atb-hover); color: var(--atb-text); }
+.dsh-atb-iconbtn:disabled { opacity: .35; cursor: default; }
+.dsh-atb-iconbtn[data-danger="true"]:hover:not(:disabled) { color: var(--atb-error); }
+.dsh-atb-cat-actions .dsh-atb-iconbtn:first-child .dsh-atb-icon { transform: rotate(180deg); }
+.dsh-atb-cat-error { grid-column: 1 / -1; color: var(--atb-error); font-size: 11px; margin: 2px 0 0; }
+.dsh-atb-cat-add { display: flex; gap: 6px; }
+.dsh-atb-cat-add .dsh-atb-input { flex: 1; min-width: 0; height: 30px; }
+.dsh-atb-labels-editor {
+  width: 100%; box-sizing: border-box; margin-top: 6px; padding: 8px 10px; resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; line-height: 1.5;
+}
+
+.dsh-atb-prioritycolors, .dsh-atb-projectcolors { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dsh-atb-prioritycolor-row, .dsh-atb-projectcolor-row {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 8px; background: var(--atb-surface-sunken);
+}
+.dsh-atb-prioritycolor-name { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; min-width: 86px; }
+.dsh-atb-prioritycolor-swatch, .dsh-atb-projectcolor-swatch { width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--atb-border-2); flex: none; }
+.dsh-atb-projectcolor-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.dsh-atb-projectcolor-swatch[data-tone="violet"] { background: var(--atb-tone-violet); }
+.dsh-atb-projectcolor-swatch[data-tone="sky"] { background: var(--atb-tone-sky); }
+.dsh-atb-projectcolor-swatch[data-tone="mint"] { background: var(--atb-tone-mint); }
+.dsh-atb-projectcolor-swatch[data-tone="peach"] { background: var(--atb-tone-peach); }
+.dsh-atb-projectcolor-swatch[data-tone="pink"] { background: var(--atb-tone-pink); }
+.dsh-atb-projectcolor-swatch[data-tone="ink"] { background: var(--atb-tone-ink); }
+.dsh-atb-projectcolor-swatch[data-tone="yellow"] { background: var(--atb-tone-yellow); }
+.dsh-atb-projectcolor-swatch[data-tone="lavender"] { background: var(--atb-tone-lavender); }
+
+.dsh-atb-preview { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--atb-border); }
+.dsh-atb-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.dsh-atb-preview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dsh-atb-preview-card { cursor: default; }
+.dsh-atb-preview-card .dsh-atb-card-title { font-size: 11.5px; line-height: 1.4; }
+.dsh-atb-preview-card .dsh-atb-card-top { margin-bottom: 7px; }
+.dsh-atb-preview-card .dsh-atb-card-divider { margin: 9px 0 7px; }
+.dsh-atb-preview-card .dsh-atb-card-category-name { max-width: 60%; }
+
+/* Colouring-by-category is meaningful only once tasks are classified: on an
+   all-unclassified board the surfaces are neutral by design, so explain it and
+   offer the explicit one-time migration instead of guessing. */
+.dsh-atb-classifyhint {
+  display: flex; align-items: center; gap: 11px; flex-wrap: wrap;
+  padding: 11px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--atb-accent) 8%, var(--atb-hover));
+  color: var(--atb-text-2); border: 1px solid var(--atb-border);
+}
+.dsh-atb-classifyhint > .dsh-atb-icon { color: var(--atb-accent); flex: none; }
+.dsh-atb-classifyhint-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 260px; }
+.dsh-atb-classifyhint-title { font-size: 12px; font-weight: 680; color: var(--atb-text); }
+.dsh-atb-classifyhint-body { font-size: 11px; line-height: 1.45; }
+.dsh-atb-classifyhint-actions { display: inline-flex; gap: 7px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------------
+   Focus-mode bottom sheets: the mobile toolbar's filters, board actions and
+   the new-task menu. Same dialog semantics and backdrop as the board modals,
+   anchored to the bottom edge by the .dsh-atb-sheet-layer wrapper.
+   --------------------------------------------------------------------- */
+.dsh-atb-sheet-layer { align-items: flex-end; justify-content: center; padding: 0; }
+.dsh-atb-sheet {
+  width: 100%; max-width: 100%; max-height: 88dvh;
+  border-radius: 20px 20px 0 0; corner-shape: round;
+  animation: dsh-atb-sheet-in .2s ease;
+}
+@keyframes dsh-atb-sheet-in { from { opacity: 0; transform: translateY(18px); } }
+.dsh-atb-sheet-handle {
+  display: block; width: 42px; height: 5px; flex: none; margin: 8px auto 2px;
+  border-radius: 3px; background: var(--atb-border-2);
+}
+.dsh-atb-sheet .dsh-atb-modal-head { padding: 10px 16px 10px; }
+.dsh-atb-sheet-body {
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 14px 16px 18px; overflow-y: auto; overscroll-behavior: contain;
+}
+.dsh-atb-sheet-field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.dsh-atb-sheet-label {
+  font-size: 10.5px; font-weight: 750; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--atb-text-3);
+}
+.dsh-atb-sheet-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.dsh-atb-sheet-chips .dsh-atb-chip { padding: 7px 12px; font-size: 12px; }
+.dsh-atb-sheet-human { align-self: flex-start; padding: 8px 12px; }
+.dsh-atb-sheet-foot {
+  display: flex; gap: 8px; flex: none;
+  border-top: 1px solid var(--atb-border);
+  padding: 11px 16px calc(11px + env(safe-area-inset-bottom));
+}
+.dsh-atb-sheet-foot > .dsh-atb-btn { flex: 1; padding: 11px 12px; font-size: 13px; }
+.dsh-atb-sheet-menu { display: flex; flex-direction: column; gap: 3px; }
+.dsh-atb-sheet-item {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 10px; border-radius: 11px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: inherit;
+  font: inherit; text-align: left;
+}
+.dsh-atb-sheet-item:hover { background: var(--atb-hover); }
+.dsh-atb-sheet-item:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 1px; }
+.dsh-atb-sheet-item-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--atb-hover); color: var(--atb-text-2);
+}
+.dsh-atb-sheet-item-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.dsh-atb-sheet-item-label { font-size: 13px; font-weight: 600; }
+.dsh-atb-sheet-item-hint {
+  font-size: 11px; color: var(--atb-text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dsh-atb-sheet .dsh-atb-newmenu-list {
+  position: static; min-width: 0; padding: 0; border: none; box-shadow: none;
+  background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.dsh-atb-sheet .dsh-atb-newmenu-opt {
+  padding: 10px 9px; font-size: 13px; border-radius: 9px; white-space: normal; text-align: left;
+}
+.dsh-atb-sheet .dsh-atb-newmenu-cat { padding: 10px 9px 3px; }
+
+/* Responsive: five readable columns first, then a snap-scrolled column
+   carousel with an explicit column navigation bar. */
+@media (max-width: 1180px) {
+  .dsh-atb-board { padding: 14px 14px 16px; }
+  .dsh-atb-column { min-width: 226px; }
+  .dsh-atb-columns { gap: 10px; }
+}
+@media (max-width: 900px) {
+  .dsh-atb-head { gap: 8px; }
+  .dsh-atb-title { font-size: 17px; }
+  .dsh-atb-grouptoggle-label { display: none; }
+  .dsh-atb-grouptoggle { padding: 5px 8px; }
+  .dsh-atb-searchfield { max-width: none; flex: 1 1 220px; }
+  .dsh-atb-detailpanel { max-height: 62%; }
+}
+/* ---------------------------------------------------------------------
+   Focus mode 1/2 — portrait / narrow panel (matches FOCUS_PORTRAIT_QUERY in
+   board/mobile.ts): one full column per snapped page, compact toolbar,
+   bottom sheets, thumb-reachable create button.
+   --------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  .dsh-atb-board { padding: 10px 10px 0; gap: 8px; }
+  .dsh-atb-head { gap: 6px; flex-wrap: nowrap; align-items: center; }
+  .dsh-atb-title { font-size: 16px; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dsh-atb-count { font-size: 10.5px; padding: 3px 7px; }
+  .dsh-atb-mobileactions { display: flex; }
+  /* Grouping moves into the actions sheet on a phone (same controller call). */
+  .dsh-atb-grouptoggle { display: none; }
+  .dsh-atb-newmenu-label, .dsh-atb-newmenu-caret { display: none; }
+  .dsh-atb-newmenu > .dsh-atb-btn { padding: 7px 9px; }
+
+  .dsh-atb-toolbar { gap: 6px; flex-wrap: nowrap; }
+  .dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: none; }
+  .dsh-atb-toolbar > .dsh-atb-spacer { display: none; }
+  .dsh-atb-searchfield { display: none; }
+  .dsh-atb-board[data-atb-search="true"] .dsh-atb-searchfield { display: inline-flex; flex: 1 1 100%; min-width: 0; max-width: none; }
+
+  .dsh-atb-mobilehead { display: flex; gap: 6px; }
+  .dsh-atb-mobilebar {
+    display: flex; gap: 7px; scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain; padding-bottom: 3px;
+  }
+  .dsh-atb-mobilebar-count { font-size: 10.5px; padding: 2px 6px; }
+  .dsh-atb-swipecue { display: inline-flex; }
+  .dsh-atb-swipecue-label { display: none; }
+
+  /* The carousel itself: the rail is the scroller, each column is one page.
+     scroll-snap-stop: always keeps a fast flick to a single column, and the
+     per-column card list keeps its own vertical scroll position. */
+  .dsh-atb-columns {
+    gap: 0; scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+    padding-bottom: 0;
+  }
+  .dsh-atb-column {
+    flex: 0 0 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+    border: none; border-radius: 0; background: transparent;
+    scroll-snap-align: start; scroll-snap-stop: always;
+    transition: none;
+  }
+  .dsh-atb-colhead { min-height: 34px; padding: 4px 2px 2px; font-size: 12px; }
+  .dsh-atb-colhead::before { display: none; }
+  .dsh-atb-cards {
+    padding: 2px 2px calc(84px + env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+  }
+  /* The project header must not inherit the transparent page background. */
+  .dsh-atb-ws-group-head { background: var(--atb-bg); }
+  .dsh-atb-fab { display: grid; }
+  .dsh-atb-detailpanel {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    max-height: 84dvh; padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0; border-bottom: none;
+    box-shadow: 0 -12px 40px rgba(8, 12, 20, .35);
+  }
+  .dsh-atb-classifyhint { padding: 9px 11px; gap: 8px; }
+  .dsh-atb-classifyhint-text { flex-basis: 100%; }
+
+  /* Every board modal becomes a bottom sheet, like the reference. */
+  .dsh-atb-modal-backdrop { align-items: flex-end; padding: 0; }
+  .dsh-atb-modal {
+    width: 100%; max-width: 100%; max-height: 88dvh;
+    border-radius: 20px 20px 0 0; corner-shape: round;
+    animation: dsh-atb-sheet-in .2s ease;
+  }
+  .dsh-atb-taskform-modal { width: 100%; min-width: 0; max-height: 90dvh; }
+  .dsh-atb-taskform-body { grid-template-columns: 1fr; gap: 12px; padding: 12px 14px; }
+  .dsh-atb-form-left { border-right: none; padding-right: 0; }
+  .dsh-atb-modal-foot { padding-bottom: calc(13px + env(safe-area-inset-bottom)); }
+
+  .dsh-atb-toolbar-divider { display: none; }
+  /* Comment composer: the drawer's writing area used to be a sliver squeezed
+     between the send buttons (its flex basis is 0). On a phone it now takes the
+     full width on its own line, with the buttons sharing the row below it. The
+     16px font is not cosmetic: iOS zooms the whole page when a focused field is
+     smaller than 16px, which alone makes the field unusable. */
+  .dsh-atb-composer { flex-wrap: wrap; gap: 8px; align-items: stretch; }
+  .dsh-atb-composer-input { flex: 1 1 100%; min-height: 88px; font-size: 16px; line-height: 1.45; padding: 9px 11px; }
+  .dsh-atb-composer-send { flex: 0 1 auto; min-width: 0; justify-content: center; padding: 9px 12px; font-size: 13px; }
+  .dsh-atb-composer-deliver { flex: 1 1 auto; white-space: normal; text-align: center; }
+  .dsh-atb-image-add { flex: 0 0 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+  .dsh-atb-colormodes { grid-template-columns: 1fr; }
+  .dsh-atb-preview-grid { grid-template-columns: 1fr 1fr; }
+  .dsh-atb-cat-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .dsh-atb-cat-id { display: none; }
+}
+
+/* ---------------------------------------------------------------------
+   Focus mode 2/2 — phone landscape (matches FOCUS_LANDSCAPE_QUERY): two
+   columns per snapped page. Declared after the portrait block so it wins the
+   overlap (a short, narrow window).
+   --------------------------------------------------------------------- */
+@media (orientation: landscape) and (max-height: 680px) and (max-width: 1380px) {
+  .dsh-atb-board { padding: 6px 10px 0; gap: 6px; }
+  .dsh-atb-head { gap: 6px; flex-wrap: nowrap; align-items: center; }
+  .dsh-atb-title { font-size: 14px; letter-spacing: -.2px; }
+  .dsh-atb-count { font-size: 10px; padding: 2px 6px; }
+  .dsh-atb-mobileactions { display: flex; }
+  .dsh-atb-grouptoggle { display: none; }
+  .dsh-atb-iconbtn { width: 32px; height: 32px; border-radius: 9px; }
+  .dsh-atb-newmenu-label, .dsh-atb-newmenu-caret { display: none; }
+  .dsh-atb-newmenu > .dsh-atb-btn { padding: 5px 8px; }
+
+  .dsh-atb-toolbar { gap: 6px; flex-wrap: nowrap; }
+  .dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: none; }
+  .dsh-atb-toolbar > .dsh-atb-spacer { display: none; }
+  .dsh-atb-searchfield { display: none; }
+  .dsh-atb-board[data-atb-search="true"] .dsh-atb-searchfield { display: inline-flex; flex: 1 1 220px; min-width: 0; max-width: none; height: 30px; }
+
+  .dsh-atb-mobilehead { display: flex; gap: 7px; }
+  .dsh-atb-mobilebar { display: flex; gap: 5px; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+  .dsh-atb-mobilebar-btn { height: 30px; padding: 0 9px; gap: 5px; font-size: 11px; border-radius: 9px; }
+  .dsh-atb-mobilebar-btn::before { left: 9px; right: 9px; height: 2.5px; }
+  .dsh-atb-mobilebar-btn[data-active="true"]::before { left: 6px; right: 6px; }
+  .dsh-atb-mobilebar-count { font-size: 10px; padding: 1px 5px; }
+  .dsh-atb-swipecue { display: inline-flex; }
+
+  .dsh-atb-columns {
+    display: flex; gap: 9px; padding-bottom: 6px;
+    scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dsh-atb-column {
+    flex: 0 0 calc((100% - 9px) / 2); min-width: 0; max-width: none; box-sizing: border-box;
+    scroll-snap-align: start; scroll-snap-stop: always;
+    border-radius: 12px; transition: none;
+  }
+  .dsh-atb-column[data-collapsed="true"] { flex: 0 0 42px; min-width: 42px; max-width: 42px; }
+  .dsh-atb-colhead { min-height: 30px; padding: 4px 8px; font-size: 11px; }
+  .dsh-atb-colhead::before { left: 8px; width: 12px; height: 2px; }
+  .dsh-atb-cards { padding: 2px 7px calc(10px + env(safe-area-inset-bottom)); overscroll-behavior-y: contain; }
+  .dsh-atb-fab { display: none; }
+  /* Landscape keeps the composer on one row (the inline panel is wide enough),
+     but the field must still be 16px so iOS does not zoom on focus. */
+  .dsh-atb-composer-input { font-size: 16px; }
+  .dsh-atb-composer-deliver { white-space: normal; }
+
+  /* Landscape keeps the centred dialog: a full-width sheet would cover the
+     two columns the user is comparing. */
+  .dsh-atb-modal-backdrop { align-items: center; justify-content: center; padding: 10px; }
+  .dsh-atb-modal { width: min(580px, 100%); max-height: 94dvh; border-radius: 15px; }
+  .dsh-atb-taskform-modal { width: min(760px, 100%); min-width: 0; max-height: 94dvh; }
+  .dsh-atb-taskform-body { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dsh-atb-form-left { border-right: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.14)); padding-right: 12px; }
+  .dsh-atb-sheet-layer { align-items: center; padding: 10px; }
+  .dsh-atb-sheet { width: min(580px, 100%); border-radius: 15px; }
+  .dsh-atb-sheet-handle { display: none; }
+  .dsh-atb-detailpanel { max-height: 70%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dsh-atb-card,
+  .dsh-atb-card:hover,
+  .dsh-atb-card:active { transform: none; transition: none; }
+  .dsh-atb-column,
+  .dsh-atb-tone-swatch,
+  .dsh-atb-switch,
+  .dsh-atb-switch-track,
+  .dsh-atb-toggle-caret,
+  .dsh-atb-ws-group-chevron { transition: none; }
+  .dsh-atb-columns { scroll-behavior: auto; }
+}
 
 `
 
@@ -1601,3 +2264,9 @@ export function injectStyles(): void {
   style.dataset.plugin = PLUGIN_ID
   style.dataset.pluginCss = CSS_TAG
 }
+
+
+
+
+
+

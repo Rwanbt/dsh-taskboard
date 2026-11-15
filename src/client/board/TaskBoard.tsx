@@ -4,7 +4,7 @@
  *
  * @module dsh-taskboard/client/board/TaskBoard
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import type { BoardController, ControllerState } from '../controller.ts'
 import type { TaskRecord, TaskStatus, Urgency } from '../../shared/protocol.ts'
 import { MAIN_STATUSES, canTransition, completedDisplayLimitOf } from '../../shared/protocol.ts'
@@ -24,6 +24,24 @@ import { ImportModal } from './ImportModal.tsx'
 import { TemplateManager } from './TemplateManager.tsx'
 import { useAlert } from './AlertModal.tsx'
 import { Select } from './Select.tsx'
+import { resolveWorkspaceName as resolveWorkspaceNameBase } from './project-label.ts'
+import { useAppearance, setAppearance, vibrancyOf } from './appearance.ts'
+import { runClassification } from './classify.ts'
+import { categoriesOf, categoryLabelMapOf } from '../../shared/protocol.ts'
+import { MobileFiltersSheet, MobileMenuSheet, MobileSheet, hasActiveFilters, type MobileMenuItem } from './MobileSheets.tsx'
+import {
+  UNCLASSIFIED_FILTER,
+  columnOffsets,
+  indexAtScroll,
+  indexOfStatus,
+  pageLabel,
+  scrollTarget,
+  statusAt,
+  stepTabIndex,
+  useFocusMode,
+} from './mobile.ts'
+import { useToolbarDensity } from './compact.ts'
+import { MobileStatusTabs } from './MobileStatusTabs.tsx'
 
 /** Urgency sort rank (urgent first). */
 const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, normal: 1, relaxed: 2 }
@@ -34,6 +52,11 @@ export function filterTasks(state: ControllerState, tasks: TaskRecord[]): TaskRe
   const filtered = tasks.filter(t =>
     (state.filters.workspaceId === undefined || t.workspaceId === state.filters.workspaceId)
     && (state.filters.urgencies.length === 0 || state.filters.urgencies.includes(t.urgency))
+    // Category filter: the unclassified bucket matches tasks without a category.
+    && (state.filters.categoryId === undefined
+      || (state.filters.categoryId === UNCLASSIFIED_FILTER
+        ? t.category === undefined
+        : t.category === state.filters.categoryId))
     && (q.length === 0 || t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)))
   if (state.sortBy === 'default') return filtered
   const sorted = [...filtered]
@@ -55,22 +78,12 @@ export interface WorkspaceTaskGroup {
   tasks: TaskRecord[]
 }
 
-/** Resolve display name for a workspace. */
-export function resolveWorkspaceName(
-  workspaceId: string | undefined,
-  workspaces: Array<{ id: string; title?: string; path?: string }>,
-  unassignedLabel: string,
-): string {
-  if (!workspaceId) return unassignedLabel
-  const ws = workspaces.find(w => w.id === workspaceId)
-  if (ws?.title && ws.title.trim().length > 0) return ws.title.trim()
-  if (ws?.path && ws.path.trim().length > 0) {
-    const trimmed = ws.path.trim().replace(/[/\\]+$/, '')
-    const base = trimmed.split(/[/\\]/).filter(Boolean).pop()
-    return base || trimmed
-  }
-  return workspaceId.slice(0, 8)
-}
+/**
+ * Resolve display name for a workspace. Implemented in `project-label.ts` so
+ * the card header and the project grouping can never disagree; re-exported
+ * here because the board has always published it.
+ */
+export const resolveWorkspaceName = resolveWorkspaceNameBase
 
 export type GroupSortOrder = 'name' | 'latestTask' | 'updated' | 'created' | 'urgency'
 
@@ -157,6 +170,8 @@ export function groupAndSortTasksByWorkspace(
  */
 export function TaskBoard({ controller }: { controller: BoardController }) {
   const t = useT()
+  const appearance = useAppearance()
+  const categories = categoriesOf(controller.getSnapshot().ledger.settings)
   const state = useSyncExternalStore(
     cb => controller.subscribe(cb),
     () => controller.getSnapshot(),
@@ -171,6 +186,31 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
   const allLive = filterTasks(state, state.ledger.tasks.filter(t => t.trashedAt === undefined))
   const needsHumanCount = allLive.filter(task => humanWaiting(task).needs).length
   const live = onlyNeedsHuman ? allLive.filter(task => humanWaiting(task).needs) : allLive
+  // "Colour by category" is only meaningful once tasks have categories. On a
+  // board whose tasks are all unclassified the surfaces are neutral by design,
+  // which reads as "everything is grey": offer the explicit migration instead
+  // of silently reclassifying anything.
+  const categorizedCount = allLive.filter(task => task.category !== undefined).length
+  const [classifyProgress, setClassifyProgress] = useState<{ done: number; total: number } | undefined>()
+  const classifyExisting = (): void => {
+    if (classifyProgress !== undefined) return
+    setClassifyProgress({ done: 0, total: 0 })
+    void runClassification(controller, {
+      categories: categoriesOf(controller.getSnapshot().ledger.settings),
+      labelMap: categoryLabelMapOf(controller.getSnapshot().ledger.settings),
+      onProgress: (done, total) => setClassifyProgress({ done, total }),
+    }).then(result => {
+      setClassifyProgress(undefined)
+      if (result.classified === 0 && result.failed === 0) {
+        showAlert(t('classification.none'))
+        return
+      }
+      showAlert(t('classification.result', { classified: result.classified, failed: result.failed }))
+    }).catch(error => {
+      setClassifyProgress(undefined)
+      showAlert(error instanceof Error ? error.message : String(error))
+    })
+  }
   const selected = state.selectedId === undefined ? undefined : state.ledger.tasks.find(t => t.id === state.selectedId)
   const detailPanelRef = useRef<HTMLDivElement>(null)
 
@@ -211,12 +251,283 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
   const closeExport = (): void => setExportOpen(false)
   // Fold/expand toggle for completed tasks (0.8.8)
   const [doneExpanded, setDoneExpanded] = useState(false)
+  /* ---------------------------------------------------------------------
+     Mobile focus mode: the five columns become one native, snap-scrolled
+     carousel (one page in portrait, two in phone landscape) and the status
+     tabs above it are two-way bound to the rail. The rail is the single
+     source of truth for scroll position; the tab is derived from it, and an
+     explicit tab click drives the rail with a short lock so the smooth
+     scroll it starts cannot bounce the selection back.
+     ------------------------------------------------------------------- */
+  const focus = useFocusMode()
+  const [activeStatus, setActiveStatus] = useState<TaskStatus>('todo')
+  const railRef = useRef<HTMLDivElement | null>(null)
+  const tabbarRef = useRef<HTMLElement | null>(null)
+  /** The status a tab click is scrolling to; scroll events are ignored meanwhile. */
+  const explicitStatusRef = useRef<TaskStatus | null>(null)
+  const explicitTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const activeStatusRef = useRef<TaskStatus>(activeStatus)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  /* Desktop header compaction: the toolbar measures itself and publishes its
+     density on the board root, so the header stays on two rows even when the
+     host sidebar narrows the panel. See board/compact.ts. */
+  const toolbarRef = useRef<HTMLDivElement | null>(null)
+  const barDensity = useToolbarDensity(toolbarRef)
+
+  useEffect(() => {
+    activeStatusRef.current = activeStatus
+  }, [activeStatus])
+
+  /** Scroll the rail so the chosen status starts at the left edge. */
+  const scrollRailTo = (status: TaskStatus, behavior: ScrollBehavior): void => {
+    const rail = railRef.current
+    if (rail === null) return
+    const offsets = columnOffsets(rail)
+    const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth)
+    const left = scrollTarget(offsets, indexOfStatus(status), maxScroll)
+    if (typeof rail.scrollTo === 'function') rail.scrollTo({ left, behavior })
+    else rail.scrollLeft = left
+  }
+
+  /** Keep the selected tab visible inside the (also scrollable) tab rail. */
+  const centerTab = (status: TaskStatus): void => {
+    const bar = tabbarRef.current
+    if (bar === null) return
+    const tab = bar.querySelector<HTMLElement>(`.dsh-atb-mobilebar-btn[data-status="${status}"]`)
+    if (tab === null) return
+    const left = Math.max(0, tab.offsetLeft - bar.offsetLeft + tab.offsetWidth / 2 - bar.clientWidth / 2)
+    if (typeof bar.scrollTo === 'function') bar.scrollTo({ left, behavior: 'smooth' })
+    else bar.scrollLeft = left
+  }
+
+  /** Explicit status selection: tab click or arrow key. */
+  const selectStatus = (status: TaskStatus): void => {
+    if (explicitTimerRef.current !== undefined) clearTimeout(explicitTimerRef.current)
+    explicitStatusRef.current = status
+    explicitTimerRef.current = setTimeout(() => { explicitStatusRef.current = null }, 1000)
+    setActiveStatus(status)
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    scrollRailTo(status, reduce ? 'auto' : 'smooth')
+  }
+
+  // Swipe → tab: derive the visible column from the rail's scroll position.
+  // Re-attached when the rail remounts (secondary view), never per render.
+  useEffect(() => {
+    if (!focus.focus || state.secondaryOpen) return
+    const rail = railRef.current
+    if (rail === null) return
+    const onScroll = (): void => {
+      if (explicitStatusRef.current !== null) return
+      const offsets = columnOffsets(rail)
+      const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth)
+      const next = statusAt(indexAtScroll(offsets, rail.scrollLeft, { maxScroll, twoUp: focus.twoUp }))
+      setActiveStatus(previous => (previous === next ? previous : next))
+    }
+    rail.addEventListener('scroll', onScroll, { passive: true })
+    return () => rail.removeEventListener('scroll', onScroll)
+  }, [focus.focus, focus.twoUp, state.secondaryOpen])
+
+  // Entering focus mode (or rotating): put the rail where the tabs say it is,
+  // without animation. `activeStatus` is read through a ref on purpose: a
+  // swipe must not be re-snapped by this effect while it is in flight.
+  useEffect(() => {
+    if (!focus.focus) return
+    scrollRailTo(activeStatusRef.current, 'auto')
+  }, [focus.focus, focus.twoUp])
+
+  // Keep the selected tab in view (a swipe moves the selection, not the bar).
+  useEffect(() => {
+    if (focus.focus) centerTab(activeStatus)
+  }, [activeStatus, focus.focus])
+
+  useEffect(() => () => {
+    if (explicitTimerRef.current !== undefined) clearTimeout(explicitTimerRef.current)
+  }, [])
+
+  const searchVisible = !focus.focus || searchOpen || state.search.length > 0
+  const filtersActive = hasActiveFilters(state, onlyNeedsHuman)
+  const menuItems: MobileMenuItem[] = [
+    {
+      id: 'group',
+      label: appearance.group ? t('board.mobile.menu.ungroup') : t('board.mobile.menu.group'),
+      icon: 'folder',
+      onSelect: () => setAppearance({ group: !appearance.group }),
+    },
+    {
+      id: 'secondary',
+      label: state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks'),
+      icon: 'checklist',
+      onSelect: () => controller.toggleSecondary(),
+    },
+    { id: 'settings', label: t('board.action.settings'), hint: t('board.action.settingsTitle'), icon: 'settings', onSelect: () => controller.openSettings() },
+    { id: 'diagnostics', label: t('board.action.diag'), hint: t('board.action.diagTitle'), icon: 'diagnostics', onSelect: () => controller.openDiagnostics() },
+    { id: 'import', label: t('board.action.import'), hint: t('board.action.importTitle'), icon: 'import', onSelect: () => controller.openImport() },
+    { id: 'export-json', label: t('board.export.json'), hint: t('board.action.exportTitle'), icon: 'export', onSelect: () => { void controller.exportJson() } },
+    { id: 'export-csv', label: t('board.export.csv'), hint: t('board.action.exportTitle'), icon: 'export', onSelect: () => { void controller.exportCsv() } },
+  ]
 
   return (
-    <div className="dsh-atb-board">
-      <div className="dsh-atb-toolbar">
+    <div
+      className="dsh-atb-board"
+      data-atb-density={appearance.density}
+      data-atb-descriptions={appearance.descriptions ? 'true' : 'false'}
+      data-atb-group={appearance.group ? 'true' : 'false'}
+      data-atb-color-mode={appearance.colorMode}
+      data-atb-intensity={appearance.intensity}
+      data-atb-focus={focus.focus ? (focus.twoUp ? 'landscape' : 'portrait') : 'none'}
+      data-atb-bar={barDensity}
+      data-atb-search={searchVisible ? 'true' : 'false'}
+      data-atb-active-status={activeStatus}
+      data-atb-filters={filtersActive ? 'true' : 'false'}
+      style={{ '--atb-vibrancy': vibrancyOf(appearance) } as CSSProperties}
+    >
+      <div className="dsh-atb-head">
         <h2 className="dsh-atb-title">{t('board.title')}</h2>
         <span className="dsh-atb-count">{t('board.count.tasks', { n: live.length, rev: state.ledger.revision })}</span>
+        <div className="dsh-atb-spacer" />
+        {/* Focus-mode actions: the desktop toolbar is compacted into these
+            three buttons plus one bottom sheet each. Hidden above 760px. */}
+        <div className="dsh-atb-mobileactions">
+          <button
+            type="button"
+            className="dsh-atb-iconbtn"
+            data-action="search"
+            aria-label={t('board.mobile.search')}
+            aria-expanded={searchVisible}
+            data-on={searchVisible ? 'true' : undefined}
+            onClick={() => {
+              const next = !searchVisible
+              setSearchOpen(next)
+              if (!next && state.search.length > 0) controller.setSearch('')
+            }}
+          >
+            <Icon name="search" />
+          </button>
+          <button
+            type="button"
+            className="dsh-atb-iconbtn"
+            data-action="filters"
+            aria-label={t('board.mobile.filters')}
+            aria-haspopup="dialog"
+            data-on={filtersActive ? 'true' : undefined}
+            onClick={() => setFiltersOpen(true)}
+          >
+            <Icon name="filter" />
+          </button>
+          <button
+            type="button"
+            className="dsh-atb-iconbtn"
+            data-action="menu"
+            aria-label={t('board.mobile.more')}
+            aria-haspopup="dialog"
+            onClick={() => setMenuOpen(true)}
+          >
+            <Icon name="menu" />
+          </button>
+        </div>
+        {/* Desktop action cluster, mirrored by the mobile actions sheet.
+            It sits on the title row: a view command belongs next to the view
+            name, and it keeps the filter row free to stay single-line. */}
+        <div className="dsh-atb-toolbar-actions">
+        <a
+          className="dsh-atb-ver"
+          href="https://github.com/cloader/dsh-taskboard"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          V{PLUGIN_VERSION}
+        </a>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="secondary"
+          aria-label={state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
+          title={state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
+          onClick={() => controller.toggleSecondary()}
+        >
+          <Icon name="checklist" />
+          <span className="dsh-atb-btn-label">{state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}</span>
+        </button>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="appearance"
+          aria-label={t('board.action.settings')}
+          title={t('board.action.settingsTitle')}
+          onClick={() => controller.openSettings()}
+        >
+          <Icon name="settings" /> <span className="dsh-atb-btn-label">{t('board.action.settings')}</span>
+        </button>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="diagnostics"
+          aria-label={t('board.action.diag')}
+          title={t('board.action.diagTitle')}
+          onClick={() => controller.openDiagnostics()}
+        >
+          <Icon name="diagnostics" /> <span className="dsh-atb-btn-label">{t('board.action.diag')}</span>
+        </button>
+        <button
+          type="button"
+          className="dsh-atb-btn"
+          data-action="import"
+          aria-label={t('board.action.import')}
+          title={t('board.action.importTitle')}
+          onClick={() => controller.openImport()}
+        >
+          <Icon name="import" /> <span className="dsh-atb-btn-label">{t('board.action.import')}</span>
+        </button>
+        <div className="dsh-atb-newmenu">
+          <button
+            type="button"
+            className="dsh-atb-btn"
+            data-action="export"
+            aria-label={t('board.action.export')}
+            title={t('board.action.exportTitle')}
+            onClick={() => setExportOpen(!exportOpen)}
+          >
+            <Icon name="export" /> <span className="dsh-atb-btn-label">{t('board.action.export')}</span>
+            <span className="dsh-atb-newmenu-caret"><Icon name="chevronDown" /></span>
+          </button>
+          {exportOpen && (
+            <>
+              <div className="dsh-atb-newmenu-backdrop" onClick={closeExport} />
+              <div className="dsh-atb-newmenu-list">
+                <button
+                  type="button"
+                  className="dsh-atb-newmenu-opt"
+                  title={t('board.export.jsonTitle')}
+                  onClick={() => { closeExport(); void controller.exportJson() }}
+                >
+                  {t('board.export.json')}
+                </button>
+                <button
+                  type="button"
+                  className="dsh-atb-newmenu-opt"
+                  title={t('board.export.csvTitle')}
+                  onClick={() => { closeExport(); void controller.exportCsv() }}
+                >
+                  {t('board.export.csv')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        </div>
+        <button
+          type="button"
+          className="dsh-atb-btn dsh-atb-grouptoggle"
+          aria-pressed={appearance.group}
+          aria-label={t('appearance.group')}
+          title={t('appearance.group.title')}
+          onClick={() => setAppearance({ group: !appearance.group })}
+        >
+          <Icon name="folder" />
+          <span className="dsh-atb-grouptoggle-label">{t('appearance.group')}</span>
+        </button>
         <div className="dsh-atb-newmenu">
           <button
             type="button"
@@ -229,10 +540,10 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             }}
           >
             <Icon name="plus" />
-            {t('board.action.newTask')}
-            <Icon name="chevronDown" />
+            <span className="dsh-atb-newmenu-label">{t('board.action.newTask')}</span>
+            <span className="dsh-atb-newmenu-caret"><Icon name="chevronDown" /></span>
           </button>
-          {newMenuOpen && (
+          {newMenuOpen && !focus.focus && (
             <>
               <div className="dsh-atb-newmenu-backdrop" onClick={closeMenu} />
               <div className="dsh-atb-newmenu-list">
@@ -263,14 +574,23 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             </>
           )}
         </div>
-        <div className="dsh-atb-spacer" />
-        <input
-          className="dsh-atb-input dsh-atb-search"
-          value={state.search}
-          placeholder={t('board.search.placeholder')}
-          spellCheck={false}
-          onChange={e => controller.setSearch(e.target.value)}
-        />
+      </div>
+
+      <div className="dsh-atb-toolbar" ref={toolbarRef}>
+        <label className="dsh-atb-searchfield">
+          <Icon name="search" />
+          <input
+            className="dsh-atb-search"
+            value={state.search}
+            placeholder={t('board.search.placeholder')}
+            aria-label={t('board.search.placeholder')}
+            spellCheck={false}
+            onChange={e => controller.setSearch(e.target.value)}
+          />
+        </label>
+        {/* Desktop filter cluster: `display: contents` keeps these children
+            direct toolbar flex items above 760px, and the mobile sheet below. */}
+        <div className="dsh-atb-toolbar-filters">
         <Select
           ariaLabel={t('board.filter.allProjects')}
           value={state.filters.workspaceId ?? ''}
@@ -278,6 +598,17 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
           options={[
             { value: '', label: t('board.filter.allProjects') },
             ...state.workspaces.map(ws => ({ value: ws.id, label: ws.title || ws.path })),
+          ]}
+        />
+        <Select
+          ariaLabel={t('board.filter.allCategories')}
+          title={t('board.filter.allCategories')}
+          value={state.filters.categoryId ?? ''}
+          onChange={v => controller.setCategoryFilter(v === '' ? undefined : v)}
+          options={[
+            { value: '', label: t('board.filter.allCategories') },
+            ...categories.map(category => ({ value: category.id, label: category.name })),
+            { value: UNCLASSIFIED_FILTER, label: t('category.unclassified') },
           ]}
         />
         <Select
@@ -293,6 +624,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             { value: 'title', label: t('board.sort.byTitle') },
           ]}
         />
+        <span className="dsh-atb-toolbar-divider" aria-hidden="true" />
         {(['urgent', 'normal', 'relaxed'] as const).map(u => (
           <button
             key={u}
@@ -300,10 +632,12 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             className="dsh-atb-chip"
             data-urgency={u}
             data-on={state.filters.urgencies.includes(u)}
+            aria-label={t(URGENCY_KEYS[u])}
+            title={t(URGENCY_KEYS[u])}
             onClick={() => controller.toggleUrgency(u)}
           >
             <span className="dsh-atb-dot" data-urgency={u} />
-            {t(URGENCY_KEYS[u])}
+            <span className="dsh-atb-chip-label">{t(URGENCY_KEYS[u])}</span>
           </button>
         ))}
         <button
@@ -312,6 +646,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
           data-kind="needs-human-filter"
           data-on={onlyNeedsHuman}
           aria-pressed={onlyNeedsHuman}
+          aria-label={t("board.filter.needsHuman")}
           style={onlyNeedsHuman ? { background: "#f59e0b", color: "#fff", borderColor: "#d97706", fontWeight: 600 } : undefined}
           title={t("board.filter.needsHumanTitle")}
           onClick={() => {
@@ -319,63 +654,61 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
             setOnlyNeedsHuman(!onlyNeedsHuman)
           }}
         >
-          <Icon name="hand" /> {t("board.filter.needsHuman")} {needsHumanCount > 0 ? `(${needsHumanCount})` : ""}
+          <Icon name="hand" />
+          <span className="dsh-atb-chip-label">{t("board.filter.needsHuman")}</span>
+          {needsHumanCount > 0 ? <span className="dsh-atb-chip-count">{`(${needsHumanCount})`}</span> : null}
         </button>
-        <button type="button" className="dsh-atb-btn" onClick={() => controller.toggleSecondary()}>
-          {state.secondaryOpen ? t('board.action.backToBoard') : t('board.action.otherTasks')}
-        </button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.settingsTitle')} onClick={() => controller.openSettings()}><Icon name="settings" /> {t('board.action.settings')}</button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.diagTitle')} onClick={() => controller.openDiagnostics()}><Icon name="diagnostics" /> {t('board.action.diag')}</button>
-        <button type="button" className="dsh-atb-btn" title={t('board.action.importTitle')} onClick={() => controller.openImport()}><Icon name="import" /> {t('board.action.import')}</button>
-        <div className="dsh-atb-newmenu">
-          <button
-            type="button"
-            className="dsh-atb-btn"
-            title={t('board.action.exportTitle')}
-            onClick={() => setExportOpen(!exportOpen)}
-          >
-            <Icon name="export" /> {t('board.action.export')} <Icon name="chevronDown" />
-          </button>
-          {exportOpen && (
-            <>
-              <div className="dsh-atb-newmenu-backdrop" onClick={closeExport} />
-              <div className="dsh-atb-newmenu-list">
-                <button
-                  type="button"
-                  className="dsh-atb-newmenu-opt"
-                  title={t('board.export.jsonTitle')}
-                  onClick={() => { closeExport(); void controller.exportJson() }}
-                >
-                  {t('board.export.json')}
-                </button>
-                <button
-                  type="button"
-                  className="dsh-atb-newmenu-opt"
-                  title={t('board.export.csvTitle')}
-                  onClick={() => { closeExport(); void controller.exportCsv() }}
-                >
-                  {t('board.export.csv')}
-                </button>
-              </div>
-            </>
-          )}
         </div>
-        <a
-          className="dsh-atb-ver"
-          href="https://github.com/cloader/dsh-taskboard"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          V{PLUGIN_VERSION}
-        </a>
+        <div className="dsh-atb-spacer" />
       </div>
 
       {state.error !== undefined && <div className="dsh-atb-error">{state.error}</div>}
 
+      {!state.secondaryOpen && appearance.colorMode === 'category' && allLive.length > 0 && categorizedCount === 0 && (
+        <div className="dsh-atb-classifyhint" role="status">
+          <Icon name="checklist" size={16} />
+          <div className="dsh-atb-classifyhint-text">
+            <span className="dsh-atb-classifyhint-title">{t('board.category.hint.title')}</span>
+            <span className="dsh-atb-classifyhint-body">{t('board.category.hint.body', { n: allLive.length })}</span>
+          </div>
+          <span className="dsh-atb-classifyhint-actions">
+            <button
+              type="button"
+              className="dsh-atb-btn"
+              data-primary="true"
+              disabled={classifyProgress !== undefined}
+              onClick={classifyExisting}
+            >
+              {classifyProgress === undefined
+                ? t('board.category.hint.classify')
+                : t('board.category.hint.classifying', { done: classifyProgress.done, total: classifyProgress.total })}
+            </button>
+            <button type="button" className="dsh-atb-btn" onClick={() => setAppearance({ colorMode: 'priority' })}>
+              {t('board.category.hint.usePriority')}
+            </button>
+          </span>
+        </div>
+      )}
+
       {state.secondaryOpen
         ? <SecondaryTab controller={controller} tasks={filterTasks(state, state.ledger.tasks)} />
         : (
-          <div className="dsh-atb-columns">
+          <div className="dsh-atb-board-body">
+            <div className="dsh-atb-mobilehead">
+              <MobileStatusTabs
+                active={activeStatus}
+                countOf={status => live.filter(task => task.status === status).length}
+                onSelect={selectStatus}
+                tabbarRef={tabbarRef}
+              />
+              <span className="dsh-atb-swipecue" aria-hidden="true">
+                <span className="dsh-atb-swipecue-arrow">←</span>
+                <span className="dsh-atb-swipecue-label">{t('board.swipe.cue')}</span>
+                <span className="dsh-atb-swipecue-arrow">→</span>
+                <strong className="dsh-atb-swipecue-page">{pageLabel(indexOfStatus(activeStatus))}</strong>
+              </span>
+            </div>
+            <div className="dsh-atb-columns" ref={railRef}>
             {MAIN_STATUSES.map(status => {
               const rawColumnTasks = live.filter(t => t.status === status)
               const isBacklog = status === 'backlog'
@@ -409,9 +742,12 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                 void controller.move(id, task.version, status)
               }
 
-              const isCollapsed = (isBacklog && state.backlogCollapsed)
+              // In focus mode every column is a full page of the carousel:
+              // folding one to a 42px sliver would break the page rhythm and
+              // strand the swipe, so the fold state is a desktop-only view.
+              const isCollapsed = !focus.focus && ((isBacklog && state.backlogCollapsed)
                 || (isTodo && state.todoCollapsed)
-                || (isDone && state.doneCollapsed)
+                || (isDone && state.doneCollapsed))
               if (isCollapsed) {
                 const expandTitle = isBacklog ? t('board.column.expandBacklog')
                   : isTodo ? t('board.column.expandTodo')
@@ -427,6 +763,8 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                   <div
                     className="dsh-atb-column"
                     key={status}
+                    id={`dsh-atb-col-${status}`}
+                    data-status={status}
                     data-collapsed="true"
                     onDragOver={onDragOver}
                     onDragLeave={onDragLeave}
@@ -482,6 +820,10 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                 <div
                   className="dsh-atb-column"
                   key={status}
+                  id={`dsh-atb-col-${status}`}
+                  data-status={status}
+                  role="tabpanel"
+                  aria-labelledby={`dsh-atb-tab-${status}`}
                   onDragOver={onDragOver}
                   onDragLeave={onDragLeave}
                   onDrop={onDrop}
@@ -499,7 +841,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                         onClick={() => controller.openQueuePanel()}
                       >{t('board.queue.chip', { n: state.queue?.depth ?? 0 })}</button>
                     )}
-                    {isBacklog && (
+                    {isBacklog && !focus.focus && (
                       <button
                         type="button"
                         className="dsh-atb-colfoldbtn"
@@ -511,7 +853,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                         </svg>
                       </button>
                     )}
-                    {isTodo && (
+                    {isTodo && !focus.focus && (
                       <button
                         type="button"
                         className="dsh-atb-colfoldbtn"
@@ -523,7 +865,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                         </svg>
                       </button>
                     )}
-                    {isDone && (
+                    {isDone && !focus.focus && (
                       <button
                         type="button"
                         className="dsh-atb-colfoldbtn"
@@ -537,37 +879,57 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                     )}
                   </div>
                   <div className="dsh-atb-cards">
-                    {workspaceGroups.map(group => (
-                      <div className="dsh-atb-ws-group" key={group.workspaceId ?? 'unassigned'}>
-                        <button type="button" className="dsh-atb-ws-group-head"
-                          aria-expanded={!controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}
-                          aria-label={t(controller.isWorkspaceGroupCollapsed(status, group.workspaceId) ? 'board.workspace.expand' : 'board.workspace.collapse', { name: group.workspaceName })}
-                          title={group.workspaceName}
-                          onClick={() => controller.toggleWorkspaceGroup(status, group.workspaceId)}>
-                          <span className="dsh-atb-ws-group-chevron"><Icon name="chevronRight" size={12} /></span>
-                          <span className="dsh-atb-ws-group-icon">
-                            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M1.5 3.5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 .8.4L8 4.5h5.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z" />
-                            </svg>
-                          </span>
-                          <span className="dsh-atb-ws-group-name">{group.workspaceName}</span>
-                          <span className="dsh-atb-ws-group-count">{group.tasks.length}</span>
-                        </button>
-                        <div className="dsh-atb-ws-group-cards" hidden={controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}>
-                          {group.tasks.map(task => (
+                    {appearance.group
+                      ? workspaceGroups.map(group => (
+                        <div className="dsh-atb-ws-group" key={group.workspaceId ?? 'unassigned'}>
+                          <button type="button" className="dsh-atb-ws-group-head"
+                            aria-expanded={!controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}
+                            aria-label={t(controller.isWorkspaceGroupCollapsed(status, group.workspaceId) ? 'board.workspace.expand' : 'board.workspace.collapse', { name: group.workspaceName })}
+                            title={group.workspaceName}
+                            onClick={() => controller.toggleWorkspaceGroup(status, group.workspaceId)}>
+                            <span className="dsh-atb-ws-group-chevron"><Icon name="chevronRight" size={12} /></span>
+                            <span className="dsh-atb-ws-group-icon">
+                              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M1.5 3.5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 .8.4L8 4.5h5.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z" />
+                              </svg>
+                            </span>
+                            <span className="dsh-atb-ws-group-name">{group.workspaceName}</span>
+                            <span className="dsh-atb-ws-group-count">{group.tasks.length}</span>
+                          </button>
+                          <div className="dsh-atb-ws-group-cards" hidden={controller.isWorkspaceGroupCollapsed(status, group.workspaceId)}>
+                            {group.tasks.map(task => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                controller={controller}
+                                draggable={!focus.focus}
+                                now={now}
+                                onAlert={showAlert}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                      : (
+                        <div className="dsh-atb-ws-group-cards">
+                          {visibleTasks.map(task => (
                             <TaskCard
                               key={task.id}
                               task={task}
                               controller={controller}
-                              draggable
+                              draggable={!focus.focus}
                               now={now}
                               onAlert={showAlert}
                             />
                           ))}
                         </div>
+                      )}
+                    {columnTasks.length === 0 && (
+                      <div className="dsh-atb-empty">
+                        <Icon name="checklist" size={22} />
+                        <span className="dsh-atb-empty-title">{t('board.empty')}</span>
                       </div>
-                    ))}
-                    {columnTasks.length === 0 && <div className="dsh-atb-empty">{t('board.empty')}</div>}
+                    )}
                     {isDone && !isSearching && columnTasks.length > doneLimit && (
                       <div className="dsh-atb-done-foldbar">
                         {!doneExpanded ? (
@@ -596,6 +958,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
                 </div>
               )
             })}
+            </div>
           </div>
         )}
 
@@ -623,6 +986,64 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
       {state.importOpen && <ImportModal controller={controller} />}
 
       {state.tplManagerOpen && <TemplateManager controller={controller} />}
+
+      {/* Focus mode: one primary creation affordance, and the compacted
+          toolbar's controls in bottom sheets. */}
+      {focus.focus && !state.secondaryOpen && !state.composerOpen && (
+        <button
+          type="button"
+          className="dsh-atb-fab"
+          aria-label={t('board.action.newTask')}
+          title={t('board.action.newTask')}
+          onClick={() => { setNewMenuOpen(true); controller.prepareTemplateMenu() }}
+        >
+          <Icon name="plus" size={22} />
+        </button>
+      )}
+
+      {newMenuOpen && focus.focus && (
+        <MobileSheet title={t('board.action.newTask')} onClose={closeMenu}>
+          <div className="dsh-atb-newmenu-list dsh-atb-newmenu-list-sheet">
+            <button type="button" className="dsh-atb-newmenu-opt" onClick={() => { closeMenu(); controller.setComposer(true) }}>{t('board.action.blankTask')}</button>
+            {groupTemplatesByCategory(state.templates).map(group => (
+              <div key={group.category ?? '\u0000'} className="dsh-atb-newmenu-catgroup">
+                <div className="dsh-atb-newmenu-cat">{categoryLabel(group.category, t)} ({group.templates.length})</div>
+                {group.templates.map(tpl => {
+                  const name = localizeBuiltinName(tpl)
+                  const spec = localizeBuiltinTask(tpl)
+                  return (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      className="dsh-atb-newmenu-opt"
+                      onClick={() => { closeMenu(); controller.newFromTemplate(spec) }}
+                    >
+                      {name}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+            <div className="dsh-atb-newmenu-sep" />
+            <button type="button" className="dsh-atb-newmenu-opt" onClick={() => { closeMenu(); controller.openTemplateManager() }}>{t('board.action.manageTemplates')}</button>
+          </div>
+        </MobileSheet>
+      )}
+
+      {filtersOpen && (
+        <MobileFiltersSheet
+          controller={controller}
+          state={state}
+          onlyNeedsHuman={onlyNeedsHuman}
+          onToggleNeedsHuman={next => {
+            if (next && state.secondaryOpen) controller.toggleSecondary()
+            setOnlyNeedsHuman(next)
+          }}
+          onClose={() => setFiltersOpen(false)}
+        />
+      )}
+
+      {menuOpen && <MobileMenuSheet items={menuItems} onClose={() => setMenuOpen(false)} />}
 
       {alertEl}
     </div>
@@ -934,3 +1355,4 @@ function SecondaryTab({ controller, tasks }: { controller: BoardController; task
     </div>
   )
 }
+

@@ -152,8 +152,20 @@ export class LinearProvider implements ExternalTaskProvider, ExternalWriteProvid
       closed: state.type === 'completed' || state.type === 'canceled',
       urgency: this.urgency(priorityValue),
       url,
+      ...(this.labelNames(issue.labels).length > 0 ? { labels: this.labelNames(issue.labels) } : {}),
       revision: typeof issue.updatedAt === 'string' ? issue.updatedAt : '',
     }
+  }
+
+  /** Remote label names (Linear exposes `labels.nodes[].name`). */
+  private labelNames(raw: unknown): string[] {
+    const labels = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>).nodes : undefined
+    if (!Array.isArray(labels)) return []
+    return labels.flatMap(entry => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return []
+      const name = (entry as Record<string, unknown>).name
+      return typeof name === 'string' && name.trim().length > 0 ? [name.trim()] : []
+    })
   }
 
   async test(signal: AbortSignal): Promise<void> {

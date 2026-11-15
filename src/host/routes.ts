@@ -28,6 +28,7 @@ import {
   canTransition,
   checklistFromTexts,
   defaultIsolationOf,
+  asTaskCategoryReference,
   defaultPermissionOf,
   dependencyChangeIds,
   isValidRelRepoPath,
@@ -916,6 +917,12 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
             if (texts.length > 0) checklist = checklistFromTexts(texts)
           }
           const now = options.now()
+          // Category is descriptive user data: validate the reference against
+          // the board categories (id or name); unknown references are refused.
+          const categoryRaw = body.category
+          const category = categoryRaw === undefined
+            ? undefined
+            : asTaskCategoryReference(store.snapshot().settings, categoryRaw)
           const task: TaskRecord = {
             id: newTaskId(),
             title,
@@ -924,6 +931,7 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
             workspaceId,
             urgency,
             status,
+            ...(category !== undefined ? { category } : {}),
             blocked: false,
             execution,
             model,
@@ -1141,6 +1149,13 @@ export function registerTaskboardRoutes(ctx: Context, options: TaskboardRoutesOp
                 next.workspaceId = workspaceId
               }
               if (typeof body.blocked === 'boolean') next.blocked = body.blocked
+              // Functional category: id/name validated against the board
+              // categories; an explicit null clears it (unclassified).
+              if (body.category !== undefined) {
+                const category = asTaskCategoryReference(store.snapshot().settings, body.category)
+                if (category === undefined) delete next.category
+                else next.category = category
+              }
               applyHumanWaitingPatch(next, body)
               // The GUI (task owner surface) may edit model/execution; null clears the model.
               if (body.execution !== undefined) {
