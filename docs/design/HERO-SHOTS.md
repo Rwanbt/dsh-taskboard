@@ -97,9 +97,20 @@ tree. `readme-capture.mjs` then:
    0 rejected;
 2. captures the panel at a 2040 px window: the host keeps a 280 px sidebar, so the
    panel is exactly 1760 px — the halved master is 2× the README's `width="880"`;
-3. opens the new-task dialog, types demo values, blurs the caret and clips the
-   dialog alone (1062×725);
+3. clicks **New task → Blank task** exactly like a user, types demo values, blurs
+   the caret and clips the dialog alone (1062×725);
 4. repeats the portrait pass at 390×844 (panel 390×796).
+
+**The dialog trap.** The first version of the script captured the dialog at the
+first frame of its opening animation: `Page.captureScreenshot` re-renders the page
+for the shot, which restarts `dsh-atb-pop` (`translateY(8px) scale(.98)`), so the
+clip framed a dialog drawn at 98 % of its measured box — the dimmed board showed
+around it and read as *two images superimposed in transparency*. Every shot now
+goes through `shootElement()`, which injects `animation/transition-duration: 0s`,
+runs `document.getAnimations().forEach(a => a.finish())`, waits two frames,
+re-measures the rectangle **after** the capture and rethrows if it moved or if the
+element still carries a transform. The capture is therefore exactly the last frame
+a user sees.
 
 The masters are written at `deviceScaleFactor: 2` in
 `scripts/qa/reports/readme-<stamp>/` together with `readme-shots.json`. The
@@ -107,16 +118,18 @@ desktop and dialog masters are then halved with `System.Drawing`
 (`HighQualityBicubic`) and copied over `img/`; the phone master is used as is
 (2× of its 390 px layout). `readme-shots.json` records, per shot, the clip
 rectangle, the hit-test proving the panel (or dialog) is what is under the
-cursor, the 30 cards spread over the five columns, the toolbar density (`wide`),
-the dialog's `mode`/title/submit state, and the phone's `data-atb-focus`,
-column count and active tab — no shot is accepted on faith.
+cursor, the residual transform/opacity at capture time, the 30 cards spread over
+the five columns, the toolbar density (`wide`), the dialog's
+`mode`/title/submit state, and the phone's `data-atb-focus`, column count and
+active tab — no shot is accepted on faith.
 
 Measured on the current dark run: `img/board.png` mean luminance **0.178**
-(0.67 % near-white pixels), `img/modal.png` **0.137**, `img/phone.png` **0.195**;
-`reachable: true` on all three, dialog `mode=create` with the demo title typed,
-phone `focus=portrait`, 5 columns, 5 tabs, active tab `To do · 6`, and the theme
-applied (`dark: true`) — the host follows `prefers-color-scheme`, the plugin
-never forces a theme.
+(0.67 % near-white pixels), `img/modal.png` **0.187** (dialog surface
+`35,35,36`, the four rounded corners showing the dimmed backdrop at `12,12,12`),
+`img/phone.png` **0.195**; `reachable: true` on all three, dialog `mode=create`
+with the demo title typed and `transform: none`, phone `focus=portrait`, 5
+columns, 5 tabs, active tab `To do · 6`, and the theme applied (`dark: true`) —
+the host follows `prefers-color-scheme`, the plugin never forces a theme.
 
 ## Limits
 

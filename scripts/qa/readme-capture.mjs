@@ -14,6 +14,12 @@
  * (`System.Drawing`, HighQualityBicubic) so the PNGs are sharp on a retina
  * screen without shipping 3000 px files.
  *
+ * Every shot goes through `shootElement`, which freezes the CSS animations
+ * first: the capture re-renders the page and would otherwise restart the
+ * dialog's `dsh-atb-pop` opening animation, framing a dialog still at
+ * `scale(.98)` — the dimmed board then showed around it, which reads as two
+ * images superimposed in transparency.
+ *
  * Driven by `scripts/qa/pastel-visual-host.ps1 -CaptureScript readme-capture.mjs`,
  * or run directly against a kept host:
  *   PTB_BASE=… PTB_TOKEN=… PTB_OUT=… PTB_BROWSER=… node scripts/qa/readme-capture.mjs
@@ -86,6 +92,61 @@ async function clipOf(selector) {
   }, selector)
 }
 
+/**
+ * Freeze CSS animations and transitions before a shot.
+ *
+ * `Page.captureScreenshot` re-renders the page for the capture, which restarts
+ * the running CSS animations **in that copy**. The new-task dialog opens with
+ * `dsh-atb-pop` (`translateY(8px) scale(.98)` → none): the first version of this
+ * script therefore captured the dialog at ~98 % of its measured box, so the
+ * clip framed a smaller dialog and the dimmed board showed around it — the
+ * "two images superimposed in transparency" report. Disabling the animations
+ * makes the capture identical to the last frame a user would see.
+ */
+async function stabilize() {
+  await page.evaluate(() => {
+    if (document.getElementById('dsh-atb-shot-still') !== null) return
+    const style = document.createElement('style')
+    style.id = 'dsh-atb-shot-still'
+    style.textContent = '*, *::before, *::after { animation-duration: 0s !important; '
+      + 'animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }'
+    document.head.appendChild(style)
+  })
+  await page.evaluate(async () => {
+    for (const animation of document.getAnimations()) {
+      try { animation.finish() } catch { /* infinite animation: nothing to finish */ }
+    }
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+}
+
+/**
+ * Shoot an element and prove the capture is aligned with it: the rect must be
+ * the same before and after the screenshot, and the element must carry no
+ * residual transform.
+ */
+async function shootElement(selector, file) {
+  await stabilize()
+  const before = await clipOf(selector)
+  if (before === null) throw new Error(`cannot shoot ${selector}: element missing`)
+  const residual = await page.evaluate(target => {
+    const element = document.querySelector(target)
+    if (element === null) return null
+    const style = getComputedStyle(element)
+    return { transform: style.transform, animation: style.animationName, opacity: style.opacity }
+  }, selector)
+  await page.screenshot({ path: join(outDir, file), clip: before })
+  const after = await clipOf(selector)
+  if (after === null || after.x !== before.x || after.y !== before.y
+    || after.width !== before.width || after.height !== before.height) {
+    throw new Error(`${file}: clip moved between measure and capture (${JSON.stringify({ before, after })})`)
+  }
+  if (residual !== null && residual.transform !== 'none') {
+    throw new Error(`${file}: ${selector} still transformed (${residual.transform}) — the capture would be misaligned`)
+  }
+  return { ...before, residual }
+}
+
 const shots = {}
 const overlays = []
 
@@ -95,8 +156,6 @@ await page.setViewport({ width: 2040, height: 1200, deviceScaleFactor: 2 })
 await sleep(1500)
 overlays.push(await clearOverlays(page, 'board'))
 await sleep(400)
-const boardBox = await clipOf('.dsh-atb-panel-root')
-if (boardBox === null) throw new Error('no .dsh-atb-panel-root on the desktop viewport')
 const boardCards = await page.evaluate(() => ({
   cards: document.querySelectorAll('.dsh-atb-card').length,
   columns: [...document.querySelectorAll('.dsh-atb-column')].map(column => ({
@@ -105,8 +164,7 @@ const boardCards = await page.evaluate(() => ({
   })),
   bar: document.querySelector('[data-atb-bar]')?.getAttribute('data-atb-bar') ?? null,
 }))
-await page.screenshot({ path: join(outDir, 'board.png'), clip: boardBox })
-shots.board = { ...boardBox, ...boardCards }
+shots.board = { ...await shootElement('.dsh-atb-panel-root', 'board.png'), ...boardCards }
 
 /* 2. New-task dialog, filled with demo values (never a real user's text). */
 await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 2 })
@@ -128,9 +186,7 @@ await page.keyboard.type(
 /* Blur the caret so the shot shows the form, not a focus ring. */
 await page.click('.dsh-atb-modal-headtext h3')
 await sleep(400)
-const modalBox = await clipOf('.dsh-atb-taskform-modal')
-if (modalBox === null) throw new Error('the new-task dialog did not open')
-await page.screenshot({ path: join(outDir, 'new-task.png'), clip: modalBox })
+const modalBox = await shootElement('.dsh-atb-taskform-modal', 'new-task.png')
 const modalState = await page.evaluate(() => ({
   mode: document.querySelector('.dsh-atb-taskform-modal')?.getAttribute('data-mode') ?? null,
   title: document.querySelector('.dsh-atb-taskform-body input')?.value ?? null,
@@ -145,16 +201,13 @@ await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 })
 await sleep(1500)
 overlays.push(await clearOverlays(page, 'phone'))
 await sleep(400)
-const phoneBox = await clipOf('.dsh-atb-panel-root')
-if (phoneBox === null) throw new Error('no .dsh-atb-panel-root on the phone viewport')
 const phoneState = await page.evaluate(() => ({
   focus: document.querySelector('[data-atb-focus]')?.getAttribute('data-atb-focus') ?? null,
   columns: document.querySelectorAll('.dsh-atb-column').length,
   tabs: document.querySelectorAll('[role="tab"]').length,
   activeTab: document.querySelector('[role="tab"][data-active], [role="tab"][aria-selected="true"]')?.textContent?.trim().slice(0, 40) ?? null,
 }))
-await page.screenshot({ path: join(outDir, 'phone.png'), clip: phoneBox })
-shots.phone = { ...phoneBox, ...phoneState }
+shots.phone = { ...await shootElement('.dsh-atb-panel-root', 'phone.png'), ...phoneState }
 
 const appliedTheme = await page.evaluate(() => ({
   dark: document.body.hasAttribute('data-ds-dark-theme'),
