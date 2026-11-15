@@ -1,0 +1,122 @@
+{
+  "seed": true,
+  "requestedTheme": "dark",
+  "appliedTheme": {
+    "dark": true,
+    "scheme": "dark"
+  },
+  "overlays": [
+    {
+      "stage": "hero-desktop-1440x900",
+      "clicks": [],
+      "hidden": [
+        "_root_1ytzq_6"
+      ],
+      "seen": [
+        "CommencezConnectez-vous à votre compte DeepSeek ou ajoutez une clé API pour comm"
+      ]
+    },
+    {
+      "stage": "hero-mobile-390x844",
+      "clicks": [],
+      "hidden": []
+    },
+    {
+      "stage": "hero-landscape-844x390",
+      "clicks": [],
+      "hidden": []
+    }
+  ],
+  "shots": {
+    "hero-desktop-1440x900": {
+      "x": 280,
+      "y": 0,
+      "width": 1160,
+      "height": 900,
+      "cards": 30,
+      "groups": [
+        "Atelier Lumen4",
+        "Nova Labs4",
+        "Studio Kestrel4",
+        "Atelier Lumen2",
+        "Nova Labs3",
+        "Studio Kestrel1",
+        "Atelier Lumen1",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Studio Kestrel2",
+        "Nova Labs1"
+      ],
+      "theme": "dark",
+      "reachable": {
+        "reachable": true,
+        "hit": "SPAN.dsh-atb-card-project-name"
+      },
+      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-010310\\hero-desktop-1440x900.png"
+    },
+    "hero-mobile-390x844": {
+      "x": 0,
+      "y": 48,
+      "width": 390,
+      "height": 796,
+      "cards": 30,
+      "groups": [
+        "Atelier Lumen4",
+        "Nova Labs4",
+        "Studio Kestrel4",
+        "Atelier Lumen2",
+        "Nova Labs3",
+        "Studio Kestrel1",
+        "Atelier Lumen1",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Studio Kestrel2",
+        "Nova Labs1"
+      ],
+      "theme": "dark",
+      "reachable": {
+        "reachable": true,
+        "hit": "DIV.dsh-atb-cards"
+      },
+      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-010310\\hero-mobile-390x844.png"
+    },
+    "hero-landscape-844x390": {
+      "x": 56,
+      "y": 0,
+      "width": 788,
+      "height": 390,
+      "cards": 30,
+      "groups": [
+        "Atelier Lumen4",
+        "Nova Labs4",
+        "Studio Kestrel4",
+        "Atelier Lumen2",
+        "Nova Labs3",
+        "Studio Kestrel1",
+        "Atelier Lumen1",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Nova Labs1",
+        "Studio Kestrel1",
+        "Atelier Lumen2",
+        "Studio Kestrel2",
+        "Nova Labs1"
+      ],
+      "theme": "dark",
+      "reachable": {
+        "reachable": true,
+        "hit": "DIV.dsh-atb-columns"
+      },
+      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-010310\\hero-landscape-844x390.png"
+    }
+  }
+}

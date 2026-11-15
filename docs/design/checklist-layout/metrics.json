@@ -1,0 +1,995 @@
+{
+  "portrait": {
+    "status": null,
+    "composer": {
+      "rect": {
+        "x": 17,
+        "y": 1303,
+        "w": 356,
+        "h": 154
+      },
+      "style": {
+        "display": "flex",
+        "width": "356px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "wrap",
+        "alignItems": "stretch",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "input": {
+        "rect": {
+          "x": 17,
+          "y": 1303,
+          "w": 356,
+          "h": 108
+        },
+        "fontSize": "16px",
+        "minHeight": "88px",
+        "flex": "1 1 100%"
+      },
+      "buttons": [
+        {
+          "text": "",
+          "w": 38,
+          "h": 38,
+          "x": 17
+        },
+        {
+          "text": "Publier",
+          "w": 66,
+          "h": 38,
+          "x": 63
+        },
+        {
+          "text": "Envoyer et laisser l’agent tra",
+          "w": 236,
+          "h": 38,
+          "x": 137
+        }
+      ],
+      "overflowRight": -17
+    },
+    "panel": {
+      "x": 0,
+      "y": 112,
+      "w": 390,
+      "h": 732
+    },
+    "detail": {
+      "x": 15,
+      "y": 123,
+      "w": 360,
+      "h": 709
+    },
+    "checklist": {
+      "rect": {
+        "x": 17,
+        "y": 389,
+        "w": 356,
+        "h": 180
+      },
+      "style": {
+        "display": "flex",
+        "width": "326px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "normal",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "label": "Liste de contrôle d’acceptation (DoD) 1/"
+    },
+    "drawer": {
+      "clientHeight": 709,
+      "scrollHeight": 1384,
+      "scrollTop": 0,
+      "scrollable": true,
+      "checklistTopInView": 266,
+      "blockCount": 9
+    },
+    "items": [
+      {
+        "rect": {
+          "x": 32,
+          "y": 437,
+          "w": 326,
+          "h": 65
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": 447,
+            "w": 139,
+            "h": 48
+          },
+          "style": {
+            "display": "block",
+            "width": "139.484px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Vérifier la grille responsive sur un petit écran de téléphone"
+        },
+        "meta": {
+          "rect": {
+            "x": 219,
+            "y": 448,
+            "w": 129,
+            "h": 44
+          },
+          "style": {
+            "display": "flex",
+            "width": "128.516px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": " agent-01 · Preuve : preuve très longue qui décrit en détail la vérification effectuée sur"
+        },
+        "lines": 3,
+        "charsPerLine": 20.3
+      },
+      {
+        "rect": {
+          "x": 32,
+          "y": 507,
+          "w": 326,
+          "h": 49
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": 517,
+            "w": 218,
+            "h": 32
+          },
+          "style": {
+            "display": "block",
+            "width": "217.875px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Confirmer la lisibilité du compteur intégré"
+        },
+        "meta": {
+          "rect": {
+            "x": 298,
+            "y": 519,
+            "w": 50,
+            "h": 14
+          },
+          "style": {
+            "display": "flex",
+            "width": "50.125px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Non coché"
+        },
+        "lines": 2,
+        "charsPerLine": 21.5
+      }
+    ],
+    "panelOverflowX": 0,
+    "viewport": {
+      "w": 390,
+      "h": 844
+    }
+  },
+  "portraitScrolled": {
+    "status": null,
+    "composer": {
+      "rect": {
+        "x": 17,
+        "y": 628,
+        "w": 356,
+        "h": 154
+      },
+      "style": {
+        "display": "flex",
+        "width": "356px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "wrap",
+        "alignItems": "stretch",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "input": {
+        "rect": {
+          "x": 17,
+          "y": 628,
+          "w": 356,
+          "h": 108
+        },
+        "fontSize": "16px",
+        "minHeight": "88px",
+        "flex": "1 1 100%"
+      },
+      "buttons": [
+        {
+          "text": "",
+          "w": 38,
+          "h": 38,
+          "x": 17
+        },
+        {
+          "text": "Publier",
+          "w": 66,
+          "h": 38,
+          "x": 63
+        },
+        {
+          "text": "Envoyer et laisser l’agent tra",
+          "w": 236,
+          "h": 38,
+          "x": 137
+        }
+      ],
+      "overflowRight": -17
+    },
+    "panel": {
+      "x": 0,
+      "y": 112,
+      "w": 390,
+      "h": 732
+    },
+    "detail": {
+      "x": 15,
+      "y": 123,
+      "w": 360,
+      "h": 709
+    },
+    "checklist": {
+      "rect": {
+        "x": 17,
+        "y": -286,
+        "w": 356,
+        "h": 180
+      },
+      "style": {
+        "display": "flex",
+        "width": "326px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "normal",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "label": "Liste de contrôle d’acceptation (DoD) 1/"
+    },
+    "drawer": {
+      "clientHeight": 709,
+      "scrollHeight": 1384,
+      "scrollTop": 675,
+      "scrollable": true,
+      "checklistTopInView": -409,
+      "blockCount": 9
+    },
+    "items": [
+      {
+        "rect": {
+          "x": 32,
+          "y": -238,
+          "w": 326,
+          "h": 65
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": -228,
+            "w": 139,
+            "h": 48
+          },
+          "style": {
+            "display": "block",
+            "width": "139.484px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Vérifier la grille responsive sur un petit écran de téléphone"
+        },
+        "meta": {
+          "rect": {
+            "x": 219,
+            "y": -227,
+            "w": 129,
+            "h": 44
+          },
+          "style": {
+            "display": "flex",
+            "width": "128.516px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": " agent-01 · Preuve : preuve très longue qui décrit en détail la vérification effectuée sur"
+        },
+        "lines": 3,
+        "charsPerLine": 20.3
+      },
+      {
+        "rect": {
+          "x": 32,
+          "y": -168,
+          "w": 326,
+          "h": 49
+        },
+        "text": {
+          "rect": {
+            "x": 71,
+            "y": -158,
+            "w": 218,
+            "h": 32
+          },
+          "style": {
+            "display": "block",
+            "width": "217.875px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Confirmer la lisibilité du compteur intégré"
+        },
+        "meta": {
+          "rect": {
+            "x": 298,
+            "y": -156,
+            "w": 50,
+            "h": 14
+          },
+          "style": {
+            "display": "flex",
+            "width": "50.125px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Non coché"
+        },
+        "lines": 2,
+        "charsPerLine": 21.5
+      }
+    ],
+    "panelOverflowX": 0,
+    "viewport": {
+      "w": 390,
+      "h": 844
+    }
+  },
+  "shapes": {
+    "390x844": {
+      "focus": "portrait",
+      "panel": {
+        "x": 0,
+        "y": 112,
+        "w": 390,
+        "h": 732
+      },
+      "drawer": {
+        "clientHeight": 709,
+        "scrollHeight": 1384,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 266,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 17,
+        "y": 389,
+        "w": 356,
+        "h": 180
+      },
+      "composer": {
+        "rect": {
+          "x": 17,
+          "y": 1303,
+          "w": 356,
+          "h": 154
+        },
+        "style": {
+          "display": "flex",
+          "width": "356px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "wrap",
+          "alignItems": "stretch",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 17,
+            "y": 1303,
+            "w": 356,
+            "h": 108
+          },
+          "fontSize": "16px",
+          "minHeight": "88px",
+          "flex": "1 1 100%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 38,
+            "h": 38,
+            "x": 17
+          },
+          {
+            "text": "Publier",
+            "w": 66,
+            "h": 38,
+            "x": 63
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 236,
+            "h": 38,
+            "x": 137
+          }
+        ],
+        "overflowRight": -17
+      },
+      "belowFoldBy": -432
+    },
+    "360x640": {
+      "focus": "portrait",
+      "panel": {
+        "x": 0,
+        "y": 79,
+        "w": 360,
+        "h": 561
+      },
+      "drawer": {
+        "clientHeight": 538,
+        "scrollHeight": 1468,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 289,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 17,
+        "y": 380,
+        "w": 326,
+        "h": 196
+      },
+      "composer": {
+        "rect": {
+          "x": 17,
+          "y": 1309,
+          "w": 326,
+          "h": 199
+        },
+        "style": {
+          "display": "flex",
+          "width": "326px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "wrap",
+          "alignItems": "stretch",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 17,
+            "y": 1309,
+            "w": 326,
+            "h": 108
+          },
+          "fontSize": "16px",
+          "minHeight": "88px",
+          "flex": "1 1 100%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 38,
+            "h": 38,
+            "x": 17
+          },
+          {
+            "text": "Publier",
+            "w": 66,
+            "h": 38,
+            "x": 63
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 326,
+            "h": 37,
+            "x": 17
+          }
+        ],
+        "overflowRight": -17
+      },
+      "belowFoldBy": -237
+    },
+    "412x915": {
+      "focus": "portrait",
+      "panel": {
+        "x": 0,
+        "y": 123,
+        "w": 412,
+        "h": 792
+      },
+      "drawer": {
+        "clientHeight": 769,
+        "scrollHeight": 1340,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 238,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 17,
+        "y": 373,
+        "w": 378,
+        "h": 164
+      },
+      "composer": {
+        "rect": {
+          "x": 17,
+          "y": 1270,
+          "w": 378,
+          "h": 154
+        },
+        "style": {
+          "display": "flex",
+          "width": "378px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "wrap",
+          "alignItems": "stretch",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 17,
+            "y": 1270,
+            "w": 378,
+            "h": 108
+          },
+          "fontSize": "16px",
+          "minHeight": "88px",
+          "flex": "1 1 100%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 38,
+            "h": 38,
+            "x": 17
+          },
+          {
+            "text": "Publier",
+            "w": 66,
+            "h": 38,
+            "x": 63
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 258,
+            "h": 38,
+            "x": 137
+          }
+        ],
+        "overflowRight": -17
+      },
+      "belowFoldBy": -519
+    },
+    "844x390": {
+      "focus": "landscape",
+      "panel": {
+        "x": 66,
+        "y": 91,
+        "w": 768,
+        "h": 299
+      },
+      "drawer": {
+        "clientHeight": 269,
+        "scrollHeight": 982,
+        "scrollTop": 0,
+        "scrollable": true,
+        "checklistTopInView": 167,
+        "blockCount": 9
+      },
+      "checklistRect": {
+        "x": 87,
+        "y": 274,
+        "w": 726,
+        "h": 146
+      },
+      "composer": {
+        "rect": {
+          "x": 87,
+          "y": 974,
+          "w": 726,
+          "h": 64
+        },
+        "style": {
+          "display": "flex",
+          "width": "726px",
+          "minWidth": "auto",
+          "maxWidth": "none",
+          "flex": "0 1 auto",
+          "flexShrink": "1",
+          "flexBasis": "auto",
+          "flexWrap": "nowrap",
+          "alignItems": "flex-end",
+          "whiteSpace": "normal",
+          "wordBreak": "normal",
+          "overflowWrap": "normal",
+          "position": "static"
+        },
+        "input": {
+          "rect": {
+            "x": 87,
+            "y": 974,
+            "w": 385,
+            "h": 64
+          },
+          "fontSize": "16px",
+          "minHeight": "38px",
+          "flex": "1 1 0%"
+        },
+        "buttons": [
+          {
+            "text": "",
+            "w": 32,
+            "h": 26,
+            "x": 479
+          },
+          {
+            "text": "Publier",
+            "w": 68,
+            "h": 32,
+            "x": 518
+          },
+          {
+            "text": "Envoyer et laisser l’agent tra",
+            "w": 220,
+            "h": 32,
+            "x": 593
+          }
+        ],
+        "overflowRight": -21
+      },
+      "belowFoldBy": -86
+    }
+  },
+  "desktop": {
+    "status": null,
+    "composer": {
+      "rect": {
+        "x": 321,
+        "y": 1171,
+        "w": 1078,
+        "h": 54
+      },
+      "style": {
+        "display": "flex",
+        "width": "1078px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "flex-end",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "input": {
+        "rect": {
+          "x": 321,
+          "y": 1171,
+          "w": 737,
+          "h": 54
+        },
+        "fontSize": "12.5px",
+        "minHeight": "38px",
+        "flex": "1 1 0%"
+      },
+      "buttons": [
+        {
+          "text": "",
+          "w": 32,
+          "h": 26,
+          "x": 1065
+        },
+        {
+          "text": "Publier",
+          "w": 68,
+          "h": 32,
+          "x": 1104
+        },
+        {
+          "text": "Envoyer et laisser l’agent tra",
+          "w": 220,
+          "h": 32,
+          "x": 1179
+        }
+      ],
+      "overflowRight": -21
+    },
+    "panel": {
+      "x": 300,
+      "y": 349,
+      "w": 1120,
+      "h": 531
+    },
+    "detail": {
+      "x": 319,
+      "y": 364,
+      "w": 1082,
+      "h": 501
+    },
+    "checklist": {
+      "rect": {
+        "x": 321,
+        "y": 518,
+        "w": 1078,
+        "h": 146
+      },
+      "style": {
+        "display": "flex",
+        "width": "1048px",
+        "minWidth": "auto",
+        "maxWidth": "none",
+        "flex": "0 1 auto",
+        "flexShrink": "1",
+        "flexBasis": "auto",
+        "flexWrap": "nowrap",
+        "alignItems": "normal",
+        "whiteSpace": "normal",
+        "wordBreak": "normal",
+        "overflowWrap": "normal",
+        "position": "static"
+      },
+      "label": "Liste de contrôle d’acceptation (DoD) 1/"
+    },
+    "drawer": {
+      "clientHeight": 501,
+      "scrollHeight": 911,
+      "scrollTop": 0,
+      "scrollable": true,
+      "checklistTopInView": 154,
+      "blockCount": 9
+    },
+    "items": [
+      {
+        "rect": {
+          "x": 336,
+          "y": 551,
+          "w": 1048,
+          "h": 62
+        },
+        "text": {
+          "rect": {
+            "x": 375,
+            "y": 561,
+            "w": 710,
+            "h": 16
+          },
+          "style": {
+            "display": "block",
+            "width": "710px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Vérifier la grille responsive sur un petit écran de téléphone"
+        },
+        "meta": {
+          "rect": {
+            "x": 1094,
+            "y": 562,
+            "w": 280,
+            "h": 44
+          },
+          "style": {
+            "display": "flex",
+            "width": "280px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": " agent-01 · Preuve : preuve très longue qui décrit en détail la vérification effectuée sur"
+        },
+        "lines": 1,
+        "charsPerLine": 61
+      },
+      {
+        "rect": {
+          "x": 336,
+          "y": 618,
+          "w": 1048,
+          "h": 33
+        },
+        "text": {
+          "rect": {
+            "x": 375,
+            "y": 628,
+            "w": 940,
+            "h": 16
+          },
+          "style": {
+            "display": "block",
+            "width": "939.875px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "flex": "1 1 140px",
+            "flexShrink": "1",
+            "flexBasis": "140px",
+            "flexWrap": "nowrap",
+            "alignItems": "normal",
+            "whiteSpace": "normal",
+            "wordBreak": "break-word",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Confirmer la lisibilité du compteur intégré"
+        },
+        "meta": {
+          "rect": {
+            "x": 1324,
+            "y": 630,
+            "w": 50,
+            "h": 14
+          },
+          "style": {
+            "display": "flex",
+            "width": "50.125px",
+            "minWidth": "0px",
+            "maxWidth": "42%",
+            "flex": "0 1 auto",
+            "flexShrink": "1",
+            "flexBasis": "auto",
+            "flexWrap": "nowrap",
+            "alignItems": "flex-end",
+            "whiteSpace": "normal",
+            "wordBreak": "normal",
+            "overflowWrap": "normal",
+            "position": "static"
+          },
+          "content": "Non coché"
+        },
+        "lines": 1,
+        "charsPerLine": 43
+      }
+    ],
+    "panelOverflowX": 0,
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    }
+  }
+}

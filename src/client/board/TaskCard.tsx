@@ -36,6 +36,20 @@ import { categoriesOf } from '../../shared/protocol.ts'
 /** dataTransfer type carrying the dragged task id. */
 export const DRAG_TYPE = 'application/x-dsh-atb-task'
 
+/**
+ * Finger travel (px) above which a gesture is a swipe/pan, not a tap. Below it
+ * a tap keeps its historic meaning: open the detail pane.
+ */
+export const SWIPE_TAP_SLOP = 10
+
+/**
+ * How long after a touch a click still counts as that gesture's tail. Browsers
+ * emit the synthetic click within a few hundred milliseconds of `touchend`;
+ * after this window the click is an independent input (mouse, trackpad) and
+ * must never be swallowed by a stale touch origin.
+ */
+export const SWIPE_TAP_WINDOW_MS = 800
+
 /** Compact session-id display (execution sessions carry the taskboard infix). */
 export function shortId(id: string | undefined): string {
   if (id === undefined) return ''
@@ -96,6 +110,9 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
   const targetSessionId = resolveTaskSessionId(task)
   const sessionTitle = controller.getSessionTitle(targetSessionId)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Touch bookkeeping for the focus-mode carousel: a pan that starts on a card
+  // and travels horizontally must never be read as a tap on that card.
+  const touchOriginRef = useRef<{ x: number, y: number, at: number } | null>(null)
   // One resolver for the four colour modes (never duplicated here). The result
   // is a pair of CSS custom properties, so a theme switch needs no re-render.
   const cardColor = resolveTaskColor({
@@ -130,8 +147,27 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
     })
   }
 
+  /**
+   * True when the click is the tail of a horizontal swipe (or a vertical pan)
+   * that started on this card. A real tap stays within the slop, and a click
+   * arriving after the touch window is a fresh input, so both keep their exact
+   * previous behaviour.
+   */
+  const isSwipeTail = (e: MouseEvent): boolean => {
+    const origin = touchOriginRef.current
+    touchOriginRef.current = null
+    if (origin === null) return false
+    if (Date.now() - origin.at > SWIPE_TAP_WINDOW_MS) return false
+    const dx = Math.abs(e.clientX - origin.x)
+    const dy = Math.abs(e.clientY - origin.y)
+    return dx > SWIPE_TAP_SLOP || dy > SWIPE_TAP_SLOP
+  }
+
   /** Single-click handler: debounce when a target session exists so double-click won't open details if closed. */
   const handleClick = (e: MouseEvent): void => {
+    // A horizontal pan is the focus-mode carousel swipe, never a tap: some
+    // webviews still emit the synthetic click at the end of the gesture.
+    if (isSwipeTail(e)) return
     if (e.target !== e.currentTarget && (e.target as HTMLElement).closest('button, input, textarea')) return
 
     // If no target session, or this task's detail is ALREADY open, select immediately
@@ -205,6 +241,11 @@ export function TaskCard({ task, controller, draggable = false, now, onAlert }: 
         e.currentTarget.dataset.dragging = 'true'
       }}
       onDragEnd={(e) => { delete e.currentTarget.dataset.dragging }}
+      onTouchStart={(e) => {
+        const touch = e.touches[0]
+        touchOriginRef.current = touch === undefined ? null : { x: touch.clientX, y: touch.clientY, at: Date.now() }
+      }}
+      onTouchCancel={() => { touchOriginRef.current = null }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onKeyDown={(e) => {

@@ -174,7 +174,7 @@ button[class*="panelRow"]:has(.dsh-atb-pglyph) { position: relative; }
 .dsh-atb-search::placeholder { color: var(--atb-text-3); }
 .dsh-atb-badge[data-kind="stale"] { background: rgba(217,130,43,.15); color: var(--atb-warn); }
 
-.dsh-atb-board { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 16px 20px 20px; gap: 12px; box-sizing: border-box; }
+.dsh-atb-board { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 16px 20px 20px; gap: 12px; box-sizing: border-box; }
 .dsh-atb-panel-root[data-dsh-atb-windows] > .dsh-atb-board {
   padding-top: max(12px, calc(env(titlebar-area-y, 0px) + env(titlebar-area-height, 36px) + 8px - var(--dsh-atb-viewport-top, 0px)));
 }
@@ -188,15 +188,136 @@ body[data-dsh-sidebar-collapsed] .dsh-atb-panel-root .dsh-atb-toolbar { padding-
   border-radius: 7px; padding: 4px 9px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .dsh-atb-grouptoggle[aria-pressed="true"] { background: color-mix(in srgb, var(--atb-accent) 14%, transparent); color: var(--atb-text); }
-/* Narrow-viewport column navigation: hidden until the five columns stop fitting. */
-.dsh-atb-mobilebar { display: none; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.dsh-atb-mobilebar-btn {
-  flex: none; display: inline-flex; align-items: center; gap: 6px;
-  height: 30px; padding: 0 10px; border-radius: 8px; cursor: pointer;
-  border: 1px solid var(--atb-border-2); background: var(--atb-hover); color: var(--atb-text-2);
-  font: inherit; font-size: 11.5px; white-space: nowrap;
+/* ---------------------------------------------------------------------
+   Focus-mode scaffolding (mobile carousel): inert above 760px where the
+   five columns are laid out side by side. The two media queries at the
+   bottom of this sheet activate it; they are the exact queries exported by
+   board/mobile.ts (a test asserts both strings stay in this sheet).
+   --------------------------------------------------------------------- */
+.dsh-atb-mobileactions { display: none; align-items: center; gap: 2px; flex: none; }
+.dsh-atb-iconbtn {
+  position: relative; width: 34px; height: 34px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 10px;
+  background: transparent; color: var(--atb-text-2); cursor: pointer; font: inherit;
 }
-.dsh-atb-mobilebar-btn:hover { color: var(--atb-text); border-color: var(--atb-accent); }
+.dsh-atb-iconbtn:hover { background: var(--atb-hover); color: var(--atb-text); }
+.dsh-atb-iconbtn:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 2px; }
+.dsh-atb-iconbtn[data-on="true"] { color: var(--atb-text); background: var(--atb-hover); }
+.dsh-atb-iconbtn[data-on="true"]::after {
+  content: ""; position: absolute; top: 5px; right: 5px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--atb-accent);
+}
+/* The two clusters are transparent wrappers on desktop: their children stay
+   direct flex items of the toolbar (no layout change at all). */
+.dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: contents; }
+/* ---------------------------------------------------------------------
+   Desktop toolbar densities. The board measures its own toolbar and
+   publishes data-atb-bar (board/compact.ts); the header must stay on two
+   rows, so the row sheds its labels before it is allowed to wrap onto a
+   third line. Every control keeps its icon, its accessible name and its
+   tooltip: only the visible text is dropped.
+   --------------------------------------------------------------------- */
+.dsh-atb-chip-count { font-variant-numeric: tabular-nums; }
+.dsh-atb-head { gap: 8px; }
+/* Title row: the action cluster drops its words first (icon + tooltip + name). */
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-btn-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-btn-label { display: none; }
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-btn,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-btn {
+  width: 34px; height: 30px; padding: 0; gap: 0; justify-content: center;
+}
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar-actions .dsh-atb-newmenu-caret,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-newmenu-caret { display: none; }
+/* Filter row: the urgency chips keep their words as long as any laptop fits. */
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar .dsh-atb-searchfield { flex: 0 1 180px; min-width: 130px; max-width: 200px; }
+.dsh-atb-board[data-atb-bar="compact"] .dsh-atb-toolbar .dsh-atb-sel { max-width: 168px; }
+/* Tight: colour dots + icon-only counters, and the title row loses the version
+   pill and the grouping label. Everything keeps its tooltip and accessible name. */
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar { gap: 4px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-searchfield { flex: 0 1 150px; min-width: 104px; max-width: 170px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-sel { max-width: 128px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-chip-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-toolbar-divider { display: none; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar .dsh-atb-chip { padding: 3px 7px; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-grouptoggle { width: 34px; padding: 0; gap: 0; justify-content: center; }
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-grouptoggle-label,
+.dsh-atb-board[data-atb-bar="tight"] .dsh-atb-toolbar-actions .dsh-atb-ver { display: none; }
+/* The focus-mode header (status tab rail + swipe cue) is a zero-cost box on
+   desktop: hidden entirely, so the board body keeps its exact previous layout. */
+.dsh-atb-mobilehead { display: none; align-items: center; gap: 8px; min-width: 0; }
+/* Narrow-viewport column navigation: hidden until the five columns stop fitting.
+   The rail is a horizontal scroller, so a long label set scrolls instead of
+   being squeezed. */
+.dsh-atb-mobilebar {
+  display: none; gap: 6px; flex: 1; min-width: 0;
+  overflow-x: auto; scrollbar-width: none; padding: 2px 2px 1px;
+}
+.dsh-atb-mobilebar::-webkit-scrollbar { display: none; }
+/* Mobile column tabs are miniature column heads, not filter chips: the same
+   sober surface as a desktop column, one short status rule on the top edge
+   (see .dsh-atb-colhead::before), a plain label and an integrated counter.
+   Height stays low (34 px) while the padding keeps a comfortable touch target. */
+.dsh-atb-mobilebar-btn {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 11px; border-radius: 11px; cursor: pointer;
+  border: 1px solid var(--atb-border); background: var(--atb-surface-sunken);
+  color: var(--atb-text-2); font: inherit;
+  font-size: 12px; font-weight: 640; letter-spacing: -.1px; white-space: nowrap;
+  scroll-snap-align: start;
+  transition: background .16s ease, color .16s ease, border-color .16s ease,
+    box-shadow .16s ease, transform .12s ease;
+}
+/* The status rule: a short coloured bar inset on the top edge. Inactive tabs
+   keep it visible but muted; the active one widens it and turns it opaque. */
+.dsh-atb-mobilebar-btn::before {
+  content: ""; position: absolute; top: 0; left: 11px; right: 11px; height: 3px;
+  border-radius: 0 0 5px 5px; background: var(--atb-status, var(--atb-text-3));
+  opacity: .45;
+  transition: opacity .16s ease, left .16s ease, right .16s ease, height .16s ease;
+}
+.dsh-atb-mobilebar-btn:hover { color: var(--atb-text); }
+.dsh-atb-mobilebar-btn:active { transform: translateY(1px); background: var(--atb-hover); }
+.dsh-atb-mobilebar-btn:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 2px; }
+.dsh-atb-mobilebar-btn[data-active="true"] {
+  color: var(--atb-text); background: var(--atb-bg-1); font-weight: 680;
+  border-color: color-mix(in srgb, var(--atb-status, var(--atb-accent)) 40%, var(--atb-border));
+  box-shadow: 0 1px 2px light-dark(#0f172a0f, #00000040), 0 5px 14px -8px light-dark(#0f172a26, #00000066);
+}
+.dsh-atb-mobilebar-btn[data-active="true"]::before { opacity: 1; left: 8px; right: 8px; }
+/* Same status palette as the desktop columns (single source of truth). */
+.dsh-atb-mobilebar-btn[data-status="backlog"] { --atb-status: var(--atb-text-3); }
+.dsh-atb-mobilebar-btn[data-status="todo"] { --atb-status: var(--atb-accent); }
+.dsh-atb-mobilebar-btn[data-status="in_progress"] { --atb-status: var(--atb-warn); }
+.dsh-atb-mobilebar-btn[data-status="in_review"] { --atb-status: var(--dsw-alias-state-done-primary, #7c3aed); }
+.dsh-atb-mobilebar-btn[data-status="done"] { --atb-status: var(--atb-success); }
+.dsh-atb-mobilebar-label { white-space: nowrap; }
+.dsh-atb-mobilebar-count {
+  font-size: 10.5px; font-weight: 500; padding: 1px 6px; border-radius: 6px;
+  background: var(--atb-hover); color: var(--atb-text-3);
+  font-variant-numeric: tabular-nums;
+  transition: background .16s ease, color .16s ease;
+}
+.dsh-atb-mobilebar-btn[data-active="true"] .dsh-atb-mobilebar-count { background: var(--atb-active, var(--atb-hover)); color: var(--atb-text-2); }
+.dsh-atb-swipecue {
+  display: none; align-items: center; gap: 6px; flex: none;
+  font-size: 10.5px; color: var(--atb-text-3); white-space: nowrap;
+}
+.dsh-atb-swipecue-arrow { opacity: .6; }
+.dsh-atb-swipecue-page { color: var(--atb-text-2); font-variant-numeric: tabular-nums; }
+/* One primary creation action on a phone, thumb-reachable, inside the panel. */
+.dsh-atb-fab {
+  position: absolute; z-index: 20; right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  width: 54px; height: 54px; display: none; place-items: center;
+  border: none; border-radius: 18px; cursor: pointer;
+  background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary, #1f2328));
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  box-shadow: var(--atb-elevation-prominent), 0 10px 22px -10px rgba(8, 12, 20, .5);
+}
+.dsh-atb-fab:hover { filter: brightness(1.08); }
+.dsh-atb-fab:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 3px; }
 .dsh-atb-board-body { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
 .dsh-atb-ver {
   font-size: 11px; color: var(--atb-text-2, gray);
@@ -1066,8 +1187,13 @@ color: var(--dsw-alias-state-business-primary, var(--atb-accent));
 .dsh-atb-cl-item[data-alert="true"] {
   border-color: rgba(229,72,77,.45); background: rgba(229,72,77,.06);
 }
-.dsh-atb-cl-text { flex: 1; min-width: 0; font-size: 12.5px; word-break: break-word; }
-.dsh-atb-cl-meta { flex-shrink: 0; font-size: 10.5px; color: var(--atb-text-3, gray); display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+.dsh-atb-cl-text { flex: 1 1 140px; min-width: 0; font-size: 12.5px; word-break: break-word; }
+/* The checker/evidence column must never eat the item text: it used to be
+   flex-shrink 0 with a 280px nowrap evidence note, which squeezed the label
+   to zero and printed it one character per line in the mobile drawer (found on
+   a real phone). It now shrinks and caps at 42% of the row, ellipsizing its own
+   note, so the label always keeps a readable width. */
+.dsh-atb-cl-meta { flex: 0 1 auto; min-width: 0; max-width: 42%; font-size: 10.5px; color: var(--atb-text-3, gray); display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
 .dsh-atb-cl-note { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dsw-alias-label-secondary, inherit); }
 
 .dsh-atb-rpt-summary { font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin-bottom: 8px; }
@@ -1845,6 +1971,70 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
 .dsh-atb-classifyhint-body { font-size: 11px; line-height: 1.45; }
 .dsh-atb-classifyhint-actions { display: inline-flex; gap: 7px; flex-wrap: wrap; }
 
+/* ---------------------------------------------------------------------
+   Focus-mode bottom sheets: the mobile toolbar's filters, board actions and
+   the new-task menu. Same dialog semantics and backdrop as the board modals,
+   anchored to the bottom edge by the .dsh-atb-sheet-layer wrapper.
+   --------------------------------------------------------------------- */
+.dsh-atb-sheet-layer { align-items: flex-end; justify-content: center; padding: 0; }
+.dsh-atb-sheet {
+  width: 100%; max-width: 100%; max-height: 88dvh;
+  border-radius: 20px 20px 0 0; corner-shape: round;
+  animation: dsh-atb-sheet-in .2s ease;
+}
+@keyframes dsh-atb-sheet-in { from { opacity: 0; transform: translateY(18px); } }
+.dsh-atb-sheet-handle {
+  display: block; width: 42px; height: 5px; flex: none; margin: 8px auto 2px;
+  border-radius: 3px; background: var(--atb-border-2);
+}
+.dsh-atb-sheet .dsh-atb-modal-head { padding: 10px 16px 10px; }
+.dsh-atb-sheet-body {
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 14px 16px 18px; overflow-y: auto; overscroll-behavior: contain;
+}
+.dsh-atb-sheet-field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.dsh-atb-sheet-label {
+  font-size: 10.5px; font-weight: 750; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--atb-text-3);
+}
+.dsh-atb-sheet-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.dsh-atb-sheet-chips .dsh-atb-chip { padding: 7px 12px; font-size: 12px; }
+.dsh-atb-sheet-human { align-self: flex-start; padding: 8px 12px; }
+.dsh-atb-sheet-foot {
+  display: flex; gap: 8px; flex: none;
+  border-top: 1px solid var(--atb-border);
+  padding: 11px 16px calc(11px + env(safe-area-inset-bottom));
+}
+.dsh-atb-sheet-foot > .dsh-atb-btn { flex: 1; padding: 11px 12px; font-size: 13px; }
+.dsh-atb-sheet-menu { display: flex; flex-direction: column; gap: 3px; }
+.dsh-atb-sheet-item {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 10px; border-radius: 11px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: inherit;
+  font: inherit; text-align: left;
+}
+.dsh-atb-sheet-item:hover { background: var(--atb-hover); }
+.dsh-atb-sheet-item:focus-visible { outline: 2px solid var(--atb-accent); outline-offset: 1px; }
+.dsh-atb-sheet-item-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--atb-hover); color: var(--atb-text-2);
+}
+.dsh-atb-sheet-item-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.dsh-atb-sheet-item-label { font-size: 13px; font-weight: 600; }
+.dsh-atb-sheet-item-hint {
+  font-size: 11px; color: var(--atb-text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dsh-atb-sheet .dsh-atb-newmenu-list {
+  position: static; min-width: 0; padding: 0; border: none; box-shadow: none;
+  background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.dsh-atb-sheet .dsh-atb-newmenu-opt {
+  padding: 10px 9px; font-size: 13px; border-radius: 9px; white-space: normal; text-align: left;
+}
+.dsh-atb-sheet .dsh-atb-newmenu-cat { padding: 10px 9px 3px; }
+
 /* Responsive: five readable columns first, then a snap-scrolled column
    carousel with an explicit column navigation bar. */
 @media (max-width: 1180px) {
@@ -1860,19 +2050,161 @@ button.dsh-atb-chip2.dsh-atb-chip-btn:hover, .dsh-atb-cron-preset:hover, .dsh-at
   .dsh-atb-searchfield { max-width: none; flex: 1 1 220px; }
   .dsh-atb-detailpanel { max-height: 62%; }
 }
+/* ---------------------------------------------------------------------
+   Focus mode 1/2 — portrait / narrow panel (matches FOCUS_PORTRAIT_QUERY in
+   board/mobile.ts): one full column per snapped page, compact toolbar,
+   bottom sheets, thumb-reachable create button.
+   --------------------------------------------------------------------- */
 @media (max-width: 760px) {
-  .dsh-atb-mobilebar { display: flex; }
-  .dsh-atb-board { padding: 12px 12px 14px; gap: 10px; }
-  .dsh-atb-columns { gap: 10px; scroll-snap-type: x proximity; }
-  .dsh-atb-column { flex: 0 0 min(86vw, 340px); min-width: 0; scroll-snap-align: start; }
-  .dsh-atb-column[data-collapsed="true"] { flex: 0 0 42px; min-width: 42px; max-width: 42px; }
-  .dsh-atb-detailpanel { max-height: 66%; padding: 12px 14px; }
+  .dsh-atb-board { padding: 10px 10px 0; gap: 8px; }
+  .dsh-atb-head { gap: 6px; flex-wrap: nowrap; align-items: center; }
+  .dsh-atb-title { font-size: 16px; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dsh-atb-count { font-size: 10.5px; padding: 3px 7px; }
+  .dsh-atb-mobileactions { display: flex; }
+  /* Grouping moves into the actions sheet on a phone (same controller call). */
+  .dsh-atb-grouptoggle { display: none; }
+  .dsh-atb-newmenu-label, .dsh-atb-newmenu-caret { display: none; }
+  .dsh-atb-newmenu > .dsh-atb-btn { padding: 7px 9px; }
+
+  .dsh-atb-toolbar { gap: 6px; flex-wrap: nowrap; }
+  .dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: none; }
+  .dsh-atb-toolbar > .dsh-atb-spacer { display: none; }
+  .dsh-atb-searchfield { display: none; }
+  .dsh-atb-board[data-atb-search="true"] .dsh-atb-searchfield { display: inline-flex; flex: 1 1 100%; min-width: 0; max-width: none; }
+
+  .dsh-atb-mobilehead { display: flex; gap: 6px; }
+  .dsh-atb-mobilebar {
+    display: flex; gap: 7px; scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain; padding-bottom: 3px;
+  }
+  .dsh-atb-mobilebar-count { font-size: 10.5px; padding: 2px 6px; }
+  .dsh-atb-swipecue { display: inline-flex; }
+  .dsh-atb-swipecue-label { display: none; }
+
+  /* The carousel itself: the rail is the scroller, each column is one page.
+     scroll-snap-stop: always keeps a fast flick to a single column, and the
+     per-column card list keeps its own vertical scroll position. */
+  .dsh-atb-columns {
+    gap: 0; scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+    padding-bottom: 0;
+  }
+  .dsh-atb-column {
+    flex: 0 0 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+    border: none; border-radius: 0; background: transparent;
+    scroll-snap-align: start; scroll-snap-stop: always;
+    transition: none;
+  }
+  .dsh-atb-colhead { min-height: 34px; padding: 4px 2px 2px; font-size: 12px; }
+  .dsh-atb-colhead::before { display: none; }
+  .dsh-atb-cards {
+    padding: 2px 2px calc(84px + env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+  }
+  /* The project header must not inherit the transparent page background. */
+  .dsh-atb-ws-group-head { background: var(--atb-bg); }
+  .dsh-atb-fab { display: grid; }
+  .dsh-atb-detailpanel {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    max-height: 84dvh; padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0; border-bottom: none;
+    box-shadow: 0 -12px 40px rgba(8, 12, 20, .35);
+  }
+  .dsh-atb-classifyhint { padding: 9px 11px; gap: 8px; }
+  .dsh-atb-classifyhint-text { flex-basis: 100%; }
+
+  /* Every board modal becomes a bottom sheet, like the reference. */
+  .dsh-atb-modal-backdrop { align-items: flex-end; padding: 0; }
+  .dsh-atb-modal {
+    width: 100%; max-width: 100%; max-height: 88dvh;
+    border-radius: 20px 20px 0 0; corner-shape: round;
+    animation: dsh-atb-sheet-in .2s ease;
+  }
+  .dsh-atb-taskform-modal { width: 100%; min-width: 0; max-height: 90dvh; }
+  .dsh-atb-taskform-body { grid-template-columns: 1fr; gap: 12px; padding: 12px 14px; }
+  .dsh-atb-form-left { border-right: none; padding-right: 0; }
+  .dsh-atb-modal-foot { padding-bottom: calc(13px + env(safe-area-inset-bottom)); }
+
   .dsh-atb-toolbar-divider { display: none; }
+  /* Comment composer: the drawer's writing area used to be a sliver squeezed
+     between the send buttons (its flex basis is 0). On a phone it now takes the
+     full width on its own line, with the buttons sharing the row below it. The
+     16px font is not cosmetic: iOS zooms the whole page when a focused field is
+     smaller than 16px, which alone makes the field unusable. */
+  .dsh-atb-composer { flex-wrap: wrap; gap: 8px; align-items: stretch; }
+  .dsh-atb-composer-input { flex: 1 1 100%; min-height: 88px; font-size: 16px; line-height: 1.45; padding: 9px 11px; }
+  .dsh-atb-composer-send { flex: 0 1 auto; min-width: 0; justify-content: center; padding: 9px 12px; font-size: 13px; }
+  .dsh-atb-composer-deliver { flex: 1 1 auto; white-space: normal; text-align: center; }
+  .dsh-atb-image-add { flex: 0 0 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; }
   .dsh-atb-colormodes { grid-template-columns: 1fr; }
   .dsh-atb-preview-grid { grid-template-columns: 1fr 1fr; }
   .dsh-atb-cat-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
   .dsh-atb-cat-id { display: none; }
 }
+
+/* ---------------------------------------------------------------------
+   Focus mode 2/2 — phone landscape (matches FOCUS_LANDSCAPE_QUERY): two
+   columns per snapped page. Declared after the portrait block so it wins the
+   overlap (a short, narrow window).
+   --------------------------------------------------------------------- */
+@media (orientation: landscape) and (max-height: 680px) and (max-width: 1380px) {
+  .dsh-atb-board { padding: 6px 10px 0; gap: 6px; }
+  .dsh-atb-head { gap: 6px; flex-wrap: nowrap; align-items: center; }
+  .dsh-atb-title { font-size: 14px; letter-spacing: -.2px; }
+  .dsh-atb-count { font-size: 10px; padding: 2px 6px; }
+  .dsh-atb-mobileactions { display: flex; }
+  .dsh-atb-grouptoggle { display: none; }
+  .dsh-atb-iconbtn { width: 32px; height: 32px; border-radius: 9px; }
+  .dsh-atb-newmenu-label, .dsh-atb-newmenu-caret { display: none; }
+  .dsh-atb-newmenu > .dsh-atb-btn { padding: 5px 8px; }
+
+  .dsh-atb-toolbar { gap: 6px; flex-wrap: nowrap; }
+  .dsh-atb-toolbar-filters, .dsh-atb-toolbar-actions { display: none; }
+  .dsh-atb-toolbar > .dsh-atb-spacer { display: none; }
+  .dsh-atb-searchfield { display: none; }
+  .dsh-atb-board[data-atb-search="true"] .dsh-atb-searchfield { display: inline-flex; flex: 1 1 220px; min-width: 0; max-width: none; height: 30px; }
+
+  .dsh-atb-mobilehead { display: flex; gap: 7px; }
+  .dsh-atb-mobilebar { display: flex; gap: 5px; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+  .dsh-atb-mobilebar-btn { height: 30px; padding: 0 9px; gap: 5px; font-size: 11px; border-radius: 9px; }
+  .dsh-atb-mobilebar-btn::before { left: 9px; right: 9px; height: 2.5px; }
+  .dsh-atb-mobilebar-btn[data-active="true"]::before { left: 6px; right: 6px; }
+  .dsh-atb-mobilebar-count { font-size: 10px; padding: 1px 5px; }
+  .dsh-atb-swipecue { display: inline-flex; }
+
+  .dsh-atb-columns {
+    display: flex; gap: 9px; padding-bottom: 6px;
+    scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dsh-atb-column {
+    flex: 0 0 calc((100% - 9px) / 2); min-width: 0; max-width: none; box-sizing: border-box;
+    scroll-snap-align: start; scroll-snap-stop: always;
+    border-radius: 12px; transition: none;
+  }
+  .dsh-atb-column[data-collapsed="true"] { flex: 0 0 42px; min-width: 42px; max-width: 42px; }
+  .dsh-atb-colhead { min-height: 30px; padding: 4px 8px; font-size: 11px; }
+  .dsh-atb-colhead::before { left: 8px; width: 12px; height: 2px; }
+  .dsh-atb-cards { padding: 2px 7px calc(10px + env(safe-area-inset-bottom)); overscroll-behavior-y: contain; }
+  .dsh-atb-fab { display: none; }
+  /* Landscape keeps the composer on one row (the inline panel is wide enough),
+     but the field must still be 16px so iOS does not zoom on focus. */
+  .dsh-atb-composer-input { font-size: 16px; }
+  .dsh-atb-composer-deliver { white-space: normal; }
+
+  /* Landscape keeps the centred dialog: a full-width sheet would cover the
+     two columns the user is comparing. */
+  .dsh-atb-modal-backdrop { align-items: center; justify-content: center; padding: 10px; }
+  .dsh-atb-modal { width: min(580px, 100%); max-height: 94dvh; border-radius: 15px; }
+  .dsh-atb-taskform-modal { width: min(760px, 100%); min-width: 0; max-height: 94dvh; }
+  .dsh-atb-taskform-body { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dsh-atb-form-left { border-right: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.14)); padding-right: 12px; }
+  .dsh-atb-sheet-layer { align-items: center; padding: 10px; }
+  .dsh-atb-sheet { width: min(580px, 100%); border-radius: 15px; }
+  .dsh-atb-sheet-handle { display: none; }
+  .dsh-atb-detailpanel { max-height: 70%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dsh-atb-card,
   .dsh-atb-card:hover,
