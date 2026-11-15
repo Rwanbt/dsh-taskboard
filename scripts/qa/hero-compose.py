@@ -16,13 +16,42 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 CANVAS = (2560, 1440)
-BG_TOP = (247, 244, 255)
-BG_BOTTOM = (238, 243, 251)
-BLOB_A = (226, 219, 250)   # violet
-BLOB_B = (214, 233, 249)   # sky
-BLOB_C = (222, 242, 232)   # mint
 INK = (34, 38, 58)
 INK_SOFT = (108, 112, 132)
+
+
+def palette_for(desktop: Image.Image) -> dict[str, object]:
+    """Pick the backdrop from the capture itself: dark panels get a dark stage."""
+    sample = desktop.convert("L").resize((64, 64))
+    pixels = sample.get_flattened_data() if hasattr(sample, "get_flattened_data") else sample.getdata()
+    mean = sum(pixels) / (64 * 64) / 255
+    if mean < 0.5:
+        return {
+            "dark": True,
+            "bg_top": (26, 26, 36),
+            "bg_bottom": (14, 15, 21),
+            "blob_a": (58, 48, 96),
+            "blob_b": (34, 62, 90),
+            "blob_c": (30, 70, 62),
+            "ink": (243, 240, 252),
+            "ink_soft": (170, 168, 190),
+            "frame": (8, 9, 13),
+            "frame_edge": (38, 39, 48),
+            "shadow_alpha": 130,
+        }
+    return {
+        "dark": False,
+        "bg_top": (247, 244, 255),
+        "bg_bottom": (238, 243, 251),
+        "blob_a": (226, 219, 250),
+        "blob_b": (214, 233, 249),
+        "blob_c": (222, 242, 232),
+        "ink": INK,
+        "ink_soft": INK_SOFT,
+        "frame": (26, 27, 34),
+        "frame_edge": (12, 13, 18),
+        "shadow_alpha": 90,
+    }
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -79,48 +108,51 @@ def main() -> int:
         return 2
     desktop_path, mobile_path, out_path = (Path(argument) for argument in sys.argv[1:])
 
-    canvas = vertical_gradient(CANVAS, BG_TOP, BG_BOTTOM).convert("RGBA")
+    desktop_source = Image.open(desktop_path).convert("RGB")
+    tones = palette_for(desktop_source)
+
+    canvas = vertical_gradient(CANVAS, tones["bg_top"], tones["bg_bottom"]).convert("RGBA")
     width, height = CANVAS
-    blob(canvas, (int(width * 0.18), int(height * 0.14)), 520, BLOB_A, 120)
-    blob(canvas, (int(width * 0.86), int(height * 0.22)), 460, BLOB_B, 110)
-    blob(canvas, (int(width * 0.55), int(height * 0.96)), 560, BLOB_C, 90)
+    blob(canvas, (int(width * 0.18), int(height * 0.14)), 520, tones["blob_a"], 150)
+    blob(canvas, (int(width * 0.86), int(height * 0.22)), 460, tones["blob_b"], 140)
+    blob(canvas, (int(width * 0.55), int(height * 0.96)), 560, tones["blob_c"], 120)
 
     # Desktop panel, left.
-    desktop = rounded(fit(Image.open(desktop_path).convert("RGB"), 880), 26)
-    desktop_shadow = shadow(desktop.size, 26, 34, 90)
+    desktop = rounded(fit(desktop_source, 880), 26)
+    desktop_shadow = shadow(desktop.size, 26, 34, tones["shadow_alpha"])
     desktop_at = (150, 250)
     canvas.alpha_composite(desktop_shadow, (desktop_at[0] - desktop_shadow.size[0] // 2 + desktop.size[0] // 2,
                                             desktop_at[1] - desktop_shadow.size[1] // 2 + desktop.size[1] // 2))
     canvas.alpha_composite(desktop, desktop_at)
 
-    # Phone, right: slim dark frame around the portrait capture.
+    # Phone, right: slim frame around the portrait capture.
     phone_height = 980
     screen = fit(Image.open(mobile_path).convert("RGB"), phone_height)
     bezel = 16
     frame_size = (screen.size[0] + bezel * 2, screen.size[1] + bezel * 2)
     frame = Image.new("RGBA", frame_size, (0, 0, 0, 0))
     frame_draw = ImageDraw.Draw(frame)
-    frame_draw.rounded_rectangle((0, 0, frame_size[0] - 1, frame_size[1] - 1), radius=58, fill=(26, 27, 34, 255))
+    frame_draw.rounded_rectangle((0, 0, frame_size[0] - 1, frame_size[1] - 1), radius=58, fill=tones["frame"])
     frame_draw.rounded_rectangle(
         (bezel - 3, bezel - 3, frame_size[0] - bezel + 2, frame_size[1] - bezel + 2),
-        radius=46, fill=(12, 13, 18, 255),
+        radius=46, fill=tones["frame_edge"],
     )
     frame.alpha_composite(rounded(screen, 42), (bezel, bezel))
     phone_x = width - frame_size[0] - 210
     phone_y = (height - frame_size[1]) // 2 - 40
-    phone_shadow = shadow(frame_size, 58, 44, 110)
+    phone_shadow = shadow(frame_size, 58, 44, 120)
     canvas.alpha_composite(phone_shadow, (phone_x - phone_shadow.size[0] // 2 + frame_size[0] // 2,
                                           phone_y - phone_shadow.size[1] // 2 + frame_size[1] // 2))
     canvas.alpha_composite(frame, (phone_x, phone_y))
 
     # Caption, bottom left.
     draw = ImageDraw.Draw(canvas)
-    draw.text((150, height - 168), "DSH Task Board", font=font(64, bold=True), fill=INK)
+    draw.text((150, height - 168), "DSH Task Board", font=font(64, bold=True), fill=tones["ink"])
     draw.text((152, height - 92), "DeepSeek Pastel — desktop et mobile · données fictives",
-              font=font(30), fill=INK_SOFT)
+              font=font(30), fill=tones["ink_soft"])
 
     canvas.convert("RGB").save(out_path, "PNG", optimize=True)
-    print(f"wrote {out_path} ({CANVAS[0]}x{CANVAS[1]})")
+    print(f"wrote {out_path} ({CANVAS[0]}x{CANVAS[1]}) · {'dark' if tones['dark'] else 'light'} backdrop")
     return 0
 
 

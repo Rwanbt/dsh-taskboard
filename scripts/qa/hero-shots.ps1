@@ -15,6 +15,7 @@ param(
   [string] $HeroHome = (Join-Path $HOME 'dsh-hero'),
   [string] $ProfileName = 'tb',
   [int]    $Port = 64943,
+  [ValidateSet('dark', 'light')] [string] $Theme = 'dark',
   [switch] $KeepHost
 )
 
@@ -115,7 +116,8 @@ $env:PTB_BASE = $base
 $env:PTB_TOKEN = $token
 $env:PTB_OUT = $outDir
 $env:PTB_BROWSER = $browser
-Step "capturing hero shots → $outDir"
+$env:PTB_THEME = $Theme
+Step "capturing hero shots ($Theme theme) → $outDir"
 & node (Join-Path $PSScriptRoot 'hero-capture.mjs')
 if ($LASTEXITCODE -ne 0) { Fail "hero capture failed with exit code $LASTEXITCODE" }
 Info "hero shots written to $outDir"

@@ -170,38 +170,86 @@ const browser = await puppeteer.launch({
 })
 const page = await browser.newPage()
 page.on('pageerror', error => console.log('pageerror:', String(error)))
-// The host follows the OS scheme; hero shots are taken in the light theme (the
-// one the pastel palette is designed for). The plugin never forces a theme.
-await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }])
+// The host follows the OS scheme; the hero is shot in the theme the caller asks
+// for (dark by default — the pastel palette on a dark surface). The plugin never
+// forces a theme itself.
+const theme = (process.env.PTB_THEME ?? 'dark') === 'light' ? 'light' : 'dark'
+await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }])
 await page.goto(`${base}/?token=${encodeURIComponent(token)}`, { waitUntil: 'domcontentloaded', timeout: 90_000 })
 await page.waitForFunction(() => document.querySelector('.dsh-atb-board .dsh-atb-card') !== null
   || document.querySelector('button .dsh-atb-pglyph') !== null
   || document.querySelector('[class*="_dialog_"]') !== null, { timeout: 60_000 })
 
-/* Dismiss the shell's first-run dialogs (they cover the panel), then make sure
-   the task board panel is open. Idempotent: called again after the reload. */
-async function ensurePanel() {
+/**
+ * Remove every full-viewport host layer that sits in front of the panel.
+ *
+ * A fresh isolated home greets the browser with the shell's **sign-in wall**
+ * ("Connectez-vous / Ajouter une clé API"); a normal user dismisses it or is
+ * already signed in, but it is a HOST element, so for a screenshot of the plugin
+ * we either click its close button or hide that layer — never style the host
+ * from plugin code. Every action is recorded in `hero-shots.json`.
+ */
+async function clearOverlays(stage) {
+  const record = { stage, clicks: [], hidden: [] }
   for (let step = 0; step < 10; step += 1) {
-    const overlays = await page.evaluate(() => [...document.querySelectorAll('div, section, aside')]
-      .filter(el => {
+    const state = await page.evaluate(() => {
+      const layers = [...document.querySelectorAll('div, section, aside')].filter(el => {
         const style = getComputedStyle(el)
         if (style.position !== 'fixed' || style.pointerEvents === 'none' || style.display === 'none') return false
         const box = el.getBoundingClientRect()
         return box.width >= window.innerWidth - 2 && box.height >= window.innerHeight * 0.7
       })
-      .map(el => [...el.querySelectorAll('button')].map(button => {
-        const box = button.getBoundingClientRect()
-        return { text: (button.textContent ?? '').trim().slice(0, 40), x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2), width: Math.round(box.width), visible: box.width > 0 }
+      return {
+        count: layers.length,
+        texts: layers.map(el => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)),
+        buttons: layers.flatMap(layer => [...layer.querySelectorAll('button')].map(button => {
+          const box = button.getBoundingClientRect()
+          return {
+            text: (button.textContent ?? '').trim().slice(0, 40),
+            x: Math.round(box.x + box.width / 2),
+            y: Math.round(box.y + box.height / 2),
+            width: Math.round(box.width),
+            visible: box.width > 0 && box.height > 0,
+          }
+        }).map(button => ({ ...button, signIn: /connectez-vous|se connecter|sign in|api key|clé api/i.test(button.text) })))
+          .flat()
+          .filter(button => button.visible),
+      }
+    })
+    if (state.count === 0) return record
+    record.seen = state.texts
+    // The sign-in wall is not dismissible with a click we can trust: hide it.
+    const isSignIn = state.texts.some(text => /connectez-vous|se connecter|sign in|ajouter une clé api/i.test(text))
+    if (isSignIn) {
+      record.hidden.push(...await page.evaluate(() => {
+        const layers = [...document.querySelectorAll('div, section, aside')].filter(el => {
+          const style = getComputedStyle(el)
+          if (style.position !== 'fixed' || style.pointerEvents === 'none' || style.display === 'none') return false
+          const box = el.getBoundingClientRect()
+          return box.width >= window.innerWidth - 2 && box.height >= window.innerHeight * 0.7
+        })
+        for (const layer of layers) layer.setAttribute('data-hero-hidden', 'true')
+        return layers.map(layer => String(layer.className).slice(0, 40))
       }))
-      .flat()
-      .filter(button => button.visible))
-    if (overlays.length === 0) break
-    const target = overlays.find(b => /continue|continuer|compris|fermer|close|d'accord|ignorer|skip|plus tard|later/i.test(b.text))
-      ?? overlays.find(b => b.width <= 44 && b.text.length === 0)
+      await page.addStyleTag({ content: '[data-hero-hidden="true"] { display: none !important; }' })
+      await sleep(500)
+      continue
+    }
+    const target = state.buttons.find(button => /continue|continuer|compris|fermer|close|d'accord|ignorer|skip|plus tard|later/i.test(button.text))
+      ?? state.buttons.find(button => button.width <= 44 && button.text.length === 0)
     if (target === undefined) { await page.keyboard.press('Escape'); await sleep(600); continue }
+    record.clicks.push({ text: target.text, x: target.x, y: target.y })
     await page.mouse.click(target.x, target.y)
     await sleep(800)
   }
+  return record
+}
+
+/* Dismiss the shell's first-run dialogs (they cover the panel), then make sure
+   the task board panel is open. Idempotent: called again after the reload. */
+async function ensurePanel() {
+  const overlays = await clearOverlays('ensurePanel')
+  await sleep(600)
   if ((await page.$('.dsh-atb-board')) === null) {
     await page.evaluate(() => document.querySelector('.dsh-atb-pglyph')?.closest('button')?.click())
   }
@@ -254,6 +302,7 @@ const panelBox = () => page.evaluate(() => {
 })
 
 const shots = {}
+const overlayRecords = []
 for (const shape of [
   { name: 'hero-desktop-1440x900', width: 1440, height: 900 },
   { name: 'hero-mobile-390x844', width: 390, height: 844 },
@@ -261,18 +310,32 @@ for (const shape of [
 ]) {
   await page.setViewport({ width: shape.width, height: shape.height, deviceScaleFactor: 2 })
   await sleep(1400)
+  // A host overlay can (re)mount at any time (the sign-in wall appears late):
+  // clear it again before every shot and prove the board is what is on screen.
+  overlayRecords.push(await clearOverlays(shape.name))
+  await sleep(400)
   const box = await panelBox()
   if (box === null) { console.log('no panel for', shape.name); continue }
+  const reachable = await page.evaluate(() => {
+    const board = document.querySelector('.dsh-atb-board')
+    if (board === null) return { reachable: false }
+    const rect = board.getBoundingClientRect()
+    const hit = document.elementFromPoint(Math.round(rect.x + rect.width / 2), Math.round(rect.y + rect.height / 2))
+    return {
+      reachable: hit !== null && hit.closest('.dsh-atb-board') !== null,
+      hit: hit === null ? null : `${hit.tagName}.${String(hit.className).slice(0, 32)}`,
+    }
+  })
   const file = join(outDir, `${shape.name}.png`)
   await page.screenshot({ path: file, clip: { x: box.x, y: box.y, width: box.width, height: box.height } })
-  shots[shape.name] = { ...box, file }
-  console.log(shape.name, JSON.stringify(box))
+  shots[shape.name] = { ...box, theme, reachable, file }
+  console.log(shape.name, JSON.stringify({ ...box, reachable }))
 }
 
-writeFileSync(join(outDir, 'hero-shots.json'), JSON.stringify({ seed: seeded.ok, shots }, null, 2))
-const theme = await page.evaluate(() => ({
+const appliedTheme = await page.evaluate(() => ({
   dark: document.body.hasAttribute('data-ds-dark-theme'),
   scheme: getComputedStyle(document.documentElement).colorScheme,
 }))
-console.log('theme:', JSON.stringify(theme))
+console.log('theme:', JSON.stringify(appliedTheme))
+writeFileSync(join(outDir, 'hero-shots.json'), JSON.stringify({ seed: seeded.ok, requestedTheme: theme, appliedTheme, overlays: overlayRecords, shots }, null, 2))
 await browser.close()
