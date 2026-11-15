@@ -54,9 +54,9 @@
       "theme": "dark",
       "reachable": {
         "reachable": true,
-        "hit": "SPAN.dsh-atb-card-project-name"
+        "hit": "DIV.dsh-atb-card-title"
       },
-      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-010310\\hero-desktop-1440x900.png"
+      "file": "scripts\\qa\\reports\\hero-20261115-021919\\hero-desktop-1440x900.png"
     },
     "hero-mobile-390x844": {
       "x": 0,
@@ -86,7 +86,7 @@
         "reachable": true,
         "hit": "DIV.dsh-atb-cards"
       },
-      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-010310\\hero-mobile-390x844.png"
+      "file": "scripts\\qa\\reports\\hero-20261115-021919\\hero-mobile-390x844.png"
     },
     "hero-landscape-844x390": {
       "x": 56,
@@ -116,7 +116,7 @@
         "reachable": true,
         "hit": "DIV.dsh-atb-columns"
       },
-      "file": "D:\\App\\dsh-taskboard\\scripts\\qa\\reports\\hero-20261115-010310\\hero-landscape-844x390.png"
+      "file": "scripts\\qa\\reports\\hero-20261115-021919\\hero-landscape-844x390.png"
     }
   }
 }

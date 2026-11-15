@@ -5,6 +5,8 @@
 
 # dsh-taskboard
 
+<p align="center"><img src="img/hero.png" alt="DeepSeek Pastel 主题下的任务看板 — 五列桌面看板与移动端状态轮播（虚构演示数据，非真实项目）" width="100%"></p>
+
 > **贡献与 PR**：日常功能、修复和文档改动请从 `dev` 创建开发分支，提交 PR 时将目标分支（base）设为 **`dev`**。`main` 是受保护的稳定发布分支，维护者通过 `dev → main` 的 PR 集成发布；合入 `main` 前须通过 CI。
 
 DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、人验收。任务挂项目（workspace）、可指定模型与 preset、支持手动与定时执行，全流程双向协作。
@@ -53,11 +55,13 @@ DeepSeek Harness 的**任务看板插件**：人建卡、agent 认领执行、�
 
 ## 界面
 
-<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/board.png" alt="任务看板" width="880"></p>
+五列看板，DeepSeek Pastel 主题，桌面 1760 px（虚构演示数据）：
 
-<p align="center"><img src="img/hero.png" alt="Task Board in the DeepSeek Pastel theme — five-column desktop board and the mobile status carousel (demo data, no real project)" width="100%"></p>
+<p align="center"><img src="img/board.png" alt="任务看板 — 五列按功能分类着色，并按三个虚构演示项目分组" width="880"></p>
 
-<p align="center"><img src="https://raw.githubusercontent.com/cloader/dsh-taskboard/main/img/modal.png" alt="新建任务" width="440"></p>
+新建任务对话框，填入演示值：
+
+<p align="center"><img src="img/modal.png" alt="新建任务对话框 — 标题、项目、模型、紧急度、分类、描述与执行提示词" width="440"></p>
 
 ## 移动端与响应式
 

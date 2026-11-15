@@ -1,16 +1,20 @@
-# Hero screenshots with FICTIONAL data — no real project, path, task or person.
+# Screenshots with FICTIONAL data — no real project, path, task or person.
 #
 # Boots an isolated DSH home (cloned from the QA home so the plugin is already
 # linked), replaces its workspace registry with three invented projects, wipes
-# the board ledger, then runs `hero-capture.mjs`, which seeds the demo cards
-# through the real import route and captures the plugin panel alone.
+# the board ledger, then runs the requested capture script, which seeds the demo
+# cards through the real import route and shoots the plugin panel alone.
 #
-#   pwsh -File scripts/qa/hero-shots.ps1 [-Source <home>] [-HeroHome <home>] [-Port 64943] [-KeepHost]
+#   pwsh -File scripts/qa/hero-shots.ps1 [-Capture hero|readme] [-Source <home>]
+#        [-HeroHome <home>] [-Port 64943] [-Theme dark|light] [-KeepHost]
 #
-# Output: scripts/qa/reports/hero-<stamp>/{hero-desktop-1440x900,hero-mobile-390x844,
-# hero-landscape-844x390}.png + hero-shots.json + hero-seed.json
+# -Capture hero   → hero-desktop-1440x900 / hero-mobile-390x844 / hero-landscape-844x390
+# -Capture readme → board.png (desktop, 2× master) / new-task.png / phone.png
+#
+# Output: scripts/qa/reports/<capture>-<stamp>/… plus the capture's JSON report.
 
 param(
+  [ValidateSet('hero', 'readme')] [string] $Capture = 'hero',
   [string] $Source = (Join-Path $HOME 'dsh-tb-test'),
   [string] $HeroHome = (Join-Path $HOME 'dsh-hero'),
   [string] $ProfileName = 'tb',
@@ -63,6 +67,25 @@ $registry = [ordered]@{
 Step "writing fictional workspaces: $($projects.title -join ', ')"
 ($registry | ConvertTo-Json -Depth 10) | Set-Content (Join-Path $HeroHome 'storages\workspace.json') -Encoding utf8
 
+# 2b. The clone dereferences the QA home's plugin link into a full COPY of
+#     whichever checkout created it. Replace that copy with a junction to THIS
+#     tree, so a run started from a git worktree really serves that worktree's
+#     build. (No package-manager call: the plugin's own node_modules comes along
+#     with the junction, and the source QA home is never modified.)
+$linkPath = Join-Path $HeroHome "profiles\$ProfileName\node_modules\dsh-taskboard"
+if (Test-Path $linkPath) { Remove-Item $linkPath -Recurse -Force }
+New-Item -ItemType Junction -Path $linkPath -Target $script:Repo | Out-Null
+$profilePkg = Join-Path $HeroHome "profiles\$ProfileName\package.json"
+if (Test-Path $profilePkg) {
+  $pkg = Get-Content $profilePkg -Raw | ConvertFrom-Json
+  $expected = 'link:' + ($script:Repo -replace '\\', '/')
+  if ([string]$pkg.dependencies.'dsh-taskboard' -ne $expected) {
+    $pkg.dependencies.'dsh-taskboard' = $expected
+    ($pkg | ConvertTo-Json -Depth 10) | Set-Content $profilePkg -Encoding utf8
+  }
+}
+Step "plugin junction: $linkPath → $($script:Repo)"
+
 # 3. Boot the host on its own port.
 Remove-Item $script:BootLog, $script:ErrLog -ErrorAction SilentlyContinue
 $previous = $env:DSH_HOME
@@ -103,7 +126,7 @@ for ($i = 0; $i -lt 120; $i++) {
 }
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$outDir = Join-Path $script:Repo "scripts/qa/reports/hero-$stamp"
+$outDir = Join-Path $script:Repo "scripts/qa/reports/$Capture-$stamp"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $browser = @(
   'C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe',
@@ -117,10 +140,12 @@ $env:PTB_TOKEN = $token
 $env:PTB_OUT = $outDir
 $env:PTB_BROWSER = $browser
 $env:PTB_THEME = $Theme
-Step "capturing hero shots ($Theme theme) → $outDir"
-& node (Join-Path $PSScriptRoot 'hero-capture.mjs')
-if ($LASTEXITCODE -ne 0) { Fail "hero capture failed with exit code $LASTEXITCODE" }
-Info "hero shots written to $outDir"
+$env:PTB_LABEL = $Capture
+$captureScript = if ($Capture -eq 'readme') { 'readme-capture.mjs' } else { 'hero-capture.mjs' }
+Step "capturing $Capture shots ($Theme theme) with $captureScript → $outDir"
+& node (Join-Path $PSScriptRoot $captureScript)
+if ($LASTEXITCODE -ne 0) { Fail "$Capture capture failed with exit code $LASTEXITCODE" }
+Info "$Capture shots written to $outDir"
 
 if ($KeepHost) {
   Info "host kept alive at $base/?token=$token (kill port $Port when done)"

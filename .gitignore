@@ -20,4 +20,8 @@ _vlog.mjs
 # local review/tooling scratch
 .aionrs/
 
+# capture artifacts (scripts/qa/*.mjs write here; the curated evidence lives in
+# docs/design/ and img/, never in a timestamped report directory)
+scripts/qa/reports/
+
 coverage/

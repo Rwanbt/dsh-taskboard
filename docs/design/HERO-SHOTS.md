@@ -1,6 +1,8 @@
 # Hero screenshots — fictional data only
 
-Status: produced 2026-11-15 on `feat/mobile-focus-swipe-v2`. Assets: `docs/design/hero/`.
+Status: hero produced 2026-11-15 on `feat/mobile-focus-swipe-v2`; the README
+images were re-captured from `dev` on 2026-11-15 with `-Capture readme`. Assets:
+`docs/design/hero/` and `img/`.
 
 ## Why
 
@@ -57,10 +59,64 @@ the desktop panel and the phone on it with a caption.
 | `hero-landscape-844x390.png` | phone landscape panel (788×390, two columns per page) |
 | `metrics.json` | clip rectangles, card count, group labels, requested/applied theme (`dark: true`), overlay actions, per-shot `reachable` hit-test |
 
-Measured on the current dark run: desktop panel mean luminance **0.182**, canvas
-**0.137**, caption present (std 0.251 in its band); the sign-in wall was found once
+Measured on the current dark run: desktop panel mean luminance **0.181**, canvas
+**0.137**, caption present (std 0.161 in its band); the sign-in wall was found once
 and hidden (`overlays[0].hidden = ["_root_…"]`), and the board is the element under
 the cursor in the centre of all three captures.
+
+## README images
+
+The READMEs embed four PNGs from `img/`. Three of them are captured from the
+**current** build by the same harness — the fourth (`hero.png`) is the composed
+image described above:
+
+| File | Content | Source |
+| --- | --- | --- |
+| `img/hero.png` | 2560×1440 composition, dark stage, caption | `hero-compose.py` |
+| `img/board.png` | 1760×1200 desktop panel, five columns, category colours, grouped by the demo projects | `readme-capture.mjs` |
+| `img/modal.png` | 1062×725 new-task dialog, filled with demo values | `readme-capture.mjs` |
+| `img/phone.png` | 780×1592 phone portrait panel (mini column heads + carousel) | `readme-capture.mjs` |
+
+Until 2026-11-15 `img/board.png` and `img/modal.png` dated from **before** the
+DeepSeek Pastel UI existed, and the READMEs loaded them through
+`raw.githubusercontent.com/cloader/dsh-taskboard/…` (the upstream repository), so
+the page advertised a plugin nobody could see anymore. They are now captured from
+this branch and referenced with repository-relative paths.
+
+```powershell
+pwsh -File scripts/qa/hero-shots.ps1 -Capture readme -Theme dark   # isolated home, port 64943
+```
+
+`hero-shots.ps1` now links the cloned profile to **the checkout it runs from**
+(a junction, not a package-manager install), so a run started from a git worktree
+really serves that worktree's `lib/` — the shot cannot silently come from another
+tree. `readme-capture.mjs` then:
+
+1. seeds the same fictional ledger as the hero (`scripts/qa/demo-board.mjs`, shared
+   by both capture scripts) through `/import`, `mode=replace` — 30 cards created,
+   0 rejected;
+2. captures the panel at a 2040 px window: the host keeps a 280 px sidebar, so the
+   panel is exactly 1760 px — the halved master is 2× the README's `width="880"`;
+3. opens the new-task dialog, types demo values, blurs the caret and clips the
+   dialog alone (1062×725);
+4. repeats the portrait pass at 390×844 (panel 390×796).
+
+The masters are written at `deviceScaleFactor: 2` in
+`scripts/qa/reports/readme-<stamp>/` together with `readme-shots.json`. The
+desktop and dialog masters are then halved with `System.Drawing`
+(`HighQualityBicubic`) and copied over `img/`; the phone master is used as is
+(2× of its 390 px layout). `readme-shots.json` records, per shot, the clip
+rectangle, the hit-test proving the panel (or dialog) is what is under the
+cursor, the 30 cards spread over the five columns, the toolbar density (`wide`),
+the dialog's `mode`/title/submit state, and the phone's `data-atb-focus`,
+column count and active tab — no shot is accepted on faith.
+
+Measured on the current dark run: `img/board.png` mean luminance **0.178**
+(0.67 % near-white pixels), `img/modal.png` **0.137**, `img/phone.png` **0.195**;
+`reachable: true` on all three, dialog `mode=create` with the demo title typed,
+phone `focus=portrait`, 5 columns, 5 tabs, active tab `To do · 6`, and the theme
+applied (`dark: true`) — the host follows `prefers-color-scheme`, the plugin
+never forces a theme.
 
 ## Limits
 
