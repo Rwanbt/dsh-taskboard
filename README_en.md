@@ -10,7 +10,7 @@
 A **task board plugin for DeepSeek Harness**: humans create cards, agents claim and execute them, humans review and accept. Tasks live on projects (= workspaces), support per-task model & preset selection, and can run manually or on a cron schedule — full two-way collaboration from card to sign-off.
 
 - **Closed loop**: human creates a card → agent claims & executes → structured hand-off report → human accepts (✓ done / ✗ send back with a reason)
-- **10 `taskboard_*` agent tools** plus code-level protocol gates: agents can never move a task to *done*, held tasks cannot be snatched away, cross-project claims are rejected
+- **11 `taskboard_*` agent tools** plus code-level protocol gates: agents can never move a task to *done*, held tasks cannot be snatched away, cross-project claims are rejected
 - **Execution**: manual, one-shot scheduled, or host-side periodic cron runs (keep running when the browser closes); scheduled tasks can reuse an existing session in the selected project; periodic tasks can return to todo each round or keep a review record while creating the next todo card
 - **Git worktree isolation**: each run works on its own worktree + dedicated task branch, one-click merge at acceptance; parallel multi-repo workspaces are mirrored whole (0.6.3); non-git projects fall back automatically
 - **Efficient acceptance**: DoD acceptance checklists (agent checks items off with evidence), structured execution reports (summary / changed files / checks / artifacts / risks), in-board diff viewer
@@ -169,7 +169,7 @@ Available in any session. Project boundary: only sessions belonging to the task'
 - **Diff viewer (0.4.0)**: clicking a commit row or an uncommitted modified-file row in the isolation block expands a diff in-board (`git show` for commits, `git diff` for files, capped at 128 KB / 2000 lines with truncation noted); falls back to the main repo when the worktree is gone (commits and baseline-range diffs only)
 
 **Agent tools (`taskboard_*`)**
-- 10 tools: board / create / edit / move / comments / soft delete / checklist / execution report — usable from any session
+- 11 tools: board / create / edit / move / comments / soft delete / checklist / execution report — usable from any session
 - Code-level protocol gates: agents can never reach *done* (not even with every checklist item ticked); held tasks cannot be preempted; model/execution fields are read-only to agents
 
 **Execution**

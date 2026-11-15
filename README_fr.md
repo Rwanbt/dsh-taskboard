@@ -10,7 +10,7 @@
 Un **plugin de tableau de tâches pour DeepSeek Harness** : l'humain crée des cartes, les agents les prennent en charge et les exécutent, l'humain vérifie et valide. Les tâches sont rattachées à des projets (= espaces de travail), acceptent un choix de modèle et de preset par tâche, et peuvent s'exécuter manuellement ou selon une planification cron — une collaboration complète, de la carte à la validation.
 
 - **Boucle fermée** : l'humain crée une carte → l'agent la prend en charge et l'exécute → rapport de passation structuré → l'humain valide (✓ terminé / ✗ renvoyé avec une raison)
-- **10 outils agent `taskboard_*`** et des verrous au niveau du code : un agent ne peut jamais déplacer une tâche vers *done*, une tâche déjà tenue ne peut pas être ravie, les prises en charge hors projet sont refusées
+- **11 outils agent `taskboard_*`** et des verrous au niveau du code : un agent ne peut jamais déplacer une tâche vers *done*, une tâche déjà tenue ne peut pas être ravie, les prises en charge hors projet sont refusées
 - **Exécution** : manuelle, planifiée en une fois, ou périodique côté hôte via cron (continue même navigateur fermé) ; une tâche planifiée peut réutiliser une session existante du projet choisi ; une tâche périodique peut revenir en todo à chaque tour ou conserver un enregistrement de revue et créer la carte todo suivante
 - **Isolation par worktree Git** : chaque exécution travaille dans son propre worktree et sur une branche de tâche dédiée, avec fusion en un clic à la validation ; les espaces de travail multi-dépôts parallèles sont mis en miroir dans leur ensemble (0.6.3) ; les projets non git retombent automatiquement en mode sur place
 - **Validation efficace** : listes de contrôle d'acceptation (DoD) avec cases cochées et preuves, rapports d'exécution structurés (résumé / fichiers modifiés / vérifications / artefacts / risques), visualiseur de diff intégré au tableau
@@ -168,7 +168,7 @@ Disponibles dans toute session. Frontière de projet : seules les sessions appar
 - **Visualiseur de diff (0.4.0)** : cliquer sur une ligne de commit ou sur un fichier modifié non validé dans le bloc d'isolation déplie un diff dans le tableau (`git show` pour les commits, `git diff` pour les fichiers, plafonné à 128 Ko / 2000 lignes avec mention de troncature) ; retombe sur le dépôt principal quand le worktree a disparu (commits et diffs de plage de référence uniquement)
 
 **Outils agent (`taskboard_*`)**
-- 10 outils : tableau / création / édition / déplacement / commentaires / suppression douce / checklist / rapport d'exécution — utilisables depuis n'importe quelle session
+- 11 outils : tableau / création / édition / déplacement / commentaires / suppression douce / checklist / rapport d'exécution — utilisables depuis n'importe quelle session
 - Verrous de protocole au niveau du code : un agent ne peut jamais atteindre *done* (pas même avec tous les éléments de la liste cochés) ; les tâches tenues ne peuvent pas être préemptées ; les champs modèle/exécution sont en lecture seule pour les agents
 
 **Exécution**
